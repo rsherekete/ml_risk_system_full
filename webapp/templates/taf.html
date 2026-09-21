@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+{% block title %}TAF — Toxic Account Forecasting{% endblock %}
+{% block content %}
+<style>
+  .taf-lead { color: var(--accent); font-family: var(--mono); font-size: 13px;
+    letter-spacing: .02em; margin: 0 0 4px; }
+  .taf-head h1 { font-size: 23px; margin: 0 0 4px; letter-spacing: .01em; }
+  .taf-sub { color: var(--ink-faint); font-size: 13px; max-width: 900px; }
+  .taf-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 18px 0; }
+  .taf-kpi { background: rgba(13,18,32,.82); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent); border-radius: 12px; padding: 16px 18px; }
+  .taf-kpi .v { font-size: 27px; font-weight: 700; font-family: var(--mono); color: var(--ink); line-height: 1; }
+  .taf-kpi .v.gold { color: #E7C877; } .taf-kpi .v.pos { color: var(--pos); }
+  .taf-kpi .k { font-size: 11px; color: var(--ink-faint); margin-top: 7px; letter-spacing: .02em; }
+  .taf-sec { background: rgba(13,18,32,.7); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; }
+  .taf-sec h2 { font-size: 16px; margin: 0 0 3px; }
+  .taf-sec .hint { color: var(--ink-faint); font-size: 12px; margin: 0 0 14px; }
+  .setrow { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .setbox { flex: 1; min-width: 150px; border-radius: 10px; padding: 14px 16px; border: 1px solid; }
+  .setbox .lab { font-family: var(--mono); font-size: 12px; letter-spacing: .04em; }
+  .setbox .cnt { font-size: 22px; font-weight: 700; font-family: var(--mono); margin-top: 4px; }
+  .setbox.u { border-color: var(--border-bright); background: rgba(255,255,255,.03); }
+  .setbox.b { border-color: #26527d; background: rgba(38,82,125,.14); }
+  .setbox.c { border-color: #E7C877; background: rgba(231,200,119,.10); }
+  .setbox.a { border-color: var(--neg); background: rgba(255,77,109,.12); }
+  table.taf { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.taf th { text-align: right; color: var(--ink-faint); font-weight: 500; font-size: 11px;
+    letter-spacing: .05em; text-transform: uppercase; padding: 8px 10px; border-bottom: 1px solid var(--border-bright); }
+  table.taf th:first-child { text-align: left; }
+  table.taf td { text-align: right; padding: 9px 10px; border-bottom: 1px solid rgba(27,36,56,.55);
+    font-variant-numeric: tabular-nums; color: var(--ink-dim); }
+  table.taf td:first-child { text-align: left; color: var(--ink); }
+  .impbar { height: 8px; border-radius: 5px; background: linear-gradient(90deg,#C9A24B,#E7C877); }
+  .auc { color: var(--accent); font-weight: 600; }
+  .wl-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .wl-tab { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); cursor: pointer;
+    padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: rgba(13,18,32,.7); }
+  .wl-tab.on { background: linear-gradient(135deg,rgba(34,211,238,.2),rgba(124,140,255,.16)); color: var(--ink); border-color: var(--accent); }
+  .wl-action { font-family: var(--mono); font-size: 11px; color: #E7C877;
+    border: 1px solid rgba(231,200,119,.35); border-radius: 6px; padding: 3px 9px; }
+  .acct-link { font-family: var(--mono); color: var(--ink-dim); text-decoration: none; }
+  .acct-link:hover { color: var(--accent); }
+  .prob { color: var(--neg); font-weight: 600; }
+  .smart-grid { display: grid; grid-template-columns: 110px 1fr; gap: 8px 14px; }
+  .smart-grid b { color: var(--accent); font-family: var(--mono); font-size: 12px; }
+  .smart-grid span { font-size: 13px; color: var(--ink-dim); }
+</style>
+
+<div class="taf-head">
+  <p class="taf-lead">// toxic account forecasting — the anti-fraud framework</p>
+  <h1>TAF — predict the cost before it happens</h1>
+  <p class="taf-sub">Toxicity is a behaviour; <b>abuse is the cost</b>. This tab measures what
+    Toxic/Arbitrage accounts extract from the B-book, forecasts who becomes an abuser in the next
+    <b id="taf-n">5</b> days per class, recommends the action, and grades itself against ground truth.</p>
+</div>
+
+<div class="taf-nav" style="display:flex;gap:8px;margin:14px 0 4px">
+  <span class="taf-t on" data-t="overview" style="font-family:var(--mono);font-size:13px;cursor:pointer;padding:7px 16px;border-radius:999px;border:1px solid var(--border-bright);background:linear-gradient(135deg,rgba(34,211,238,.2),rgba(124,140,255,.16));color:var(--ink)">Overview</span>
+  <span class="taf-t" data-t="monitor" style="font-family:var(--mono);font-size:13px;cursor:pointer;padding:7px 16px;border-radius:999px;border:1px solid var(--border);background:rgba(13,18,32,.7);color:var(--ink-dim)">Monitor · predicted vs actual</span>
+</div>
+
+<div id="pane-overview">
+<div class="taf-kpis" id="taf-kpis">
+  <div class="taf-kpi"><div class="v" id="kpi-cost">—</div><div class="k">Addressable abuse / day — perfect oracle (upper bound)</div></div>
+  <div class="taf-kpi"><div class="v gold" id="kpi-rec">—</div><div class="k">Recoverable / day at 75% target</div></div>
+  <div class="taf-kpi"><div class="v pos" id="kpi-auc">—</div><div class="k">Mean out-of-sample model AUC</div></div>
+  <div class="taf-kpi"><div class="v" id="kpi-share">—</div><div class="k">of client winnings from Toxic/Arbitrage</div></div>
+</div>
+
+<div class="taf-sec">
+  <h2>The universe, split from first principles</h2>
+  <p class="hint">U = B ∪ C. A = C ∩ {net-profitable} — the abuse we act on. <span id="taf-window"></span></p>
+  <div class="setrow">
+    <div class="setbox u"><div class="lab" style="color:var(--ink-dim)">U — Universe</div><div class="cnt" id="set-u" style="color:var(--ink)">—</div></div>
+    <div class="setbox b"><div class="lab" style="color:#7fb0dd">B — B-Book (kept)</div><div class="cnt" id="set-b" style="color:#7fb0dd">—</div></div>
+    <div class="setbox c"><div class="lab" style="color:#E7C877">C — Toxic / Arbitrage</div><div class="cnt" id="set-c" style="color:#E7C877">—</div></div>
+    <div class="setbox a"><div class="lab" style="color:var(--neg)">A — Abuse (cost)</div><div class="cnt" id="set-a" style="color:var(--neg)">—</div></div>
+  </div>
+</div>
+
+<div class="taf-sec">
+  <h2>Cost by class — tackled in order of business impact</h2>
+  <p class="hint"><b>Cost/day</b> is the framework's windowed basis: profitable-toxic-week P&amp;L ÷ trading days.
+    <b>Today (live)</b> / <b>This week (live)</b> are day-level realised gains of accounts matching the class right now
+    (<span id="taf-today-date">latest day</span>).
+    <span style="color:#8b9ab4">Classes overlap — an account counts in every class it matches — so the rows sum to
+    <b>more</b> than the <b>Total</b> line, which counts each account once.</span></p>
+  <table class="taf"><thead><tr>
+    <th>Toxic / Arbitrage class</th><th>Abuse accts (A)</th>
+    <th>Cost / day (windowed)</th><th>Today (live)</th><th>This week (live)</th><th>Model AUC</th><th style="width:120px">Impact</th></tr></thead>
+    <tbody id="taf-classes"><tr><td colspan="7" style="text-align:center;color:var(--ink-faint)">loading…</td></tr></tbody>
+    <tfoot id="taf-classes-foot"></tfoot>
+  </table>
+</div>
+
+<div class="taf-sec">
+  <h2>Forecast watchlist — who becomes abuse in the next 5 days</h2>
+  <p class="hint">Per class, the accounts most likely to convert to Abuse, with the recommended action. Click an account to drill in.</p>
+  <div class="wl-tabs" id="wl-tabs"></div>
+  <div id="wl-action" style="margin-bottom:10px"></div>
+  <table class="taf"><thead><tr><th>Account</th><th>P(abuse within 5d)</th></tr></thead>
+    <tbody id="wl-rows"><tr><td colspan="2" style="color:var(--ink-faint)">select a class…</td></tr></tbody>
+  </table>
+</div>
+
+<div class="taf-sec">
+  <h2>Frontier — auto-discovery of new abuse classes</h2>
+  <p class="hint">Accounts that are profitable and consistent (predictable) yet fit <b>no</b> current class —
+    candidates to name a new class, or to act on early on the evidence.</p>
+  <table class="taf"><thead><tr><th>Account</th><th>Net USD</th><th>Active days</th><th>Consistency</th></tr></thead>
+    <tbody id="disc-rows"><tr><td colspan="4" style="color:var(--ink-faint)">loading…</td></tr></tbody>
+  </table>
+</div>
+
+<div class="taf-sec">
+  <h2>The SMART target</h2>
+  <div class="smart-grid">
+    <b>Specific</b><span>Detect accounts that become Abuse within 5 days, per class, and act (A-book / widen / restrict).</span>
+    <b>Measurable</b><span>Out-of-sample detection of Abuse-USD + precision; USD recovered/day vs the walk-forward baseline.</span>
+    <b>Achievable</b><span>Models already average <span id="smart-auc" class="auc">—</span> AUC — above the 0.75 bar — on Zeal's own history.</span>
+    <b>Relevant</b><span>Directly protects B-book P&L: <span id="smart-cost" style="color:var(--neg)">—</span>/day at stake today.</span>
+    <b>Time-bound</b><span>A 2-week live test, reported daily against realised ground truth, with a clear go / no-go.</span>
+  </div>
+</div>
+</div><!-- /pane-overview -->
+
+<div id="pane-monitor" style="display:none">
+  <div class="taf-kpis">
+    <div class="taf-kpi"><div class="v gold" id="mon-capture">—</div><div class="k">Out-of-sample abuse-USD captured — a week ahead (target ≥75%)</div></div>
+    <div class="taf-kpi"><div class="v" id="mon-prec">—</div><div class="k">Precision — of accounts flagged, share truly abusive</div></div>
+    <div class="taf-kpi"><div class="v" id="mon-rec">—</div><div class="k">Recall — share of abuse accounts caught</div></div>
+    <div class="taf-kpi"><div class="v pos" id="mon-capusd">—</div><div class="k">USD captured across the back-test weeks</div></div>
+  </div>
+
+  <div class="taf-sec">
+    <h2>Walk-forward — we predict the week before the money moves</h2>
+    <p class="hint">Each week is scored by a model trained <b>only on prior weeks</b>; the operating threshold is
+      calibrated on a held-out validation window, <b>never on the test weeks</b>. Bars = that week's perfect-oracle
+      abuse (the upper bound); the gold line = what the model flagged <b>a week ahead</b> and we would have captured.
+      <span id="mon-wf-note"></span></p>
+    <div id="mon-wf-chart" style="height:300px"></div>
+  </div>
+
+  <div class="taf-sec">
+    <h2>Predicted vs actual — by week (out-of-sample)</h2>
+    <p class="hint">The numbers behind the chart: what we flagged ahead of time, what actually became abuse, and the
+      USD captured against each week's perfect-oracle ceiling.</p>
+    <table class="taf"><thead><tr><th>ISO week</th><th>Flagged</th><th>Actual abusers</th><th>Precision</th>
+      <th>Recall</th><th>Captured (USD)</th><th>Upper bound</th><th>Capture %</th></tr></thead>
+      <tbody id="mon-wf-rows"><tr><td colspan="8" style="color:var(--ink-faint)">loading…</td></tr></tbody>
+      <tfoot id="mon-wf-foot"></tfoot>
+    </table>
+  </div>
+
+  <div class="taf-sec">
+    <h2>Cost by class — today's live values</h2>
+    <p class="hint">Realised gains of Toxic/Arbitrage accounts on the latest day (<span id="mon-today-date">latest day</span>) per class,
+      against the trailing day-level average — what the desk loses right now if these classes stay in the B-book.
+      <b id="mon-today-total" style="color:#E7C877"></b>.
+      <span style="color:#8b9ab4">Classes overlap, so the rows sum to more than the <b>Total (unique)</b> line, which counts each account once.</span></p>
+    <table class="taf"><thead><tr><th>Toxic / Arbitrage class</th><th>Today (live)</th><th>Accts today</th>
+      <th>Avg / day (live)</th><th>This week (live)</th><th style="width:120px">Today vs avg</th></tr></thead>
+      <tbody id="mon-today-rows"><tr><td colspan="6" style="color:var(--ink-faint)">loading…</td></tr></tbody>
+      <tfoot id="mon-today-foot"></tfoot>
+    </table>
+  </div>
+
+  <div class="taf-sec">
+    <h2>Operating point — the precision / capture dial</h2>
+    <p class="hint">Calibrated on validation to clear the 75% USD-capture target with margin for out-of-sample drift.
+      Lower the threshold to capture more abuse-USD (at lower precision); raise it to intervene more surgically.
+      The live operating point is highlighted.</p>
+    <table class="taf"><thead><tr><th>Threshold</th><th>USD capture</th><th>Precision</th><th>Recall (acct)</th><th>Flagged</th><th></th></tr></thead>
+      <tbody id="mon-frontier"><tr><td colspan="6" style="color:var(--ink-faint)">loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="taf-sec">
+    <h2>Addressable abuse — full weekly history (perfect oracle)</h2>
+    <p class="hint">The theoretical ceiling: every profitable toxic week A-booked with perfect foresight. The
+      walk-forward above is the fraction of this the live system captures a week in advance.</p>
+    <div id="mon-weekly-chart" style="height:240px"></div>
+  </div>
+  <div class="taf-sec">
+    <h2>Daily breakdown</h2>
+    <p class="hint">Abuse USD extracted per day (accounts inside a profitable toxic week).</p>
+    <div id="mon-daily-chart" style="height:200px"></div>
+  </div>
+
+  <div class="taf-sec">
+    <h2>Live log — scored as real weeks elapse in the pilot</h2>
+    <p class="hint">Once deployed, each day's watchlist is snapshotted and graded when its 5-day window closes — the
+      same precision / recall / USD as the back-test, but on genuinely forward predictions. Fills in as the pilot runs;
+      the walk-forward above is the honest expectation for these numbers.</p>
+    <table class="taf"><thead><tr><th>Snapshot</th><th>Flagged</th><th>Actual</th><th>Precision</th>
+      <th>Recall</th><th>Captured</th><th>Upper bound</th><th>Capture %</th></tr></thead>
+      <tbody id="mon-live"><tr><td colspan="8" style="color:var(--ink-faint)">no elapsed snapshots yet — the first scores land after ~1 week of live logging</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  const usd = v => { const n=Math.abs(Math.round(v||0));
+    return (v<0?'-$':'$') + (n>=1e6 ? (n/1e6).toFixed(1)+'M' : n>=1e3 ? (n/1e3).toFixed(0)+'k' : n); };
+  const full = v => '$' + Math.round(v||0).toLocaleString();
+  const NAMES = {persistent_edge:'Persistent edge', high_magnitude:'High magnitude',
+    scalper:'Scalper', news_vol:'News/Event/Vol', martingale:'Martingale',
+    high_exposure_recovery:'High-exposure / recovery', toxic_flow:'Toxic flow',
+    swap_arb:'Swap arb', bonus_arb:'Bonus arb'};
+
+  async function loadOverview(){
+    let d; try { d = await (await fetch('/api/taf/overview')).json(); } catch(e){ return; }
+    if (d.error) { document.getElementById('taf-classes').innerHTML =
+      `<tr><td colspan="7" style="color:var(--neg)">${d.error}</td></tr>`; return; }
+    if (d.computing && !(d.by_class||[]).length) {
+      document.getElementById('taf-classes').innerHTML =
+        `<tr><td colspan="7" style="text-align:center;color:var(--ink-faint)">cost accounting computing (~1–2 min)… auto-refreshing</td></tr>`;
+      setTimeout(loadOverview, 12000); return;
+    }
+    document.getElementById('taf-n').textContent = d.horizon;
+    document.getElementById('kpi-cost').textContent = usd(d.cost_per_day);
+    document.getElementById('kpi-rec').textContent = usd(d.recoverable_per_day);
+    document.getElementById('kpi-auc').textContent = (d.mean_auc||0).toFixed(2);
+    document.getElementById('kpi-share').textContent = Math.round((d.abuse_share_of_winnings||0)*100)+'%';
+    document.getElementById('set-u').textContent = (d.universe_accounts||0).toLocaleString();
+    document.getElementById('set-b').textContent = (d.B_accounts||0).toLocaleString();
+    document.getElementById('set-c').textContent = (d.C_accounts||0).toLocaleString();
+    document.getElementById('set-a').textContent = (d.A_accounts||0).toLocaleString();
+    document.getElementById('taf-window').textContent =
+      `Measured over ${d.n_days} trading days (${d.date_min} → ${d.date_max}); ${full(d.total_cost)} total.`;
+    document.getElementById('smart-auc').textContent = (d.mean_auc||0).toFixed(2);
+    document.getElementById('smart-cost').textContent = usd(d.cost_per_day);
+    if (d.latest_day) document.getElementById('taf-today-date').textContent = d.latest_day;
+    const max = Math.max(...d.by_class.map(c=>c.cost_per_day), 1);
+    document.getElementById('taf-classes').innerHTML = d.by_class.map(c=>`
+      <tr><td>${NAMES[c.class]||c.class}</td>
+        <td>${(c.A_accounts||0).toLocaleString()}</td>
+        <td style="color:var(--neg);font-weight:600">${usd(c.cost_per_day)}</td>
+        <td style="color:#E7C877;font-weight:700">${usd(c.live_today)}</td>
+        <td>${usd(c.live_week)}</td>
+        <td class="auc">${c.auc!=null?c.auc.toFixed(3):'—'}</td>
+        <td><div class="impbar" style="width:${Math.round(100*c.cost_per_day/max)}%"></div></td></tr>`).join('');
+    document.getElementById('taf-classes-foot').innerHTML = `
+      <tr style="border-top:2px solid var(--border-bright)">
+        <td style="font-weight:700;color:var(--ink)">Total — unique accounts (union)</td>
+        <td>${(d.A_accounts||0).toLocaleString()}</td>
+        <td style="color:var(--neg);font-weight:700">${usd(d.cost_per_day)}</td>
+        <td style="color:#E7C877;font-weight:700">${usd(d.cost_today)}</td>
+        <td style="font-weight:700">${usd(d.live_week_total)}</td>
+        <td></td><td></td></tr>`;
+  }
+
+  async function loadWatchlist(){
+    let d; try { d = await (await fetch('/api/taf/watchlist')).json(); } catch(e){ return; }
+    const tabs = document.getElementById('wl-tabs');
+    const classes = Object.keys(d.classes||{});
+    if (!classes.length) { document.getElementById('wl-rows').innerHTML =
+      `<tr><td colspan="2" style="color:var(--ink-faint)">${d.training?'models training in background — refresh shortly':'no classes'}</td></tr>`; return; }
+    tabs.innerHTML = classes.map((c,i)=>`<span class="wl-tab ${i===0?'on':''}" data-c="${c}">${NAMES[c]||c}</span>`).join('');
+    function show(cls){
+      const info = d.classes[cls];
+      document.getElementById('wl-action').innerHTML =
+        `<span class="wl-action">▶ ${info.action}</span> <span style="color:var(--ink-faint);font-size:11px;margin-left:8px">drivers: ${(info.drivers||[]).join(', ')}</span>`;
+      const wl = info.watchlist||[];
+      document.getElementById('wl-rows').innerHTML = wl.length ? wl.map(w=>`
+        <tr><td><a class="acct-link" href="/trading/account?account=${encodeURIComponent(w.account_key)}">${w.account_key} ↗</a></td>
+          <td class="prob">${(w.probability*100).toFixed(1)}%</td></tr>`).join('')
+        : `<tr><td colspan="2" style="color:var(--ink-faint)">no accounts above 5%</td></tr>`;
+    }
+    tabs.querySelectorAll('.wl-tab').forEach(t=>t.onclick=()=>{
+      tabs.querySelectorAll('.wl-tab').forEach(x=>x.classList.remove('on'));
+      t.classList.add('on'); show(t.dataset.c);
+    });
+    show(classes[0]);
+  }
+
+  async function loadDiscovery(){
+    let d; try { d = await (await fetch('/api/taf/discovery')).json(); } catch(e){ return; }
+    const rows = d.candidates||[];
+    document.getElementById('disc-rows').innerHTML = rows.length ? rows.map(r=>`
+      <tr><td><a class="acct-link" href="/trading/account?account=${encodeURIComponent(r.account_key)}">${r.account_key} ↗</a></td>
+        <td style="color:var(--pos)">${usd(r.net_usd)}</td>
+        <td>${r.active_days}</td>
+        <td>${r.consistency}</td></tr>`).join('')
+      : `<tr><td colspan="4" style="color:var(--ink-faint)">${d.error||'none found'}</td></tr>`;
+  }
+
+  // ---- tabs ----
+  let monLoaded = false;
+  document.querySelectorAll('.taf-t').forEach(t => t.onclick = () => {
+    document.querySelectorAll('.taf-t').forEach(x => {
+      x.classList.remove('on');
+      x.style.background = 'rgba(13,18,32,.7)'; x.style.color = 'var(--ink-dim)'; x.style.borderColor = 'var(--border)';
+    });
+    t.classList.add('on');
+    t.style.background = 'linear-gradient(135deg,rgba(34,211,238,.2),rgba(124,140,255,.16))';
+    t.style.color = 'var(--ink)'; t.style.borderColor = 'var(--border-bright)';
+    const m = t.dataset.t === 'monitor';
+    document.getElementById('pane-overview').style.display = m ? 'none' : '';
+    document.getElementById('pane-monitor').style.display = m ? '' : 'none';
+    if (m && !monLoaded) { monLoaded = true; loadMonitor(); }
+  });
+
+  async function loadMonitor(){
+    let d; try { d = await (await fetch('/api/taf/monitor')).json(); } catch(e){ return; }
+    if (d.computing && !(d.weekly||[]).length) {
+      document.getElementById('mon-wf-rows').innerHTML =
+        '<tr><td colspan="8" style="color:var(--ink-faint)">walk-forward computing (~1–2 min)… auto-refreshing</td></tr>';
+      setTimeout(()=>{ monLoaded=false; loadMonitor(); }, 12000); return;
+    }
+    const wf = d.walkforward||{}, ag = wf.aggregate||{}, wfw = wf.weekly||[];
+
+    // ---- headline walk-forward KPIs
+    if (wf.available && wfw.length){
+      document.getElementById('mon-capture').textContent = Math.round((ag.usd_capture_pct||0)*100)+'%';
+      document.getElementById('mon-prec').textContent = Math.round((ag.precision||0)*100)+'%';
+      document.getElementById('mon-rec').textContent = Math.round((ag.recall||0)*100)+'%';
+      document.getElementById('mon-capusd').textContent = usd(ag.captured_usd);
+      document.getElementById('mon-wf-note').textContent =
+        `Model: ${wf.n_features} features, trained on ${(wf.train_weeks||[]).length} weeks, `+
+        `validated on ${(wf.val_weeks||[]).length}, tested out-of-sample on ${(wf.test_weeks||[]).length} `+
+        `(${(wf.test_weeks||[])[0]}→${(wf.test_weeks||[]).slice(-1)[0]}); operating threshold ${wf.operating_threshold}.`;
+
+      // ---- walk-forward chart: bars = upper bound, gold line = captured ahead of time
+      window.zfxChart(document.getElementById('mon-wf-chart'), {
+        backgroundColor:'transparent', grid: zfxTheme.grid,
+        tooltip: Object.assign({trigger:'axis', valueFormatter:v=>'$'+Math.round(v).toLocaleString()}, zfxTheme.tooltip),
+        legend:{data:['Perfect-oracle upper bound','Captured a week ahead'],textStyle:{color:'#8b9ab4'},top:0},
+        xAxis: Object.assign({type:'category', data:wfw.map(w=>w.week)}, zfxTheme.axis),
+        yAxis: Object.assign({type:'value'}, zfxTheme.axis, {axisLabel:{formatter:v=>'$'+(v/1e6).toFixed(1)+'M',color:'#55637d',fontFamily:'JetBrains Mono',fontSize:10}}),
+        series:[
+          {name:'Perfect-oracle upper bound', type:'bar', data:wfw.map(w=>w.upper_usd),
+           itemStyle:{color:'rgba(201,162,75,.28)', borderColor:'rgba(201,162,75,.6)', borderWidth:1}},
+          {name:'Captured a week ahead', type:'line', data:wfw.map(w=>w.captured_usd),
+           smooth:true, symbol:'circle', symbolSize:6, lineStyle:{width:2.5,color:'#E7C877'}, itemStyle:{color:'#E7C877'},
+           areaStyle:{color:'rgba(231,200,119,.10)'}}]});
+
+      // ---- per-week table + aggregate footer
+      document.getElementById('mon-wf-rows').innerHTML = wfw.map(w=>`
+        <tr><td>${w.week}</td><td>${w.flagged.toLocaleString()}</td><td>${w.actual.toLocaleString()}</td>
+          <td class="auc">${Math.round(w.precision*100)}%</td><td class="auc">${Math.round(w.recall*100)}%</td>
+          <td style="color:var(--pos);font-weight:600">${full(w.captured_usd)}</td><td>${full(w.upper_usd)}</td>
+          <td style="color:#E7C877;font-weight:600">${Math.round(w.capture_pct*100)}%</td></tr>`).join('');
+      document.getElementById('mon-wf-foot').innerHTML = `
+        <tr style="border-top:2px solid var(--border-bright)">
+          <td style="font-weight:700;color:var(--ink)">Aggregate (OOS)</td>
+          <td>${(ag.flagged||0).toLocaleString()}</td><td>${(ag.actual||0).toLocaleString()}</td>
+          <td class="auc" style="font-weight:700">${Math.round((ag.precision||0)*100)}%</td>
+          <td class="auc" style="font-weight:700">${Math.round((ag.recall||0)*100)}%</td>
+          <td style="color:var(--pos);font-weight:700">${full(ag.captured_usd)}</td>
+          <td style="font-weight:700">${full(ag.upper_usd)}</td>
+          <td style="color:#E7C877;font-weight:700">${Math.round((ag.usd_capture_pct||0)*100)}%</td></tr>`;
+
+      // ---- frontier (operating-point dial)
+      const thr = wf.operating_threshold;
+      document.getElementById('mon-frontier').innerHTML = (wf.frontier||[]).map(r=>{
+        const on = Math.abs(r.threshold-thr) < 1e-6;
+        return `<tr style="${on?'background:rgba(231,200,119,.10)':''}">
+          <td style="${on?'color:#E7C877;font-weight:700':''}">${r.threshold.toFixed(2)}${on?' ◀ live':''}</td>
+          <td style="color:#E7C877">${Math.round(r.usd_capture_pct*100)}%</td>
+          <td class="auc">${Math.round(r.precision*100)}%</td>
+          <td>${Math.round(r.recall*100)}%</td>
+          <td>${r.flagged.toLocaleString()}</td>
+          <td><div class="impbar" style="width:${Math.round(r.usd_capture_pct*100)}%;background:${r.usd_capture_pct>=(wf.target_acc||.75)?'linear-gradient(90deg,#2f9e6f,#3ddc97)':'linear-gradient(90deg,#C9A24B,#E7C877)'}"></div></td></tr>`;
+      }).join('');
+    } else {
+      document.getElementById('mon-wf-rows').innerHTML =
+        '<tr><td colspan="8" style="color:var(--ink-faint)">walk-forward unavailable ('+(wf.note||'insufficient history')+')</td></tr>';
+    }
+
+    // ---- cost by class, today's live values (day-level basis, internally consistent)
+    const bc = (d.by_class||[]).slice().sort((a,b)=>(b.live_today||0)-(a.live_today||0));
+    if (d.latest_day){ document.getElementById('mon-today-date').textContent = d.latest_day; }
+    document.getElementById('mon-today-total').textContent =
+      `${usd(d.cost_today)} live today across ${(d.today_accounts||0).toLocaleString()} accounts`;
+    document.getElementById('mon-today-rows').innerHTML = bc.length ? bc.map(c=>{
+      const ratio = (c.live_avg_daily>0) ? (c.live_today/c.live_avg_daily) : 0;
+      const hot = ratio>=1;
+      return `<tr><td>${NAMES[c.class]||c.class}</td>
+        <td style="color:#E7C877;font-weight:700">${full(c.live_today)}</td>
+        <td>${(c.today_accounts||0).toLocaleString()}</td>
+        <td>${usd(c.live_avg_daily)}</td>
+        <td>${usd(c.live_week)}</td>
+        <td style="color:${hot?'var(--neg)':'var(--pos)'};font-weight:600">${(ratio*100).toFixed(0)}%${hot?' ▲':' ▼'}</td></tr>`;
+    }).join('') : '<tr><td colspan="6" style="color:var(--ink-faint)">no class costs</td></tr>';
+    document.getElementById('mon-today-foot').innerHTML = `
+      <tr style="border-top:2px solid var(--border-bright)">
+        <td style="font-weight:700;color:var(--ink)">Total (unique accounts)</td>
+        <td style="color:#E7C877;font-weight:700">${full(d.cost_today)}</td>
+        <td>${(d.today_accounts||0).toLocaleString()}</td>
+        <td>${usd(d.live_avg_daily_total)}</td>
+        <td>${usd(d.live_week_total)}</td>
+        <td></td></tr>`;
+
+    // ---- perfect-oracle context: full weekly history + daily
+    const wk = d.weekly||[];
+    window.zfxChart(document.getElementById('mon-weekly-chart'), {
+      backgroundColor:'transparent', grid: zfxTheme.grid,
+      tooltip: Object.assign({trigger:'axis', valueFormatter:v=>'$'+Math.round(v).toLocaleString()}, zfxTheme.tooltip),
+      xAxis: Object.assign({type:'category', data:wk.map(w=>w.week)}, zfxTheme.axis),
+      yAxis: Object.assign({type:'value'}, zfxTheme.axis, {axisLabel:{formatter:v=>'$'+(v/1e6).toFixed(1)+'M',color:'#55637d',fontFamily:'JetBrains Mono',fontSize:10}}),
+      series:[{name:'Addressable abuse', type:'bar', data:wk.map(w=>w.abuse_usd),
+        itemStyle:{color:'rgba(201,162,75,.5)', borderColor:'#C9A24B', borderWidth:1}}]});
+    const dy = d.daily||[];
+    window.zfxChart(document.getElementById('mon-daily-chart'), {
+      backgroundColor:'transparent', grid: zfxTheme.grid,
+      tooltip: Object.assign({trigger:'axis', valueFormatter:v=>'$'+Math.round(v).toLocaleString()}, zfxTheme.tooltip),
+      xAxis: Object.assign({type:'category', data:dy.map(x=>x.day), axisLabel:{color:'#55637d',fontSize:9,fontFamily:'JetBrains Mono'}}, zfxTheme.axis),
+      yAxis: Object.assign({type:'value'}, zfxTheme.axis, {axisLabel:{formatter:v=>'$'+(v/1e3).toFixed(0)+'k',color:'#55637d',fontFamily:'JetBrains Mono',fontSize:10}}),
+      series:[{type:'line', data:dy.map(x=>x.abuse_usd), smooth:true, symbol:'none',
+        areaStyle:{color:'rgba(255,77,109,.12)'}, lineStyle:{width:2,color:'#ff4d6d'}}]});
+
+    const live = d.live||[];
+    if (live.length) document.getElementById('mon-live').innerHTML = live.slice().reverse().map(r=>`
+      <tr><td>${r.snapshot}</td><td>${r.flagged}</td><td>${r.actual}</td>
+        <td class="auc">${(r.precision*100).toFixed(0)}%</td><td class="auc">${(r.recall*100).toFixed(0)}%</td>
+        <td style="color:var(--pos)">${usd(r.captured_usd)}</td><td>${usd(r.upper_usd)}</td>
+        <td style="color:#E7C877">${(r.capture_pct*100).toFixed(0)}%</td></tr>`).join('');
+  }
+
+  loadOverview(); loadWatchlist(); loadDiscovery();
+})();
+</script>
+{% endblock %}

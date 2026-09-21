@@ -1,0 +1,48 @@
+# Anti-Fraud Engine web application — runtime dependencies.
+#
+# Pinned to the versions the application is actually running on (captured from
+# the working environment on 2026-09-18), because two of them are not
+# interchangeable across majors: pandas 3.x changed enough of the frame API
+# that the markout and feature code is written against it, and duckdb's file
+# format is tied to its minor version — an older duckdb cannot open the tick
+# store written by 1.5.
+#
+# The repository's older `requirements.txt` belongs to the notebook/analysis
+# side of this tree (streamlit, jupyterlab, altair) and does NOT install the
+# web application. Use this file for a server deployment.
+#
+#     python -m venv .venv
+#     .venv/bin/pip install -r requirements-webapp.txt      # Linux/macOS
+#     .venv\Scripts\pip install -r requirements-webapp.txt  # Windows
+
+# --- web layer
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn==0.53.0
+jinja2==3.1.6
+python-multipart==0.0.32      # required for the login form POST
+bcrypt==5.0.0                 # password hashing
+
+# --- data layer
+pandas==3.0.5
+numpy==2.5.3
+pyarrow==25.0.1               # parquet artefacts
+duckdb==1.5.5                 # tick/quote store — SINGLE WRITER, see below
+SQLAlchemy==2.0.53
+PyMySQL==1.2.0                # MT4/MT5 broker databases
+
+# --- models
+scikit-learn==1.9.1
+scipy==1.18.1
+lightgbm==4.7.0
+
+# --- ingest and misc
+confluent-kafka==2.15.1       # MT4 millisecond execution events
+PyYAML==6.0.3
+requests==2.34.2
+python-dateutil==2.9.0.post0
+matplotlib==3.11.2
+
+# NOT included, and deliberately: google-cloud-bigquery. The warehouse client
+# is optional — without it the IB rebate figures are reported as unavailable
+# rather than wrong. Add it only when the deployment has DWH credentials.

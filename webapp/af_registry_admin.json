@@ -1,0 +1,94 @@
+{
+  "categories": [
+    {
+      "key": "latency_arbitrage",
+      "label": "Latency Arbitrage",
+      "order": 1,
+      "active": true,
+      "use_ml": true,
+      "definition": "med_hold_s <= 60 and fast_win_rate >= 0.55 and profit_per_min > 0",
+      "description": "Dealing on stale quotes: tick-tape-proved entry markouts, fast holds, extraction. ML target = tape-proved labels."
+    },
+    {
+      "key": "news_vol",
+      "label": "News/Event/Vol",
+      "order": 2,
+      "active": true,
+      "use_ml": true,
+      "definition": "event_trades >= 5 and event_pnl > 0",
+      "description": "Profitable activity on the fixed event calendar (macro prints + market-derived synchronized-volatility minutes). ML target = the rule holding over the next 5 days with client equity rising."
+    },
+    {
+      "key": "persistent_edge",
+      "label": "Persistent Edge",
+      "order": 3,
+      "active": true,
+      "use_ml": true,
+      "definition": "profit_factor >= 1.4 and win_rate >= 0.55 and n_trades >= 50",
+      "description": "Sustained statistically meaningful profitability."
+    },
+    {
+      "key": "toxic_flow",
+      "label": "Toxic Flow",
+      "order": 4,
+      "active": true,
+      "use_ml": false,
+      "definition": "mk_short > 0 and mk_trades >= 30",
+      "description": "Positive short-horizon markout: fills that are adverse selection against the book."
+    },
+    {
+      "key": "high_magnitude",
+      "label": "High Magnitude",
+      "order": 5,
+      "active": true,
+      "use_ml": false,
+      "definition": "notional_z >= 2",
+      "description": "Position sizes far above peer scale."
+    },
+    {
+      "key": "scalper",
+      "label": "Scalper",
+      "order": 6,
+      "active": true,
+      "use_ml": false,
+      "definition": "scalp_rate >= 0.6",
+      "description": "Dominantly sub-2-minute round trips."
+    },
+    {
+      "key": "bonus_arb",
+      "label": "Bonus Arbitrage",
+      "order": 7,
+      "active": true,
+      "use_ml": false,
+      "definition": "bonus_extraction >= 0.9 and life_pnl > 0 and life_days_active <= 20 and life_profit_factor >= 1.5",
+      "description": "Deposit-bonus extraction patterns."
+    },
+    {
+      "key": "swap_arb",
+      "label": "Swap Arbitrage",
+      "order": 8,
+      "active": true,
+      "use_ml": false,
+      "definition": "swap_capture_rate >= 0.5",
+      "description": "Positioning purely for swap capture."
+    },
+    {
+      "key": "martingale",
+      "label": "Martingale",
+      "order": 9,
+      "active": true,
+      "use_ml": false,
+      "definition": "martingale_rate >= 0.4",
+      "description": "Loss-doubling size escalation."
+    },
+    {
+      "key": "high_exposure_recovery",
+      "label": "High Exposure / Recovery",
+      "order": 10,
+      "active": true,
+      "use_ml": false,
+      "definition": "notional_z >= 1 and overnight_share >= 0.3",
+      "description": "Oversized positions held to recover drawdowns."
+    }
+  ]
+}

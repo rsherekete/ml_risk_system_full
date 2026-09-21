@@ -1,0 +1,255 @@
+{# Risk monitoring: settled history for a chosen day, then the live stream.
+   The two are never blended -- one is warehouse fact, the other is only
+   meaningful while the consumer is connected, and a stale live number is more
+   dangerous than an absent one. #}
+
+<form method="get" class="toolbar">
+  <div>
+    <label for="day">Risk date</label>
+    <select id="day" name="day" onchange="this.form.submit()">
+      {% for d in days %}<option value="{{ d }}" {{ 'selected' if d == selected_day }}>{{ d }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="hedge">Hedge policy</label>
+    <select id="hedge" name="hedge" onchange="this.form.submit()">
+      {# 0% is the flat-book case: everything B-booked, nothing hedged. It is the
+         benchmark every other policy is judged against, so it belongs in the
+         same control rather than being a separate screen. #}
+      <option value="0" {{ 'selected' if config.hedge_fraction == 0 }}>0% &mdash; flat book (nothing hedged)</option>
+      {% for value in [0.02, 0.05, 0.10, 0.20] %}
+        <option value="{{ value }}" {{ 'selected' if config.hedge_fraction == value }}>{{ '{:.0%}'.format(value) }} hedged</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div style="flex:1"></div>
+  <div style="text-align:right;font-size:11px;color:var(--ink-faint);line-height:1.5">
+    <div>Warehouse data to <b style="color:var(--ink-dim)">{{ days[0] if days else '--' }}</b></div>
+    <div id="refreshed">rendered just now</div>
+  </div>
+</form>
+
+{% if data_age and data_age > 1 %}
+<div class="alert alert-info" style="display:flex;align-items:center;gap:14px">
+  <div style="flex:1">
+    <b>Warehouse is {{ data_age }} days behind.</b> Historical panels end at
+    {{ days[0] if days else '--' }}; the live stream below is current.
+    An incremental refresh reads only what is new, with a 3-day overlap to
+    recover amended trades.
+  </div>
+  {% if user.is_admin %}
+  <form method="post" action="/data/refresh" style="margin:0">
+    <input type="hidden" name="database" value="">
+    <input type="hidden" name="days" value="0">
+    <button class="btn-primary btn-sm" type="submit">Refresh now</button>
+  </form>
+  {% else %}
+  <a class="btn btn-sm" href="/data">View warehouse</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if risk and not risk.empty %}
+<div class="grid cols-4" style="margin-bottom:14px">
+  <div class="panel stat">
+    <span class="label">Firm P&amp;L &mdash; {{ risk.day }}</span>
+    <span class="value {{ 'pos' if risk.firm_pnl >= 0 else 'neg' }}">${{ '{:,.0f}'.format(risk.firm_pnl) }}</span>
+    <span class="delta dim">
+      {% if risk.percentile is not none %}{{ '{:.0%}'.format(risk.percentile) }} percentile of all days{% endif %}
+    </span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Historical VaR 95%</span>
+    <span class="value neg">${{ '{:,.0f}'.format(risk.var.var_95) if risk.var else 0 }}</span>
+    <span class="delta dim">ES ${{ '{:,.0f}'.format(risk.var.es_95) if risk.var else 0 }}</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Historical VaR 99%</span>
+    <span class="value neg">${{ '{:,.0f}'.format(risk.var.var_99) if risk.var else 0 }}</span>
+    <span class="delta dim">ES ${{ '{:,.0f}'.format(risk.var.es_99) if risk.var else 0 }}</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Largest single payout</span>
+    <span class="value neg">${{ '{:,.0f}'.format(risk.largest_single_payout) }}</span>
+    <span class="delta dim">worst single account that day</span>
+  </div>
+</div>
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>Risk measurement note</h2>
+  <p class="hint" style="margin:0">
+    VaR here is <b>historical, not parametric</b>. Client P&amp;L is violently
+    heavy-tailed &mdash; the top 1% of winning account-days carry roughly 40% of all
+    winner dollars &mdash; so a normal approximation would report a comfortable number
+    precisely on the days that matter. These are empirical quantiles of the actual
+    daily series over {{ risk.var.days if risk.var else 0 }} days, with expected shortfall
+    (the average loss <i>given</i> the threshold is breached) beside each one.
+  </p>
+</div>
+
+<div class="grid cols-2" style="margin-bottom:14px">
+  <div class="panel">
+    <h2>Rolling risk</h2>
+    <p class="hint">Cumulative P&amp;L against rolling volatility and 30-day VaR. A profitable
+      stretch that was violent is a different book from a calm one at the same total.</p>
+    <div id="risk-timeline" class="chart chart-tall"></div>
+  </div>
+  <div class="panel">
+    <h2>Concentration &mdash; {{ risk.day }}</h2>
+    <p class="hint">
+      Two books with the same P&amp;L carry different risk if one earns it from three
+      clients. Herfindahl
+      <b>{{ '%.4f'|format(risk.by_account.herfindahl) if risk.by_account else 0 }}</b>;
+      top account
+      <b>{{ '{:.1%}'.format(risk.by_account.top1_share) if risk.by_account else 0 }}</b>
+      of the day's profit, top ten
+      <b>{{ '{:.1%}'.format(risk.by_account.top10_share) if risk.by_account else 0 }}</b>.
+    </p>
+    <table>
+      <thead><tr><th>Account</th><th class="num">Firm P&amp;L</th><th class="num">Share</th></tr></thead>
+      <tbody>
+      {% for row in (risk.by_account.top_names if risk.by_account else [])[:10] %}
+        <tr>
+          <td><a href="/trading/account?account={{ row.name }}"
+                 style="font-family:var(--mono);font-size:11px">{{ row.name }}</a></td>
+          <td class="num {{ 'pos' if row.firm_pnl >= 0 else 'neg' }}">${{ '{:,.0f}'.format(row.firm_pnl) }}</td>
+          <td class="num">{{ '{:.1%}'.format(row.share) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid cols-4" style="margin-bottom:14px">
+  <div class="panel stat">
+    <span class="label">Accounts active</span>
+    <span class="value">{{ '{:,}'.format(risk.accounts) }}</span>
+    <span class="delta dim">{{ '{:,}'.format(risk.rows) }} rows</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Client win rate</span>
+    <span class="value">{{ '{:.1%}'.format(risk.win_rate) }}</span>
+    <span class="delta dim">that day</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Worst day on record</span>
+    <span class="value neg">${{ '{:,.0f}'.format(risk.var.worst_day) if risk.var else 0 }}</span>
+    <span class="delta dim">{{ '{:.0%}'.format(risk.var.losing_day_share) if risk.var else 0 }} of days lost money</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Under hedge policy</span>
+    <span class="value {{ 'pos' if risk.firm_pnl_hedged >= risk.firm_pnl else 'neg' }}">
+      ${{ '{:,.0f}'.format(risk.firm_pnl_hedged) }}</span>
+    <span class="delta {{ 'pos' if risk.firm_pnl_hedged >= risk.firm_pnl else 'neg' }}">
+      {{ '{:+,.0f}'.format(risk.firm_pnl_hedged - risk.firm_pnl) }} vs unhedged</span>
+  </div>
+</div>
+{% endif %}
+
+<div class="panel" id="live-status" style="margin-bottom:14px">
+  <div class="panel-head">
+    <h2>Live stream</h2>
+    <div class="live-controls" data-live="risk"></div>
+  </div>
+  <div class="empty" id="status-body">
+    <div class="skeleton skeleton-row" style="width:60%;margin:0 auto 9px"></div>
+    <div class="skeleton skeleton-row" style="width:40%;margin:0 auto"></div>
+  </div>
+</div>
+
+<div class="grid cols-2" id="live-charts" style="display:none">
+  <div class="panel">
+    <h2>Live activity</h2>
+    <p class="hint">Events and distinct accounts per hour from the event stream.</p>
+    <div id="activity" class="chart"></div>
+  </div>
+  <div class="panel">
+    <h2>Live exposure by symbol</h2>
+    <p class="hint">Volume over the retained window. Cash movements are excluded from P&amp;L.</p>
+    <div id="exposure" class="chart"></div>
+  </div>
+</div>
+
+<div class="panel" id="ohlc-panel" style="display:none;margin-top:14px">
+  <h2>Price &mdash; <span id="ohlc-symbol">--</span></h2>
+  <p class="hint">Built from the live quote stream. Candles are real OHLC over the chosen bar width.</p>
+  <div class="toolbar" style="margin-bottom:10px">
+    <div>
+      <label for="ohlc-sym">Instrument</label>
+      <select id="ohlc-sym" onchange="loadOhlc()"></select>
+    </div>
+    <div>
+      <label for="ohlc-tf">Timeframe</label>
+      <select id="ohlc-tf" onchange="loadOhlc()">
+        <option value="1">1 minute</option>
+        <option value="5" selected>5 minutes</option>
+        <option value="15">15 minutes</option>
+        <option value="60">1 hour</option>
+        <option value="240">4 hours</option>
+        <option value="1440">1 day</option>
+      </select>
+    </div>
+    <div>
+      <label for="ohlc-window">Lookback</label>
+      <select id="ohlc-window" onchange="loadOhlc()">
+        <option value="6">6 hours</option>
+        <option value="24" selected>24 hours</option>
+        <option value="72">3 days</option>
+        <option value="168">7 days</option>
+      </select>
+    </div>
+  </div>
+  <div id="ohlc" class="chart chart-tall"></div>
+</div>
+
+<div class="panel" id="live-table" style="display:none;margin-top:14px">
+  <h2>Live symbol breakdown</h2>
+  <p class="hint">
+    Value at Risk per instrument at three horizons, computed from the
+    <b>event stream</b> &mdash; so it covers only instruments that have traded since the
+    consumer connected, which is far fewer than the full book. For complete
+    exposure across every instrument, use the
+    <a href="/{{ view }}/exposure">Exposure</a> tab, which reads the servers' own
+    position tables.
+    <span class="def" data-def="{{ define('var_multi_day') }}">Multi-day figures are scaled by the square root of time</span>,
+    so they assume independent daily moves and are a floor rather than a worst case.
+    Deselect symbols to focus the chart above.
+  </p>
+  <div class="chip-group" id="symbol-chips"></div>
+  <div class="table-scroll">
+    <table>
+      <thead><tr>
+        <th>Symbol</th>
+        <th class="num"><span class="def" data-def="{{ define('events') }}">Events</span></th>
+        <th class="num"><span class="def" data-def="{{ define('accounts') }}">Accounts</span></th>
+        <th class="num">Volume</th>
+        <th class="num"><span class="def" data-def="{{ define('firm_pnl') }}">Firm P&amp;L</span></th>
+        <th class="num"><span class="def def-right" data-def="{{ define('var') }}">VaR 1d</span></th>
+        <th class="num">VaR 5d</th><th class="num">VaR 20d</th>
+      </tr></thead>
+      <tbody id="exposure-rows"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel" id="positions-panel" style="margin-top:14px">
+  <div class="panel-head">
+    <h2>Open positions <span id="positions-source" class="pill">checking</span></h2>
+    <div class="live-controls" data-live="positions"></div>
+  </div>
+  <p class="hint">
+    Read from each server's own position table &mdash; the whole book, including
+    positions opened before the stream's retention window. Gross lots is total
+    size regardless of side; net is directional exposure.
+  </p>
+  <div class="table-scroll" style="max-height:400px">
+    <table>
+      <thead><tr><th>Server</th><th>Symbol</th>
+        <th class="num"><span class="def" data-def="{{ define('accounts') }}">Accounts</span></th>
+        <th class="num">Positions</th><th class="num">Gross lots</th>
+        <th class="num">Net lots</th><th class="num">Floating P&amp;L</th></tr></thead>
+      <tbody id="positions-rows"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>

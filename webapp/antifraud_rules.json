@@ -1,0 +1,47 @@
+{
+  "persistent_edge": {
+    "profit_factor": 1.1,
+    "min_trades": 20,
+    "pf_strong": 1.6
+  },
+  "toxic_flow": {
+    "min_trades": 50,
+    "markout_bad": 0,
+    "toxic_pf": 1.2
+  },
+  "high_magnitude": {
+    "notional_z": 2,
+    "hold_hours": 24
+  },
+  "scalper": {
+    "under_5m_share": 0.1,
+    "min_trades": 30
+  },
+  "news_vol": {
+    "event_pnl_dependency": 0.4
+  },
+  "bonus_arb": {
+    "credit_to_equity": 0.5
+  },
+  "swap_arb": {
+    "swap_dependency": 0.4,
+    "min_hold_days": 3
+  },
+  "martingale": {
+    "escalation_rate": 0.15,
+    "min_sequences": 5
+  },
+  "high_exposure_recovery": {
+    "exposure_to_equity": 3
+  },
+  "_global": {
+    "short_term_profit_flag": 0
+  },
+  "_custom": [],
+  "_alerts": {
+    "autopilot": false,
+    "min_priority": 60,
+    "digest_hour_london": 7,
+    "poll_minutes": 5
+  }
+}

@@ -1,0 +1,125 @@
+{# Net notional exposure. P&L says what happened; this says what could happen
+   next, and a book flat on the day may still be carrying size into tomorrow. #}
+<div class="page-head">
+  <h1>Exposure</h1>
+  <p>Net and gross notional by instrument &mdash; what the firm is carrying, and how it got here.</p>
+</div>
+
+<form class="toolbar" onsubmit="return false">
+  <div>
+    <label for="as-at">As at</label>
+    <select id="as-at" onchange="loadLive()">
+      <option value="">Live &mdash; right now</option>
+      {% for d in days or [] %}<option value="{{ d }}">{{ d }} (end of day)</option>{% endfor %}
+    </select>
+  </div>
+  <div style="flex:1"></div>
+  <div class="live-controls" data-live="exposure"></div>
+</form>
+
+<div class="alert alert-info" id="basis-note" style="font-size:12px">
+  <b>Live</b> reads each server's own position table, so it includes positions opened
+  before any stored history. <b>End-of-day</b> reconstructs the book from the warehouse
+  &mdash; positions opened on or before that date and not yet closed &mdash; so it can only
+  see what the warehouse holds.
+</div>
+
+<div class="grid cols-4" style="margin-bottom:14px">
+  <div class="panel stat">
+    <span class="label">Net notional</span>
+    <span class="value" id="total-net">--</span>
+    <span class="delta dim">direction-weighted &mdash; the actual exposure</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Gross notional</span>
+    <span class="value dim" id="total-gross">--</span>
+    <span class="delta dim">total size regardless of side</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Instruments</span>
+    <span class="value" id="total-symbols">--</span>
+    <span class="delta dim" id="exposure-source">loading</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Alerts</span>
+    <span class="value" id="alert-count">--</span>
+    <span class="delta dim">limit and concentration breaches</span>
+  </div>
+</div>
+
+<div id="alerts-panel" class="panel" style="display:none;margin-bottom:14px">
+  <h2>Breaches</h2>
+  <p class="hint">Two independent tests: an absolute net limit catches a book that is
+    simply too large one way; a concentration share catches one diversified in name only.</p>
+  <div id="alerts"></div>
+</div>
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>Current exposure by instrument</h2>
+  <p class="hint">
+    Click a bar's symbol below to include or exclude it. <b>Net share</b> is net over
+    gross: near 1 means the book is one-directional in that instrument, near 0 means
+    longs and shorts offset.
+  </p>
+  <div class="chip-group" id="exposure-chips"></div>
+  <div id="exposure-chart" class="chart chart-tall"></div>
+</div>
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>Historical net notional</h2>
+  <p class="hint">
+    Running exposure from position opens and closes. Defaults to every instrument;
+    deselect above to focus. Warehouse-backed, so it extends as far as the store does.
+  </p>
+  <div class="toolbar" style="margin-bottom:10px">
+    <div>
+      <label for="hist-days">Window</label>
+      <select id="hist-days" onchange="loadHistory()">
+        <option value="30">30 days</option>
+        <option value="90" selected>90 days</option>
+        <option value="365">1 year</option>
+        <option value="730">2 years</option>
+      </select>
+    </div>
+    <div>
+      <label for="hist-freq">Granularity</label>
+      <select id="hist-freq" onchange="loadHistory()">
+        <option value="h">Hourly</option>
+        <option value="D" selected>Daily</option>
+        <option value="W">Weekly</option>
+      </select>
+    </div>
+  </div>
+  <div id="history-chart" class="chart chart-tall"></div>
+</div>
+
+<div class="grid cols-2">
+  <div class="panel">
+    <h2>Instrument detail</h2>
+    <div class="table-scroll" style="max-height:420px">
+      <table>
+        <thead><tr><th>Symbol</th>
+          <th class="num"><span class="def" data-def="{{ define('accounts') }}">Accounts</span></th>
+          <th class="num">Net lots</th><th class="num">Net notional</th>
+          <th class="num">Gross notional</th><th class="num">Net share</th>
+          <th class="num">Floating P&amp;L</th></tr></thead>
+        <tbody id="exposure-rows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Stress test</h2>
+    <p class="hint">
+      An instantaneous move in every instrument, and what it costs the firm. The firm
+      is on the other side of client positions, so a move that profits clients is a loss
+      here. A deliberately linear shock &mdash; it assumes no correlation structure, which
+      is more honest than one estimated from a short sample.
+    </p>
+    <div id="stress-chart" class="chart"></div>
+    <table style="margin-top:10px">
+      <thead><tr><th>Shock</th><th class="num">Firm P&amp;L</th><th>Worst instrument</th></tr></thead>
+      <tbody id="stress-rows"></tbody>
+    </table>
+  </div>
+</div>

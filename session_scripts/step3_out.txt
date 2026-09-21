@@ -1,0 +1,3851 @@
+﻿python.exe : C:\Users\RoyVivasi\Documents\notebook\.venv\Lib\site-packages\google\auth\_default.py:113: UserWarning: 
+Your application has authenticated using end user credentials from Google Cloud SDK without a quota project. You might 
+receive a "quota exceeded" or "API not enabled" error. See the following page for troubleshooting: 
+https://cloud.google.com/docs/authentication/adc-troubleshooting/user-creds. 
+At line:1 char:302
++ ... tch {} } }; & "C:\Users\RoyVivasi\Documents\notebook\.venv\Scripts\py ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\RoyViv...ng/user-creds. :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  warnings.warn(_CLOUD_SDK_CREDENTIALS_WARNING)
+==========================================================================================
+TABLE: zfx-dwh-prod.data_marts_multi_region.mt5_dubai_live01_accounts
+  type: VIEW  rows: 0  size_bytes: 0
+  created: 2026-08-27 02:03:56.244000+00:00  modified: 2026-08-27 02:03:56.244000+00:00
+  description: None
+  labels: {}
+  schema:
+   - id STRING NULLABLE
+   - registration_datetime TIMESTAMP NULLABLE
+   - registration_datetime_london DATETIME NULLABLE
+   - registration_datetime_london_trading_day DATE NULLABLE
+   - name STRING NULLABLE
+   - primary_trading_account_id STRING NULLABLE
+   - primary_trading_account_number INTEGER NULLABLE
+   - is_deleted BOOLEAN NULLABLE
+   - type STRING NULLABLE
+   - account_status STRING NULLABLE
+   - assigned_user_id STRING NULLABLE
+   - assigned_user_name STRING NULLABLE
+   - activation_time_assigned_user_id STRING NULLABLE
+   - activation_time_assigned_user_name STRING NULLABLE
+   - sales_account_id STRING NULLABLE
+   - sales_account_name STRING NULLABLE
+   - owner_office_id STRING NULLABLE
+   - owner_office_name STRING NULLABLE
+   - parent_account_id STRING NULLABLE
+   - parent_account_name STRING NULLABLE
+   - parent_trading_account_number INTEGER NULLABLE
+   - passed_kyc INTEGER NULLABLE
+   - approved_date TIMESTAMP NULLABLE
+   - country_name STRING NULLABLE
+   - country_of_residence STRING NULLABLE
+   - province STRING NULLABLE
+   - language STRING NULLABLE
+   - gender STRING NULLABLE
+   - birth_date TIMESTAMP NULLABLE
+   - ip_address STRING NULLABLE
+   - ip_region STRING NULLABLE
+   - ip_country STRING NULLABLE
+   - ip_city STRING NULLABLE
+   - account_utm_campaign STRING NULLABLE
+   - account_utm_content STRING NULLABLE
+   - account_utm_medium STRING NULLABLE
+   - account_utm_source STRING NULLABLE
+   - account_utm_term STRING NULLABLE
+   - first_deposit_date TIMESTAMP NULLABLE
+   - first_deposit_amount_usd BIGNUMERIC NULLABLE
+   - last_deposit_date TIMESTAMP NULLABLE
+   - last_deposit_amount_usd BIGNUMERIC NULLABLE
+   - total_deposit_usd BIGNUMERIC NULLABLE
+   - last_withdrawal_date TIMESTAMP NULLABLE
+   - last_withdrawal_amount_usd BIGNUMERIC NULLABLE
+   - trading_balance_usd BIGNUMERIC NULLABLE
+   - wallet_balance_usd BIGNUMERIC NULLABLE
+   - total_withdrawal_usd BIGNUMERIC NULLABLE
+   - total_ib_withdrawal_usd BIGNUMERIC NULLABLE
+   - net_usd BIGNUMERIC NULLABLE
+   - ib_mode STRING NULLABLE
+   - rebate_level STRING NULLABLE
+   - self_return_date_time TIMESTAMP NULLABLE
+   - custom_rebate_ratio INTEGER NULLABLE
+   - stp_rate_forex_value INTEGER NULLABLE
+   - stp_rate_cfd_value INTEGER NULLABLE
+   - stp_rate_gold_value INTEGER NULLABLE
+   - stp_rate_silver_value INTEGER NULLABLE
+   - stp_rate_btc_value INTEGER NULLABLE
+   - stp_rate_ltc_value INTEGER NULLABLE
+   - stp_rate_eth_value INTEGER NULLABLE
+   - stp_rate_stock_value INTEGER NULLABLE
+   - mini_rate_forex_value INTEGER NULLABLE
+   - mini_rate_cfd_value INTEGER NULLABLE
+   - mini_rate_gold_value INTEGER NULLABLE
+   - mini_rate_silver_value INTEGER NULLABLE
+   - mini_rate_btc_value INTEGER NULLABLE
+   - mini_rate_ltc_value INTEGER NULLABLE
+   - mini_rate_eth_value INTEGER NULLABLE
+   - ecn_rate_value INTEGER NULLABLE
+   - ecn_rate_cfd_value INTEGER NULLABLE
+   - ecn_rate_btc_value INTEGER NULLABLE
+   - ecn_rate_ltc_value INTEGER NULLABLE
+   - ecn_rate_eth_value INTEGER NULLABLE
+   - ecn_rate_stock_value INTEGER NULLABLE
+   - last_trade_datetime TIMESTAMP NULLABLE
+   - total_volume NUMERIC NULLABLE
+   - total_volume_cfd NUMERIC NULLABLE
+   - total_volume_fx NUMERIC NULLABLE
+   - total_volume_metal NUMERIC NULLABLE
+   - total_volume_usd BIGNUMERIC NULLABLE
+   - total_trade_profit_usd NUMERIC NULLABLE
+   - total_swaps_usd BIGNUMERIC NULLABLE
+   - total_commission_usd BIGNUMERIC NULLABLE
+   - total_rebates_generated_usd NUMERIC NULLABLE
+   - total_rebate_spread NUMERIC NULLABLE
+   - total_rebate_commission INTEGER NULLABLE
+   - total_rebate_subsidy INTEGER NULLABLE
+   - floating_volume NUMERIC NULLABLE
+   - floating_volume_usd BIGNUMERIC NULLABLE
+   - floating_profit_usd NUMERIC NULLABLE
+   - floating_swap_usd BIGNUMERIC NULLABLE
+   - floating_commission_usd BIGNUMERIC NULLABLE
+   - equity_usd BIGNUMERIC NULLABLE
+   - floating_values_last_update TIMESTAMP NULLABLE
+   - tenant_id INTEGER NULLABLE
+   - average_purchase_value BIGNUMERIC NULLABLE
+   - average_purchase_frequency NUMERIC NULLABLE
+   - customer_value BIGNUMERIC NULLABLE
+   - customer_lifespan FLOAT NULLABLE
+   - customer_lifetime_value FLOAT NULLABLE
+   - invite_referral_code STRING NULLABLE
+   - sic_code STRING NULLABLE
+   - introducing_broker STRING NULLABLE
+   - acquisition_category STRING NULLABLE
+   - acquisition_traffic_type STRING NULLABLE
+   - acquisition_channel STRING NULLABLE
+   - acquisition_url STRING NULLABLE
+   - acquisition_referral_code INTEGER NULLABLE
+   - acquisition_referral_account_id STRING NULLABLE
+   - compliance_approved_datetime TIMESTAMP NULLABLE
+  VIEW QUERY:
+WITH cte_transactions AS (
+    SELECT
+        id,
+        account_id,
+        transaction_datetime,
+        transaction_date_london_trading_day,
+        usd_amount,
+        completed_transaction_type,
+        funds_account_type
+    FROM `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_transactions`
+    WHERE status = 'Paid'
+),
+
+cte_transactions_agg AS (
+    SELECT
+        account_id,
+        SUM(
+            IF(
+                completed_transaction_type = 'Deposit',
+                usd_amount,
+                0
+            )
+        ) AS total_deposit_usd,
+        MAX(
+            IF(
+                completed_transaction_type IN ('Withdrawal'),
+                transaction_datetime,
+                NULL
+            )
+        ) AS last_withdrawal_date,
+        MAX_BY(
+            CASE
+                WHEN completed_transaction_type IN ('Withdrawal', 'IB Withdrawal')
+                    THEN usd_amount
+                ELSE 0
+            END,
+            CASE
+                WHEN completed_transaction_type IN ('Withdrawal', 'IB Withdrawal')
+                    THEN transaction_datetime
+            END
+        ) AS last_withdrawal_amount_usd,
+        SUM(
+            IF(
+                completed_transaction_type IN ('Withdrawal', 'IB Withdrawal')
+                AND funds_account_type = 'MT5',
+                usd_amount,
+                0
+            )
+        ) AS total_withdrawal_usd,
+        SUM(
+            IF(
+                completed_transaction_type IN ('Withdrawal', 'IB Withdrawal')
+                AND funds_account_type = 'Ewallet',
+                usd_amount,
+                0
+            )
+        ) AS total_ib_withdrawal_usd,
+        SUM(
+            IF(
+                funds_account_type = 'Ewallet',
+                usd_amount,
+                0
+            )
+        ) AS wallet_balance_usd
+    FROM cte_transactions
+    GROUP BY 1
+),
+
+tr_bl AS (
+    SELECT
+        account_id,
+        SUM(trading_balance_usd) AS trading_balance_usd,
+        MAX(last_trade_datetime) AS last_trade_datetime,
+        SUM(COALESCE(total_volume, 0)) AS total_volume,
+        SUM(COALESCE(total_volume_cfd, 0)) AS total_volume_cfd,
+        SUM(COALESCE(total_volume_fx, 0)) AS total_volume_fx,
+        SUM(COALESCE(total_volume_metal, 0)) AS total_volume_metal,
+        SUM(COALESCE(total_volume_usd, 0)) AS total_volume_usd,
+        SUM(COALESCE(total_trade_profit_usd, 0)) AS total_trade_profit_usd,
+        SUM(COALESCE(total_swaps_usd, 0)) AS total_swaps_usd,
+        SUM(COALESCE(total_commission_usd, 0)) AS total_commission_usd,
+        SUM(COALESCE(total_rebates_generated_usd, 0)) AS total_rebates_generated_usd,
+        SUM(COALESCE(total_rebate_spread, 0)) AS total_rebate_spread,
+        SUM(COALESCE(total_rebate_commission, 0)) AS total_rebate_commission,
+        SUM(COALESCE(total_rebate_subsidy, 0)) AS total_rebate_subsidy,
+        SUM(COALESCE(floating_volume, 0)) AS floating_volume,
+        SUM(COALESCE(floating_volume_usd, 0)) AS floating_volume_usd,
+        SUM(COALESCE(floating_profit_usd, 0)) AS floating_profit_usd,
+        SUM(COALESCE(floating_swap_usd, 0)) AS floating_swap_usd,
+        SUM(COALESCE(floating_commission_usd, 0)) AS floating_commission_usd,
+        SUM(COALESCE(equity_usd, 0)) AS equity_usd,
+        MAX(floating_values_last_update) AS floating_values_last_update
+    FROM `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_trading_accounts`
+    GROUP BY 1
+),
+
+cte_utms AS (
+    SELECT
+        id,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_source') AS STRING) AS acquisition_source,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_medium') AS STRING) AS acquisition_medium,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_campaign') AS STRING) AS acquisition_campaign,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_content') AS STRING) AS acquisition_content,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_term') AS STRING) AS acquisition_term
+    FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_users`
+)
+
+SELECT
+    af.account_id AS id,
+    af.registration_datetime,
+    DATETIME(af.registration_datetime + INTERVAL 2 HOUR, 'Europe/London') AS registration_datetime_london,
+    registration_london_trade_date AS registration_datetime_london_trading_day,
+    af.full_name AS `name`,
+    SAFE_CAST(af.account_id AS STRING) AS primary_trading_account_id,
+    SAFE_CAST(af.account_id AS INT64) AS primary_trading_account_number,
+    IF(fu.is_enabled = 1, FALSE, TRUE) AS is_deleted,
+    CASE
+        WHEN fu.is_ib = 1 THEN 'IntroducingBroker'
+        WHEN fu.client_type = 'Corporate' THEN 'Corporate'
+        ELSE 'IndividualClient'
+    END AS `type`,
+    CASE
+        WHEN af.approved_datetime IS NOT NULL THEN 'Approved'
+        ELSE 'Pending'
+    END AS account_status, -- can be investigate to find more statuses
+    af.account_owner_id AS assigned_user_id,
+    af.account_owner_name AS assigned_user_name,
+
+    -- TODO, there is no historical table at the creation time
+    af.account_owner_id AS activation_time_assigned_user_id,
+    af.account_owner_name AS activation_time_assigned_user_name,
+    -- TODO, there are no Sales accounts currently
+    SAFE_CAST(NULL AS STRING) AS sales_account_id,
+    SAFE_CAST(NULL AS STRING) AS sales_account_name,
+    af.account_owner_office_id AS owner_office_id,
+    af.account_owner_office_name AS owner_office_name,
+    af.parent_id AS parent_account_id,
+    af.parent_name AS parent_account_name,
+    SAFE_CAST(af.parent_id AS INT64) AS parent_trading_account_number, -- user id as a primary trading account
+    fu.is_verified AS passed_kyc,
+    af.approved_datetime AS approved_date,
+    af.country_of_residence AS country_name,
+    af.country_of_residence,
+    SAFE_CAST(NULL AS STRING) AS province,
+    fu.language,
+    'Unknown' AS gender,
+    SAFE_CAST(fu.birth_date AS TIMESTAMP) AS birth_date,
+    SAFE_CAST(NULL AS STRING) AS ip_address, -- todo, maybe it's loginIp
+    SAFE_CAST(NULL AS STRING) AS ip_region,
+    SAFE_CAST(NULL AS STRING) AS ip_country,
+    SAFE_CAST(NULL AS STRING) AS ip_city,
+    cte_utms.acquisition_campaign AS account_utm_campaign,
+    cte_utms.acquisition_content AS account_utm_content,
+    cte_utms.acquisition_medium AS account_utm_medium,
+    cte_utms.acquisition_source AS account_utm_source,
+    cte_utms.acquisition_term AS account_utm_term,
+    fu.first_deposit_date,
+    t_first.usd_amount AS first_deposit_amount_usd,
+    t_last.transaction_datetime AS last_deposit_date,
+    t_last.usd_amount AS last_deposit_amount_usd,
+    COALESCE(t_total.total_deposit_usd, 0) AS total_deposit_usd,
+    t_total.last_withdrawal_date,
+    COALESCE(t_total.last_withdrawal_amount_usd, 0) AS last_withdrawal_amount_usd,
+    COALESCE(tr_bl.trading_balance_usd, 0) AS trading_balance_usd,
+    COALESCE(t_total.wallet_balance_usd, 0) AS wallet_balance_usd,
+    COALESCE(t_total.total_withdrawal_usd, 0) AS total_withdrawal_usd,
+    COALESCE(t_total.total_ib_withdrawal_usd, 0) AS total_ib_withdrawal_usd,
+    (
+        t_total.total_deposit_usd + t_total.total_withdrawal_usd + t_total.total_ib_withdrawal_usd
+    ) AS net_usd,
+    SAFE_CAST(NULL AS STRING) AS ib_mode,
+    -- TODO, there are might be more than one level: stats_ib_commissions_by_rule_type
+    SAFE_CAST(NULL AS STRING) AS rebate_level,
+    SAFE_CAST(NULL AS TIMESTAMP) AS self_return_date_time, -- TODO; is it enabled in Dubai Traze?
+    NULL AS custom_rebate_ratio,
+    NULL AS stp_rate_forex_value,
+    NULL AS stp_rate_cfd_value,
+    NULL AS stp_rate_gold_value,
+    NULL AS stp_rate_silver_value,
+    NULL AS stp_rate_btc_value,
+    NULL AS stp_rate_ltc_value,
+    NULL AS stp_rate_eth_value,
+    NULL AS stp_rate_stock_value,
+    NULL AS mini_rate_forex_value,
+    NULL AS mini_rate_cfd_value,
+    NULL AS mini_rate_gold_value,
+    NULL AS mini_rate_silver_value,
+    NULL AS mini_rate_btc_value,
+    NULL AS mini_rate_ltc_value,
+    NULL AS mini_rate_eth_value,
+    NULL AS ecn_rate_value,
+    NULL AS ecn_rate_cfd_value,
+    NULL AS ecn_rate_btc_value,
+    NULL AS ecn_rate_ltc_value,
+    NULL AS ecn_rate_eth_value,
+    NULL AS ecn_rate_stock_value,
+    tr_bl.last_trade_datetime,
+    COALESCE(tr_bl.total_volume, 0) AS total_volume,
+    COALESCE(tr_bl.total_volume_cfd, 0) AS total_volume_cfd,
+    COALESCE(tr_bl.total_volume_fx, 0) AS total_volume_fx,
+    COALESCE(tr_bl.total_volume_metal, 0) AS total_volume_metal,
+    COALESCE(tr_bl.total_volume_usd, 0) AS total_volume_usd,
+    COALESCE(tr_bl.total_trade_profit_usd, 0) AS total_trade_profit_usd,
+    COALESCE(tr_bl.total_swaps_usd, 0) AS total_swaps_usd,
+    COALESCE(tr_bl.total_commission_usd, 0) AS total_commission_usd,
+    COALESCE(tr_bl.total_rebates_generated_usd, 0) AS total_rebates_generated_usd,
+    SAFE_CAST(COALESCE(tr_bl.total_rebate_spread, 0) AS NUMERIC) AS total_rebate_spread,
+    COALESCE(tr_bl.total_rebate_commission, 0) AS total_rebate_commission,
+    COALESCE(tr_bl.total_rebate_subsidy, 0) AS total_rebate_subsidy,
+    COALESCE(tr_bl.floating_volume, 0) AS floating_volume,
+    COALESCE(tr_bl.floating_volume_usd, 0) AS floating_volume_usd,
+    COALESCE(tr_bl.floating_profit_usd, 0) AS floating_profit_usd,
+    COALESCE(tr_bl.floating_swap_usd, 0) AS floating_swap_usd,
+    COALESCE(tr_bl.floating_commission_usd, 0) AS floating_commission_usd,
+    COALESCE(tr_bl.equity_usd, 0) AS equity_usd,
+    tr_bl.floating_values_last_update,
+    -1 AS tenant_id, --artificial tenant_id for Dubai Traze
+    CASE
+        WHEN af.account_type NOT IN ('Sales', 'Manager', 'Director')
+            THEN
+                ROUND(
+                    -(
+                        COALESCE(tr_bl.total_trade_profit_usd, 0)
+                        + COALESCE(tr_bl.total_swaps_usd, 0)
+                        + COALESCE(tr_bl.total_commission_usd, 0)
+                    )
+                    / IF(tr_bl.total_volume = 0, NULL, tr_bl.total_volume),
+                    4
+                )
+    END AS average_purchase_value,
+    CASE
+        WHEN af.account_type NOT IN ('Sales', 'Manager', 'Director')
+            THEN
+                COALESCE(tr_bl.total_volume, 0) / 1
+    END AS average_purchase_frequency,
+    CASE
+        WHEN af.account_type NOT IN ('Sales', 'Manager', 'Director')
+            THEN
+                ROUND(
+                    -(
+                        COALESCE(tr_bl.total_trade_profit_usd, 0)
+                        + COALESCE(tr_bl.total_swaps_usd, 0)
+                        + COALESCE(tr_bl.total_commission_usd, 0)
+                    )
+                    / IF(tr_bl.total_volume = 0, NULL, tr_bl.total_volume) * (tr_bl.total_volume / 1), 4
+                )
+    END AS customer_value,
+    CASE
+        WHEN
+            af.account_type NOT IN ('Sales', 'Manager', 'Director')
+            AND tr_bl.last_trade_datetime > fu.first_deposit_date
+            THEN ROUND(TIMESTAMP_DIFF(tr_bl.last_trade_datetime, fu.first_deposit_date, SECOND) / (24 * 60 * 60), 4)
+        WHEN
+            af.account_type NOT IN ('Sales', 'Manager', 'Director')
+            AND tr_bl.last_trade_datetime <= fu.first_deposit_date
+            THEN 0
+    END AS customer_lifespan,
+    CASE
+        WHEN
+            af.account_type NOT IN ('Sales', 'Manager', 'Director')
+            AND tr_bl.last_trade_datetime > fu.first_deposit_date
+            THEN ROUND(
+                -(
+                    COALESCE(tr_bl.total_trade_profit_usd, 0)
+                    + COALESCE(tr_bl.total_swaps_usd, 0)
+                    + COALESCE(tr_bl.total_commission_usd, 0)
+                )
+                / IF(tr_bl.total_volume = 0, NULL, tr_bl.total_volume)
+                * (tr_bl.total_volume / 1)
+                * ROUND(TIMESTAMP_DIFF(tr_bl.last_trade_datetime, fu.first_deposit_date, SECOND) / (24 * 60 * 60), 2)
+                / 100,
+                4
+            )
+        WHEN
+            af.account_type NOT IN ('Sales', 'Manager', 'Director')
+            AND tr_bl.last_trade_datetime <= fu.first_deposit_date
+            THEN 0
+    END AS customer_lifetime_value,
+    SAFE_CAST(NULL AS STRING) AS invite_referral_code,
+    SAFE_CAST(NULL AS STRING) AS sic_code,
+    SAFE_CAST(NULL AS STRING) AS introducing_broker,
+    
+  
+  
+  
+
+  
+    CASE
+      WHEN fu.referral_link_id IS NOT NULL THEN 'IB/SALES Referral'
+      WHEN aq.acquisition_category IS NOT NULL THEN aq.acquisition_category
+      WHEN fmc.title IN ('Campaign 1 (Sales)', 'Traze ZFX') THEN 'IB/SALES Referral'
+      ELSE 'Organic'
+    END
+
+  
+ AS acquisition_category,
+    
+  
+  
+  
+
+  
+    CASE
+      WHEN fu.referral_link_id IS NOT NULL THEN 'Sales/IB/IC'
+      WHEN aq.acquisition_traffic_type IS NOT NULL THEN aq.acquisition_traffic_type
+      WHEN fmc.title IN ('Campaign 1 (Sales)', 'Traze ZFX') THEN 'Sales/IB/IC'
+      ELSE 'Organic'
+    END
+
+  
+ AS acquisition_traffic_type,
+    
+  
+  
+  
+
+  
+    CASE
+      WHEN fu.referral_link_id IS NOT NULL THEN 'Sales/IB'
+      WHEN aq.acquisition_channel IS NOT NULL THEN aq.acquisition_channel
+      WHEN fmc.title IN ('Campaign 1 (Sales)', 'Traze ZFX') THEN 'Sales/IB'
+      ELSE 'Marketing' -- Organic
+    END
+
+  
+ AS acquisition_channel,
+    SAFE_CAST(NULL AS STRING) AS acquisition_url,
+    SAFE_CAST(NULL AS INT64) AS acquisition_referral_code,
+    SAFE_CAST(l.user_id AS STRING) AS acquisition_referral_account_id,
+    af.compliance_approved_datetime
+FROM `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_accounts_flagged` AS af
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_users` AS fu
+    ON CAST(fu.id AS STRING) = af.account_id
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_links` AS l
+    ON fu.referral_link_id = l.id
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_marketing_links` AS mll
+    ON fu.marketing_link_id = mll.id
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_marketing_campaigns` AS fmc
+    ON mll.campaign_id = fmc.id
+LEFT JOIN cte_transactions AS t_first
+    ON
+        SAFE_CAST(fu.first_deposit_id AS INT64) = SAFE_CAST(t_first.id AS INT64)
+        AND t_first.completed_transaction_type = 'Deposit'
+LEFT JOIN cte_transactions AS t_last
+    ON
+        SAFE_CAST(fu.last_deposit_id AS INT64) = SAFE_CAST(t_last.id AS INT64)
+        AND t_last.completed_transaction_type = 'Deposit'
+LEFT JOIN cte_transactions_agg AS t_total
+    ON af.account_id = t_total.account_id
+LEFT JOIN tr_bl
+    ON af.account_id = tr_bl.account_id
+LEFT JOIN cte_utms ON fu.id = cte_utms.id
+LEFT JOIN `zfx-dwh-prod`.`views`.`marketing_acquisition_traffic_types` AS aq
+    ON (
+        (cte_utms.acquisition_source = aq.acquisition_source AND cte_utms.acquisition_medium = aq.acquisition_medium)
+        OR (
+            cte_utms.acquisition_source IS NULL
+            AND cte_utms.acquisition_medium IS NOT NULL
+            AND aq.acquisition_source IS NULL
+            AND cte_utms.acquisition_medium = aq.acquisition_medium
+        )
+        OR (
+            cte_utms.acquisition_source IS NOT NULL
+            AND cte_utms.acquisition_medium IS NULL
+            AND cte_utms.acquisition_source = aq.acquisition_source
+            AND aq.acquisition_medium IS NULL
+        )
+        OR (
+            cte_utms.acquisition_source IS NULL
+            AND cte_utms.acquisition_medium IS NULL
+            AND aq.acquisition_source IS NULL
+            AND aq.acquisition_medium IS NULL
+        )
+    )
+    -- ignore row with NULLs when it's Sales/IB
+    AND NOT (
+        aq.acquisition_source IS NULL
+        AND aq.acquisition_medium IS NULL
+        AND (
+            fu.referral_link_id IS NOT NULL
+            OR fmc.title IN ('Campaign 1 (Sales)', 'Traze ZFX')
+        )
+    )
+WHERE af.is_test = 0
+==========================================================================================
+TABLE: zfx-dwh-prod.data_marts_multi_region.mt5_dubai_live01_accounts_assigned_user_rel_hist
+  type: TABLE  rows: 4604  size_bytes: 234136
+  created: 2026-08-27 18:03:01.060000+00:00  modified: 2026-08-27 18:03:01.061000+00:00
+  description: None
+  labels: {}
+  schema:
+   - account_id STRING NULLABLE
+   - assigned_user_name STRING NULLABLE
+   - assigned_user_id STRING NULLABLE
+   - valid_from_timestamp TIMESTAMP NULLABLE
+   - valid_to_timestamp TIMESTAMP NULLABLE
+   - is_current BOOLEAN NULLABLE
+   - crm_scope_id INTEGER NULLABLE
+==========================================================================================
+TABLE: zfx-dwh-prod.data_marts_multi_region.mt5_dubai_live01_accounts_flagged
+  type: VIEW  rows: 0  size_bytes: 0
+  created: 2026-08-27 02:03:02.024000+00:00  modified: 2026-08-27 02:03:02.024000+00:00
+  description: None
+  labels: {}
+  schema:
+   - is_employee INTEGER NULLABLE
+   - is_enabled INTEGER NULLABLE
+   - account_country_code STRING NULLABLE
+   - country_of_residence STRING NULLABLE
+   - region STRING NULLABLE
+   - account_owner_office_name STRING NULLABLE
+   - approved_datetime TIMESTAMP NULLABLE
+   - account_id STRING NULLABLE
+   - first_name STRING NULLABLE
+   - last_name STRING NULLABLE
+   - full_name STRING NULLABLE
+   - account_type STRING NULLABLE
+   - parent_id STRING NULLABLE
+   - parent_name STRING NULLABLE
+   - account_owner_id STRING NULLABLE
+   - account_owner_name STRING NULLABLE
+   - account_owner_office_id STRING NULLABLE
+   - registration_datetime TIMESTAMP NULLABLE
+   - registration_london_trade_date DATE NULLABLE
+   - approved_london_trade_date DATE NULLABLE
+   - is_test INTEGER NULLABLE
+   - compliance_approved_datetime TIMESTAMP NULLABLE
+   - compliance_approved_london_trade_date DATE NULLABLE
+  VIEW QUERY:
+WITH cte_compliance_approval AS (
+    SELECT
+        created_at,
+        t.text,
+        CAST(user_id AS STRING) AS account_id,
+        JSON_EXTRACT_SCALAR(context, '$.value.old') AS old_value,
+        JSON_EXTRACT_SCALAR(context, '$.value.new') AS new_value,
+        ROW_NUMBER() OVER (
+            PARTITION BY user_id
+            ORDER BY
+                created_at
+        ) AS rn
+    FROM
+        `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_manager_log` AS t
+    WHERE
+        user_id IS NOT NULL
+        AND manager_id IS NOT NULL
+        AND LOWER(t.text) LIKE '%custom_compliance_approval_field%'
+        AND COALESCE(JSON_EXTRACT_SCALAR(context, '$.value.old'), '') = 'No'
+        AND COALESCE(JSON_EXTRACT_SCALAR(context, '$.value.new'), '') = 'Yes' -- approved
+    QUALIFY rn = 1
+    ORDER BY
+        user_id,
+        created_at
+)
+
+SELECT
+    fu.is_employee,
+    fu.is_enabled,
+    fu.country AS account_country_code,
+    cd.country_name AS country_of_residence,
+    cd.continent_region_internal AS region,
+    d.name AS account_owner_office_name,
+    fu.verified_at AS approved_datetime,
+    CAST(fu.id AS STRING) AS account_id,
+    TRIM(fu.first_name) AS first_name,
+    TRIM(fu.last_name) AS last_name,
+    CONCAT(TRIM(fu.first_name), ' ', TRIM(fu.last_name)) AS full_name,
+    CASE
+        WHEN fu.is_ib = 1 THEN 'IntroducingBroker'
+        WHEN fu.client_type = 'Corporate' THEN 'Institutional'
+        ELSE 'IndividualClient'
+    END AS `account_type`,
+    CAST(fu.partner_id AS STRING) AS parent_id,
+    CONCAT(TRIM(parent_u.first_name), ' ', TRIM(parent_u.last_name)) AS parent_name,
+    CAST(fu.manager_id AS STRING) AS account_owner_id,
+    TRIM(m.full_name) AS account_owner_name,
+    CAST(md.department_id AS STRING) AS account_owner_office_id,
+    COALESCE(fu.promoted_to_client_at, fu.created_at) AS registration_datetime,
+    DATE(DATETIME(COALESCE(fu.promoted_to_client_at, fu.created_at) + INTERVAL 2 HOUR, 'Europe/London'))
+        AS registration_london_trade_date,
+    DATE(DATETIME(fu.verified_at + INTERVAL 2 HOUR, 'Europe/London')) AS approved_london_trade_date,
+    -- logic for test accounts provided by Oliver Hopkins
+    CASE
+        WHEN fu.is_employee = 1 THEN 1
+        --- accounts with null id in FXBO are considered as test accounts, according to Oliver
+        WHEN fu.id IS NULL THEN 1
+        --- not excluded like %test% to avoid situations when client's name contains test in his first_name
+        WHEN LOWER(TRIM(fu.first_name)) = 'test' THEN 1
+        --- not excluded as %test% to avoid situations when client's name contains test in his last_name
+        WHEN LOWER(TRIM(fu.last_name)) = 'test' THEN 1
+        ELSE 0
+    END AS is_test,
+    cca.created_at AS compliance_approved_datetime,
+    DATE(DATETIME(cca.created_at + INTERVAL 2 HOUR, 'Europe/London')) AS compliance_approved_london_trade_date
+FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_users` AS fu
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_users` AS parent_u
+    ON COALESCE(CAST(fu.partner_id AS STRING), '') = COALESCE(CAST(parent_u.id AS STRING), '')
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers` AS m ON fu.manager_id = m.id
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers_to_departments` AS md
+    ON fu.manager_id = md.manager_id
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers_departments` AS d
+    ON md.department_id = d.id
+LEFT JOIN `zfx-dwh-prod`.`manual_dictionary`.`manual_dictionary_countries` AS cd ON fu.country = cd.country_code
+LEFT JOIN cte_compliance_approval AS cca ON CAST(fu.id AS STRING) = cca.account_id
+WHERE COALESCE(fu.is_lead, -1) IN (0, -1) -- leads excluded
+ORDER BY is_test, account_id
+==========================================================================================
+TABLE: zfx-dwh-prod.data_marts_multi_region.mt5_dubai_live01_closed_trades
+  type: VIEW  rows: 0  size_bytes: 0
+  created: 2026-08-27 02:03:09.082000+00:00  modified: 2026-08-27 02:03:09.082000+00:00
+  description: None
+  labels: {}
+  schema:
+   - server_name STRING NULLABLE
+   - closing_deal_id INTEGER NULLABLE
+   - opening_deal_ids INTEGER REPEATED
+   - closing_deal_ids INTEGER REPEATED
+   - trade_id INTEGER NULLABLE
+   - position_id INTEGER NULLABLE
+   - login INTEGER NULLABLE
+   - symbol_name STRING NULLABLE
+   - is_buy INTEGER NULLABLE
+   - open_time TIMESTAMP NULLABLE
+   - open_time_london DATETIME NULLABLE
+   - open_time_london_trading_date DATE NULLABLE
+   - close_time TIMESTAMP NULLABLE
+   - close_time_london DATETIME NULLABLE
+   - close_time_london_trading_date DATE NULLABLE
+   - volume_lots NUMERIC NULLABLE
+   - volume_std_lots NUMERIC NULLABLE
+   - qty BIGNUMERIC NULLABLE
+   - close_qty_usd BIGNUMERIC NULLABLE
+   - open_qty_usd BIGNUMERIC NULLABLE
+   - qty_usd BIGNUMERIC NULLABLE
+   - open_price NUMERIC NULLABLE
+   - close_price NUMERIC NULLABLE
+   - open_original_client_price NUMERIC NULLABLE
+   - close_original_client_price NUMERIC NULLABLE
+   - trade_profit NUMERIC NULLABLE
+   - trade_profit_usd NUMERIC NULLABLE
+   - commission_usd BIGNUMERIC NULLABLE
+   - swap_usd BIGNUMERIC NULLABLE
+   - admin_fee_usd BIGNUMERIC NULLABLE
+   - sl NUMERIC NULLABLE
+   - tp NUMERIC NULLABLE
+   - comment STRING NULLABLE
+   - open_group STRING NULLABLE
+   - close_group STRING NULLABLE
+   - open_book STRING NULLABLE
+   - close_book STRING NULLABLE
+   - open_markup INTEGER NULLABLE
+   - close_markup INTEGER NULLABLE
+   - open_spread_diff INTEGER NULLABLE
+   - close_spread_diff INTEGER NULLABLE
+   - rebate_payout_markup BIGNUMERIC NULLABLE
+   - rebate_payout_commission INTEGER NULLABLE
+   - rebate_payout_subsidy INTEGER NULLABLE
+   - rebate_payout BIGNUMERIC NULLABLE
+   - account_id STRING NULLABLE
+   - account_registration_datetime TIMESTAMP NULLABLE
+   - account_registration_datetime_london DATETIME NULLABLE
+   - account_registration_datetime_london_trading_day DATE NULLABLE
+   - account_assgined_user_id_hist STRING NULLABLE
+   - account_owner_office_id_hist STRING NULLABLE
+   - account_parent_account_id_hist STRING NULLABLE
+   - account_sales_account_id_hist STRING NULLABLE
+   - account_type_hist STRING NULLABLE
+   - account_passed_kyc_hist BOOLEAN NULLABLE
+   - account_utm_campaign STRING NULLABLE
+   - account_utm_content STRING NULLABLE
+   - account_utm_medium STRING NULLABLE
+   - account_utm_source STRING NULLABLE
+   - account_utm_term STRING NULLABLE
+   - account_country_code_hist STRING NULLABLE
+   - account_mode_hist STRING NULLABLE
+   - primary_trading_account_id STRING NULLABLE
+   - primary_trading_account_number INTEGER NULLABLE
+   - trading_account_id STRING NULLABLE
+   - trading_account_registration_datetime TIMESTAMP NULLABLE
+   - trading_account_registration_datetime_london DATETIME NULLABLE
+   - trading_account_registration_datetime_london_trading_day DATE NULLABLE
+   - trading_account_conditions_id_hist STRING NULLABLE
+   - trading_account_assigned_user_id_hist STRING NULLABLE
+   - trading_account_parent_trading_account_id_hist STRING NULLABLE
+   - open_source INTEGER NULLABLE
+   - close_source INTEGER NULLABLE
+   - trading_account_assigned_user_name_hist STRING NULLABLE
+   - open_time_ms TIMESTAMP NULLABLE
+   - close_time_ms TIMESTAMP NULLABLE
+   - open_time_setup_ms TIMESTAMP NULLABLE
+   - close_time_setup_ms TIMESTAMP NULLABLE
+   - open_bid NUMERIC NULLABLE
+   - open_ask NUMERIC NULLABLE
+   - open_confirmed_price NUMERIC NULLABLE
+   - open_raw_execution_price NUMERIC NULLABLE
+   - close_bid NUMERIC NULLABLE
+   - close_ask NUMERIC NULLABLE
+   - close_confirmed_price NUMERIC NULLABLE
+   - close_raw_execution_price NUMERIC NULLABLE
+   - profit_mode INTEGER NULLABLE
+   - open_fbr_markup_usd NUMERIC NULLABLE
+   - close_fbr_markup_usd NUMERIC NULLABLE
+   - open_ib_markup_usd NUMERIC NULLABLE
+   - close_ib_markup_usd NUMERIC NULLABLE
+   - open_ts_markup_usd NUMERIC NULLABLE
+   - close_ts_markup_usd NUMERIC NULLABLE
+   - trade_margin INTEGER NULLABLE
+   - account_assgined_user_name_hist STRING NULLABLE
+   - account_owner_office_name_hist STRING NULLABLE
+  VIEW QUERY:
+WITH done_trades AS (
+    SELECT
+        createtimestamp_partition AS time_setup_msc,
+        CAST(id AS STRING) AS id,
+        SUM(usdqty) AS ts_usd_qty,
+        SUM(usdqty * markup / fillprice) AS ts_markup
+    FROM `zfx-dwh-prod`.`ecn_ts`.`DoneTrades`
+    WHERE
+        fillprice != 0
+        AND createtimestamp_partition >= '2025-01-01' -- to decrease memory usage
+    -- AND LOWER(ExternalAccountId) LIKE '%mt5_live02%' -- commented, as it's not safe in case if name is changed
+    GROUP BY id, createtimestamp_partition
+),
+
+mt5_dubai_rebates AS (
+    SELECT
+        d.order,
+        SUM(t.commission) AS rebate_spread_usd
+    FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_ib_processed_tickets` AS t
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_mt4_trades` AS mt ON t.ticket_sid = mt.ticket_sid
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_deals` AS d ON CAST(mt.ticket AS INT64) = CAST(d.deal AS INT64)
+    GROUP BY 1
+),
+
+-- BI-4109. Admin Fee is a fee for Dubai Traze clients as an alternative to swap free.
+-- For now admin fee exists for Dubai Traze clients only.
+dubai_admin_fee AS (
+    SELECT
+        `login`,
+        CAST(REGEXP_EXTRACT(comment, r'#(\d+)') AS INT64) AS position_id,
+        SUM(profit) AS admin_fee
+    FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_deals`
+    WHERE
+        1 = 1
+        AND `action` = 7
+        AND comment LIKE 'Admin fee%'
+    GROUP BY 1, 2
+),
+
+detailed_info AS (
+    SELECT
+        d.deal, -- primary key: deal + position_id
+        d.login,
+        d.`order`,
+        d.position_id,
+        o.`type` AS order_type,
+        d.action,
+        d.entry,
+        d.`time` AS execution_time,
+        o.time_done_msc,
+        d.symbol,
+        d.price AS deal_price,
+        d.price_position,
+        d.price_gateway,
+        d.price_sl,
+        d.price_tp,
+        d.volume,
+        d.volume_closed,
+        d.profit,
+        d.storage,
+        d.commission,
+        d.market_bid,
+        d.market_ask,
+        d.comment,
+        dt.ts_usd_qty,
+        dt.ts_markup,
+        COALESCE(fee.admin_fee, 0) AS admin_fee,
+        -- BI-2461, reversed to the opposite sign, since we need the opening order sign; 
+        -- 0-buy, 1-sell, but as it's closed orders, we should take opening order direction:
+        IF(d.action = 0, 1, 0) AS is_buy_deal,
+        IF(d.action = 0, 0, 1) AS is_buy_of_opening_order,
+        IF(d.entry IN (0), 0, 1) AS is_close,
+        CASE
+            WHEN d.entry = 0 THEN 'ENTRY_IN'
+            WHEN d.entry = 1 THEN 'ENTRY_OUT'
+            WHEN d.entry = 2 THEN 'ENTRY_INOUT'
+            WHEN d.entry = 3 THEN 'ENTRY_OUT_BY'
+        END AS entry_type,
+        -- Setup time (the time when the client places an order)
+        -- in the case of pending orders, the DoneTrades creation time is used, which reflects the trigger time).
+        CASE
+            -- Market orders & Close_By
+            WHEN `type` IN (0, 1, 8) THEN o.time_setup_msc
+            -- Pending orders
+            WHEN `type` IN (2, 3, 4, 5) THEN dt.time_setup_msc
+        END AS time_setup_msc,
+        -- original_client_price BI-2914
+        CASE
+            -- Market orders
+            WHEN `type` IN (0, 1) THEN o.price_current
+            -- Pending orders
+            WHEN `type` IN (2, 3, 4, 5) THEN o.price_order
+            WHEN `type` IN (6, 7) THEN o.price_trigger
+        END AS original_client_price,
+        d.volume / 10000 AS volume_lot,
+        d.volume_closed / 10000 AS closed_vol_lot,
+        IF(d.action = 0, 1, -1) * d.volume_closed / 10000 AS signed_closed_vol_lot
+    FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_deals` AS d
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_orders` AS o ON d.`order` = o.`order`
+    LEFT JOIN done_trades AS dt ON d.external_id = dt.id
+    LEFT JOIN dubai_admin_fee AS fee ON d.position_id = fee.position_id
+    WHERE
+        1 = 1
+        AND d.action IN (0, 1)
+    ORDER BY d.position_id, d.deal
+),
+
+part_2 AS (
+    SELECT
+        position_id,
+        `order`,
+        deal,
+        login,
+        symbol,
+        is_buy_deal,
+        is_close,
+        price_sl,
+        price_tp,
+        comment,
+        order_type,
+        SUM(IF(is_close = 1, 1, 0)) OVER (PARTITION BY position_id, login) AS cnt_clsd_orders_in_position,
+        -- BI-2461, take direction of order opening
+        MAX(is_buy_of_opening_order) OVER (PARTITION BY position_id, `order`, login) AS is_buy,
+        -- prices
+        SUM(deal_price * volume) OVER (PARTITION BY position_id, `order`, login, is_buy_deal)
+        / SUM(volume) OVER (PARTITION BY position_id, `order`, login, is_buy_deal) AS price,
+        SUM(price_position * volume) OVER (PARTITION BY position_id, `order`, login, is_buy_deal)
+        / SUM(volume) OVER (PARTITION BY position_id, `order`, login, is_buy_deal) AS price_position,
+        -- original client price is set for an order no matter how many deals are involved there
+        MAX(CASE WHEN is_close = 0 THEN original_client_price END)
+            OVER (PARTITION BY position_id, login)
+            AS open_original_client_price,
+        MAX(CASE WHEN is_close = 1 THEN original_client_price END)
+            OVER (PARTITION BY position_id, login)
+            AS close_original_client_price,
+        -- volume 
+        SUM(volume) OVER (PARTITION BY position_id, `order`, login) AS volume,
+        SUM(volume_closed) OVER (PARTITION BY position_id, `order`, login) AS volume_closed,   -- BI-2461, added
+        SUM(closed_vol_lot) OVER (PARTITION BY position_id, `order`, login) AS volume_close_lot,
+        -- trade parameters
+        SUM(profit) OVER (PARTITION BY position_id, `order`, login) AS profit,
+
+        SUM(IF(is_close = 0, commission, 0)) OVER (PARTITION BY position_id, login) AS open_commission,
+        SUM(IF(is_close = 1, commission, 0)) OVER (PARTITION BY position_id, `order`, login) AS close_commission,
+
+        SUM(IF(is_close = 0, storage, 0)) OVER (PARTITION BY position_id, login) AS open_storage,
+        SUM(IF(is_close = 1, storage, 0)) OVER (PARTITION BY position_id, `order`, login) AS close_storage,
+
+        -- weighted average admin fee for closing deals
+        SAFE_DIVIDE(admin_fee, SUM(IF(is_close = 1, volume_closed, 0)) OVER (PARTITION BY position_id, login))
+        * volume_closed AS admin_fee,
+
+        -- close time of last closing deal within one position AND order
+        MAX(CASE WHEN is_close = 1 THEN execution_time END)
+            OVER (PARTITION BY position_id, `order`, login)
+            AS close_time,
+        MAX(CASE WHEN is_close = 1 THEN time_done_msc END)
+            OVER (PARTITION BY position_id, `order`, login)
+            AS close_time_ms,
+        MAX(CASE WHEN is_close = 1 THEN time_setup_msc END)
+            OVER (PARTITION BY position_id, `order`, login)
+            AS close_time_setup_ms,
+        -- open time of initial opening order within one position   
+        MIN(CASE WHEN is_close = 0 THEN execution_time END)
+            OVER (PARTITION BY position_id, login)
+            AS open_time,
+        MIN(CASE WHEN is_close = 0 THEN time_done_msc END)
+            OVER (PARTITION BY position_id, login)
+            AS open_time_ms,
+        MIN(CASE WHEN is_close = 0 THEN time_setup_msc END)
+            OVER (PARTITION BY position_id, login)
+            AS open_time_setup_ms,
+        -- open ask/bid prices of initial opening order within one position 
+        -- MAX(CASE WHEN is_close = 0 THEN market_bid END)
+        --     OVER (PARTITION BY position_id, login)
+        --     AS open_market_bid,
+        -- MIN(CASE WHEN is_close = 0 THEN market_ask END)
+        --     OVER (PARTITION BY position_id, login)
+        --     AS open_market_ask,
+        -- -- close ask/bid prices of closing deals within one position AND order   
+        -- MAX(CASE WHEN is_close = 1 THEN market_bid END)
+        --     OVER (PARTITION BY position_id, `order`, login)
+        --     AS close_market_bid,
+        -- MIN(CASE WHEN is_close = 1 THEN market_ask END)
+        --     OVER (PARTITION BY position_id, `order`, login)
+        --     AS close_market_ask,
+        -- BI-13456322 (weighted by volume):
+        SUM(CASE WHEN is_close = 0 THEN market_bid * volume END) OVER (PARTITION BY position_id, login)
+        / SUM(CASE WHEN is_close = 0 THEN volume END) OVER (PARTITION BY position_id, login) AS open_market_bid,
+        SUM(CASE WHEN is_close = 0 THEN market_ask * volume END) OVER (PARTITION BY position_id, login)
+        / SUM(CASE WHEN is_close = 0 THEN volume END) OVER (PARTITION BY position_id, login) AS open_market_ask,
+        SUM(CASE WHEN is_close = 1 THEN market_bid * volume END)
+            OVER (PARTITION BY position_id, `order`, login)
+        / SUM(CASE WHEN is_close = 1 THEN volume END)
+            OVER (PARTITION BY position_id, `order`, login) AS close_market_bid,
+        SUM(CASE WHEN is_close = 1 THEN market_ask * volume END)
+            OVER (PARTITION BY position_id, `order`, login)
+        / SUM(CASE WHEN is_close = 1 THEN volume END)
+            OVER (PARTITION BY position_id, `order`, login) AS close_market_ask,
+
+        -- for markups
+        SUM(IF(is_close = 0, ts_markup, 0)) OVER (PARTITION BY position_id, login) AS open_ts_markup,
+        SUM(IF(is_close = 1, ts_markup, 0)) OVER (PARTITION BY position_id, `order`, login) AS close_ts_markup,
+        SUM(IF(is_close = 0, ts_usd_qty, 0)) OVER (PARTITION BY position_id, login) AS open_ts_usd_qty,
+        SUM(IF(is_close = 1, ts_usd_qty, 0)) OVER (PARTITION BY position_id, `order`, login) AS close_ts_usd_qty,
+        SUM(IF(is_close = 0 AND price_gateway != 0, price_gateway - deal_price, 0))
+            OVER (PARTITION BY position_id, login)
+            AS open_ib_markup,
+        SUM(IF(is_close = 1 AND price_gateway != 0, price_gateway - deal_price, 0))
+            OVER (PARTITION BY position_id, login)
+            AS close_ib_markup,
+        --
+        ROW_NUMBER() OVER (
+            PARTITION BY position_id, `order`, login, is_close
+            ORDER BY deal DESC
+        ) AS num_row
+    FROM detailed_info
+),
+
+-- BI-2943
+opening_deal AS (
+    SELECT
+        position_id,
+        ARRAY_AGG(
+            SAFE_CAST(deal AS INT64) IGNORE NULLS
+            ORDER BY deal
+        ) AS opening_deal_ids
+    FROM detailed_info
+    WHERE
+        entry_type IN ('ENTRY_IN')
+        AND deal IS NOT NULL
+    GROUP BY position_id
+),
+
+closing_deal AS (
+    SELECT
+        position_id,
+        ARRAY_AGG(
+            SAFE_CAST(deal AS INT64) IGNORE NULLS
+            ORDER BY deal
+        ) AS closing_deal_ids
+    FROM detailed_info
+    WHERE
+        entry_type IN ('ENTRY_OUT', 'ENTRY_INOUT', 'ENTRY_OUT_BY')
+        AND deal IS NOT NULL
+    GROUP BY position_id
+),
+
+part_3 AS (
+    SELECT
+        position_id,
+        `order`,
+        deal,
+        login,
+        symbol,
+        is_buy,
+        open_time,
+        open_time_ms,
+        open_time_setup_ms,
+        close_time,
+        close_time_ms,
+        close_time_setup_ms,
+        volume,
+        volume_closed,
+        volume_close_lot,
+        comment,
+        price AS close_price,
+        price_sl,
+        price_tp,
+        profit,
+        open_market_bid,
+        open_market_ask,
+        close_market_bid,
+        close_market_ask,
+        admin_fee,
+        -- TS markups are calculated at the deal level; therefore, we sum them up for an order, 
+        -- taking into account cases where the number of opening and closing orders is not equal. 
+        -- In this case, opening markups are distributed among the closing orders.
+        -- cnt_clsd_orders_in_position is for opening side only.
+        close_ts_markup,
+        close_ts_usd_qty,
+        open_ts_markup / cnt_clsd_orders_in_position AS open_ts_markup,
+        open_ts_usd_qty / cnt_clsd_orders_in_position AS open_ts_usd_qty,
+        -- IB markups are calculated at the order level; therefore, we do not need them to sum up.
+        -- And cnt_clsd_orders_in_position is for both sides.
+        -- The direction should be taken into account.
+        IF(is_buy = 1, -1, 1) * open_ib_markup / cnt_clsd_orders_in_position AS open_ib_markup,
+        IF(is_buy = 0, -1, 1) * close_ib_markup / cnt_clsd_orders_in_position AS close_ib_markup,
+        -- one position can include more than one closing orders (typical behaviour for CLOSE_BY). 
+        -- In this case we split open commissions/swaps between them
+        open_commission / cnt_clsd_orders_in_position + close_commission AS commission,
+        open_storage / cnt_clsd_orders_in_position + close_storage AS storage,
+        -- price_position = 0 AND profit = 0 is a CLOSE_BY case. 
+        -- Means that the whole opening volume was closed by CLOSE_BY order, and prices/profits are considered in the 
+        -- position what was opened instead of the previous one. In this case price_position = 0 AND profit = 0, 
+        -- and we take a close_price as an open one to explain zero profit.
+        IF(price_position = 0 AND profit = 0, price, price_position) AS open_price,
+        -- taken into account CLOSE BY cases for original_client_price
+        IF(price_position = 0 AND profit = 0, NULL, open_original_client_price) AS open_original_client_price,
+        IF(order_type = 8, NULL, close_original_client_price) AS close_original_client_price
+    FROM part_2
+    WHERE is_close = 1 AND num_row = 1
+    ORDER BY 1, 2
+),
+
+group_symbols AS (
+    SELECT
+        *,
+        SPLIT(path, '*')[SAFE_OFFSET(0)] AS path_prefix,
+        LENGTH(SPLIT(path, '*')[SAFE_OFFSET(0)]) AS path_len
+    FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_group_symbols`
+    WHERE
+        spread_diff IS NOT NULL
+        AND spread_diff != 2147483647
+),
+
+final_data AS (
+    SELECT
+        'mt5_dubai_live01' AS server_name,
+        o.position_id,
+        o.`order` AS trade_id,
+        o.deal AS closing_deal_id,
+        od.opening_deal_ids, -- BI-2943
+        cd.closing_deal_ids, -- BI-2943
+        o.login,
+        o.is_buy,
+        o.symbol AS symbol_name,
+        o.open_time,
+        DATETIME(o.open_time, 'Europe/London') AS open_time_london,
+        DATE(TIMESTAMP_ADD(DATETIME(o.open_time, 'Europe/London'), INTERVAL 120 MINUTE))
+            AS open_time_london_trading_date,
+        o.close_time,
+        DATETIME(o.close_time, 'Europe/London') AS `close_time_london`,
+        DATE(TIMESTAMP_ADD(DATETIME(o.close_time, 'Europe/London'), INTERVAL 120 MINUTE))
+            AS close_time_london_trading_date,
+        o.volume_close_lot AS volume_lots,
+        -- calculation as per this doc https://zealgroup.sg.larksuite.com/wiki/A729wTaJqibg0OkfoGSlJmtqgzs
+        CASE
+        WHEN REGEXP_CONTAINS(UPPER(ta.trading_conditions), r'(ECN|PREMIER|PRO)') THEN o.volume_closed / 10000
+        WHEN UPPER(ta.trading_conditions) LIKE '%STP%' AND NOT REGEXP_CONTAINS(o.symbol, r'(US30t|DAX30)') THEN o.volume_closed / 10000
+        WHEN UPPER(ta.trading_conditions) LIKE '%STP%' AND o.symbol LIKE '%US30t%' THEN o.volume_closed / 10000 / 10
+        WHEN UPPER(ta.trading_conditions) LIKE '%STP%' AND o.symbol LIKE '%DAX30%' THEN o.volume_closed / 10000 / 25
+        WHEN UPPER(ta.trading_conditions) LIKE '%CENT%' AND NOT REGEXP_CONTAINS(o.symbol, r'(US30t|DAX30)') THEN o.volume_closed / 10000 / 100
+        WHEN UPPER(ta.trading_conditions) LIKE '%CENT%' AND o.symbol LIKE '%US30t%' THEN o.volume_closed / 10000 / 100 / 10
+        WHEN UPPER(ta.trading_conditions) LIKE '%CENT%' AND o.symbol LIKE '%DAX30%' THEN o.volume_closed / 10000 / 100 / 25
+        ELSE o.volume_closed / 10000
+    END AS volume_std_lots,
+        o.volume_closed / 10000 * sh.contract_size AS qty,
+        CASE
+            -- FOREX
+            WHEN
+                s.calc_mode IN (0, 5) AND UPPER(g.currency) != 'CNT'
+                THEN (o.volume_closed / 10000) * sh.contract_size * ra.mid
+            -- CFD
+            WHEN
+                s.calc_mode IN (2, 3, 4) AND UPPER(g.currency) != 'CNT'
+                THEN (o.volume_closed / 10000) * o.close_price * sh.contract_size * ra.mid
+            -- FUTURES
+            WHEN
+                s.calc_mode = 1 AND UPPER(g.currency) != 'CNT'
+                THEN (o.volume_closed / 10000) * o.close_price * ra.mid * (sh.tick_value / sh.tick_size)
+            WHEN
+                s.calc_mode IN (0, 5) AND UPPER(g.currency) = 'CNT'
+                THEN (o.volume_closed / 10000) * sh.contract_size * ra.mid * 0.01
+            WHEN
+                s.calc_mode IN (2, 3, 4) AND UPPER(g.currency) = 'CNT'
+                THEN (o.volume_closed / 10000) * o.close_price * sh.contract_size * ra.mid * 0.01
+            WHEN
+                s.calc_mode = 1 AND UPPER(g.currency) = 'CNT'
+                THEN (o.volume_closed / 10000) * o.close_price * ra.mid * (sh.tick_value / sh.tick_size) * 0.01
+        END AS close_qty_usd,
+        CASE
+            -- FOREX
+            WHEN
+                s.calc_mode IN (0, 5) AND UPPER(g.currency) != 'CNT'
+                THEN (o.volume_closed / 10000) * sh.contract_size * rao.mid
+            -- CFD
+            WHEN
+                s.calc_mode IN (2, 3, 4) AND UPPER(g.currency) != 'CNT'
+                THEN (o.volume_closed / 10000) * o.open_price * sh.contract_size * rao.mid
+            -- FUTURES
+            WHEN
+                s.calc_mode = 1 AND UPPER(g.currency) != 'CNT'
+                THEN (o.volume_closed / 10000) * o.open_price * rao.mid * (sh.tick_value / sh.tick_size)
+            WHEN
+                s.calc_mode IN (0, 5) AND UPPER(g.currency) = 'CNT'
+                THEN (o.volume_closed / 10000) * sh.contract_size * rao.mid * 0.01
+            WHEN
+                s.calc_mode IN (2, 3, 4) AND UPPER(g.currency) = 'CNT'
+                THEN (o.volume_closed / 10000) * o.open_price * sh.contract_size * rao.mid * 0.01
+            WHEN
+                s.calc_mode = 1 AND UPPER(g.currency) = 'CNT'
+                THEN (o.volume_closed / 10000) * o.open_price * rao.mid * (sh.tick_value / sh.tick_size) * 0.01
+        END AS open_qty_usd,
+        CASE
+            -- FOREX
+            WHEN
+                s.calc_mode IN (0, 5) AND UPPER(g.currency) != 'CNT'
+                THEN
+                    ((o.volume_closed / 10000) * sh.contract_size * rao.mid)
+                    + ((o.volume_closed / 10000) * sh.contract_size * ra.mid)
+            -- CFD
+            WHEN
+                s.calc_mode IN (2, 3, 4) AND UPPER(g.currency) != 'CNT'
+                THEN
+                    ((o.volume_closed / 10000) * o.close_price * sh.contract_size * rao.mid)
+                    + ((o.volume_closed / 10000) * o.open_price * sh.contract_size * ra.mid)
+            -- FUTURES
+            WHEN
+                s.calc_mode = 1 AND UPPER(g.currency) != 'CNT'
+                THEN
+                    ((o.volume_closed / 10000) * o.close_price * rao.mid * (sh.tick_value / sh.tick_size))
+                    + ((o.volume_closed / 10000) * o.open_price * ra.mid * (sh.tick_value / sh.tick_size))
+            WHEN
+                s.calc_mode IN (0, 5) AND UPPER(g.currency) = 'CNT'
+                THEN
+                    ((o.volume_closed / 10000) * sh.contract_size * rao.mid * 0.01)
+                    + ((o.volume_closed / 10000) * sh.contract_size * ra.mid * 0.01)
+            WHEN
+                s.calc_mode IN (2, 3, 4) AND UPPER(g.currency) = 'CNT'
+                THEN
+                    ((o.volume_closed / 10000) * o.close_price * sh.contract_size * rao.mid * 0.01)
+                    + ((o.volume_closed / 10000) * o.open_price * sh.contract_size * ra.mid * 0.01)
+            WHEN
+                s.calc_mode = 1 AND UPPER(g.currency) = 'CNT'
+                THEN
+                    ((o.volume_closed / 10000) * o.close_price * rao.mid * (sh.tick_value / sh.tick_size) * 0.01)
+                    + ((o.volume_closed / 10000) * o.open_price * ra.mid * (sh.tick_value / sh.tick_size) * 0.01)
+        END AS qty_usd, -- BI-2461, closing part changed from volume to volume_closed
+        ROUND(o.open_price, CAST(sh.digits AS INT64)) AS open_price,
+        ROUND(o.open_original_client_price, CAST(sh.digits AS INT64)) AS open_original_client_price,
+        ROUND(o.close_price, CAST(sh.digits AS INT64)) AS close_price,
+        ROUND(o.close_original_client_price, CAST(sh.digits AS INT64)) AS close_original_client_price,
+        o.profit AS trade_profit,
+        ROUND(o.profit * rg.mid, CAST(s.currency_profit_digits AS INT64)) AS trade_profit_usd,
+        o.commission * rg.mid AS commission_usd,
+        o.storage * rg.mid AS swap_usd,
+        o.admin_fee * rg.mid AS admin_fee_usd,
+        o.price_sl AS sl,
+        o.price_tp AS tp,
+        o.comment,
+        -- confirmed with Oliver to take current groups in cases when historical data not available, ticket: TDV-1786
+        COALESCE(tago.trading_account_group_name, ta.trading_group) AS open_group,
+        COALESCE(tagc.trading_account_group_name, ta.trading_group) AS close_group,
+        CASE
+            WHEN COALESCE(LOWER(tago.trading_account_group_name), LOWER(ta.trading_group), '') LIKE r'%\\o\\%' THEN 'A'
+            WHEN COALESCE(LOWER(tago.trading_account_group_name), LOWER(ta.trading_group), '') LIKE r'%\\r\\%' THEN 'B'
+        END AS `open_book`,
+        CASE
+            WHEN COALESCE(LOWER(tagc.trading_account_group_name), LOWER(ta.trading_group), '') LIKE r'%\\o\\%' THEN 'A'
+            WHEN COALESCE(LOWER(tagc.trading_account_group_name), LOWER(ta.trading_group), '') LIKE r'%\\r\\%' THEN 'B'
+        END AS `close_book`,
+        -- FBR markup + IB markup. Bridge doesn't exist in MT5, hence markup = spread_diff.
+        COALESCE(gs_open.spread_diff, 0) AS open_markup,
+        -- COALESCE(gs_close.spread_diff, 0) AS close_markup, -- moved to next cte
+        COALESCE(gs_open.spread_diff, 0) AS open_spread_diff,
+        -- COALESCE(gs_close.spread_diff, 0) AS close_spread_diff, -- moved to next cte
+
+        COALESCE(mdr.rebate_spread_usd, 0) AS rebate_payout_markup,
+        0 AS rebate_payout_commission,
+        0 AS rebate_payout_subsidy,
+        COALESCE(mdr.rebate_spread_usd, 0) AS rebate_payout,
+        -- open_source TBD
+        NULL AS open_source,
+        -- close_source TBD
+        NULL AS close_source,
+        o.open_market_bid AS open_bid,
+        o.open_market_ask AS open_ask,
+        o.open_price AS open_confirmed_price,
+        -- raw_execution_price = price_gateway. price_gateway = IB markup + deal_price
+        o.open_price + o.open_ib_markup AS open_raw_execution_price,
+        o.close_market_bid AS close_bid,
+        o.close_market_ask AS close_ask,
+        o.close_price AS close_confirmed_price,
+        -- raw_execution_price = price_gateway. price_gateway = IB markup + deal_price
+        o.close_price + o.close_ib_markup AS close_raw_execution_price,
+        -- FBR markups. Bridge doesn't exist in mt5 hence markups = 0
+        0 AS open_fbr_markup_usd,
+        0 AS close_fbr_markup_usd,
+        -- IB markup. Price_gateway - Deal Price.
+        IF(UPPER(g.currency) = 'CNT', open_ib_markup * 0.01, open_ib_markup) AS open_ib_markup_usd,
+        IF(UPPER(g.currency) = 'CNT', close_ib_markup * 0.01, close_ib_markup) AS close_ib_markup_usd,
+        -- TS markups. Based on DoneTrades, the same logic as for MT4.
+        IF(UPPER(g.currency) = 'CNT', open_ts_markup * 0.01, open_ts_markup) AS open_ts_markup_usd,
+        IF(UPPER(g.currency) = 'CNT', close_ts_markup * 0.01, close_ts_markup) AS close_ts_markup_usd,
+        --
+        s.calc_mode AS profit_mode,
+        NULL AS trade_margin,
+        -- Execution time in ms
+        open_time_ms,
+        close_time_ms,
+        -- Setup time in ms
+        open_time_setup_ms,
+        close_time_setup_ms,
+
+        -- FXBO accounts
+        CAST(a.id AS STRING) AS `account_id`,
+        a.created_at AS `account_registration_datetime`,
+        DATETIME(a.created_at, 'Europe/London') AS `account_registration_datetime_london`,
+        DATE(a.created_at, 'Europe/London') AS `account_registration_datetime_london_trading_day`,
+
+        a_hist.assigned_user_id AS `account_assgined_user_id_hist`,
+        a_hist.assigned_user_name AS `account_assgined_user_name_hist`, -- additional
+        CAST(md.department_id AS STRING) AS `account_owner_office_id_hist`,
+        d.name AS `account_owner_office_name_hist`,
+
+        -- current values:
+        -- , taf.account_owner_id AS `account_assgined_user_id_hist` 
+        -- , taf.account_owner_name AS `account_assgined_user_name_hist` 
+        -- , taf.account_owner_office_id AS `account_owner_office_id_hist`
+        -- , taf.account_owner_office_name AS `account_owner_office_name_hist` 
+
+        -- TODO, this is current parent
+        taf.parent_id AS `account_parent_account_id_hist`,
+        taf.parent_name AS `account_parent_account_name_hist`,
+        SAFE_CAST(NULL AS STRING) AS `account_sales_account_id_hist`,
+        taf.account_type AS `account_type_hist`,
+        -- TODO, this is current
+        NOT COALESCE(a.verified_at IS NULL, FALSE) AS `account_passed_kyc_hist`,
+
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_campaign') AS STRING) AS `account_utm_campaign`,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_content') AS STRING) AS `account_utm_content`,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_medium') AS STRING) AS `account_utm_medium`,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_source') AS STRING) AS `account_utm_source`,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_term') AS STRING) AS `account_utm_term`,
+
+        -- Country of residence in FXBO
+        a.country AS `account_country_code_hist`,
+
+        -- In FXBO single mode which is the equivalent to mode B 
+        SAFE_CAST(NULL AS STRING) AS `account_mode_hist`,
+
+        -- There is no such entity as primary trading account, so client id is used
+        SAFE_CAST(a.id AS STRING) AS `primary_trading_account_id`,
+        SAFE_CAST(a.id AS INT64) AS `primary_trading_account_number`,
+
+        -- Hash of login is used as there is no trading accs id in FXBO
+        SAFE_CAST(ma.login AS STRING) AS `trading_account_id`,
+
+        ma.registration AS `trading_account_registration_datetime`,
+        DATETIME(ma.registration, 'Europe/London') AS `trading_account_registration_datetime_london`,
+        DATE(ma.registration, 'Europe/London') AS `trading_account_registration_datetime_london_trading_day`,
+
+        -- Trading conditions are current state
+        ta.trading_conditions AS `trading_account_conditions_id_hist`,
+
+        -- There is no additional assignment for trading account
+        SAFE_CAST(NULL AS STRING) AS `trading_account_assigned_user_id_hist`,
+        SAFE_CAST(NULL AS STRING) AS `trading_account_parent_trading_account_id_hist`,
+        SAFE_CAST(NULL AS STRING) AS `trading_account_assigned_user_name_hist`,
+        -- BI-3865, column path added for the next step:
+        s.path AS s_path
+    FROM part_3 AS o
+    INNER JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_trading_accounts_flagged` AS taf
+        ON
+            o.login = taf.login
+            AND taf.is_test = 0
+            AND taf.is_demo = 0
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_accounts` AS ma ON o.login = ma.login
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_groups` AS g ON ma.group = g.group
+    LEFT JOIN
+        `zfx-dwh-prod`.`rep_general`.`tbl_currency_rates` AS rg
+        ON g.currency = rg.currency AND rg.rate_date = DATE(o.close_time)
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_symbols` AS s ON o.symbol = s.symbol
+    LEFT JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`zeal_mt5_consymbol_with_validity_ranges` AS sh
+        ON
+            o.symbol = sh.symbol
+            AND o.close_time >= sh._valid_from_dttm
+            AND o.close_time < sh._valid_to_dttm
+    LEFT JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_trading_conditions` AS ta ON g.group = ta.trading_group
+    LEFT JOIN `zfx-dwh-prod`.`rep_general`.`tbl_currency_rates` AS ra
+        ON
+            s.currency_base = ra.currency
+            AND ra.rate_date = DATE(o.close_time)
+    LEFT JOIN `zfx-dwh-prod`.`rep_general`.`tbl_currency_rates` AS rao
+        ON
+            s.currency_base = rao.currency
+            AND rao.rate_date = DATE(o.open_time)
+    LEFT JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`trading_account_group_changes_optimized` AS tago
+        ON
+            tago.server_name = 'mt5_dubai_live01'
+            AND o.login = tago.trading_account_number
+            AND o.open_time >= tago.valid_from_timestamp
+            AND o.open_time < tago.valid_to_timestamp
+    LEFT JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`trading_account_group_changes_optimized` AS tagc
+        ON
+            tagc.server_name = 'mt5_dubai_live01'
+            AND o.login = tagc.trading_account_number
+            AND o.close_time >= tagc.valid_from_timestamp
+            AND o.close_time < tagc.valid_to_timestamp
+    -- for spread_diff
+    LEFT JOIN group_symbols AS gs_open
+        ON
+            tago.trading_account_group_name = gs_open.`group`
+            AND STARTS_WITH(s.path, gs_open.path_prefix)
+    -- FXBO
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_users` AS a
+        ON COALESCE(CAST(ma.idx AS STRING), '') = COALESCE(CAST(a.id AS STRING), '')
+    LEFT JOIN mt5_dubai_rebates AS mdr ON CAST(o.`order` AS INT64) = CAST(mdr.`order` AS INT64)
+    LEFT JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_accounts_assigned_user_rel_hist` AS a_hist
+        ON
+            taf.account_id = a_hist.account_id
+            AND o.close_time >= a_hist.valid_from_timestamp
+            AND o.close_time < a_hist.valid_to_timestamp
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers_to_departments` AS md
+        ON SAFE_CAST(a_hist.assigned_user_id AS STRING) = SAFE_CAST(md.manager_id AS STRING)
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers_departments` AS d
+        ON md.department_id = d.id
+    LEFT JOIN closing_deal AS cd ON o.position_id = cd.position_id
+    LEFT JOIN opening_deal AS od ON o.position_id = od.position_id
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY o.position_id, o.`order`, s.path, tago.trading_account_group_name
+        -- we take the most detailed path. 
+        -- For example, if there are two options: 
+        -- Forex\FX Major\* and Forex\* 
+        -- We will take Forex\FX Major\*
+        ORDER BY gs_open.path_len DESC
+    ) = 1
+),
+
+format_final_data AS (
+    SELECT
+        server_name,
+        opening_deal_ids,
+        closing_deal_ids, -- BI-2943
+        symbol_name, -- BI-2943
+        is_buy,
+        open_time,
+        open_time_london,
+        open_time_london_trading_date,
+        close_time,
+        close_time_london,
+        close_time_london_trading_date,
+        volume_lots,
+        qty,
+        close_qty_usd,
+        open_qty_usd,
+        qty_usd,
+        commission_usd,
+        swap_usd,
+        admin_fee_usd,
+        comment,
+        open_group,
+        close_group,
+        open_book,
+        close_book,
+        open_markup,
+        gs_close.spread_diff AS close_markup,
+        open_spread_diff,
+        gs_close.spread_diff AS close_spread_diff,
+        rebate_payout_markup,
+        rebate_payout_commission,
+        rebate_payout_subsidy,
+        rebate_payout,
+        account_id,
+        account_registration_datetime,
+        account_registration_datetime_london,
+        account_registration_datetime_london_trading_day,
+        account_assgined_user_id_hist,
+        account_owner_office_id_hist,
+        account_parent_account_id_hist,
+        account_sales_account_id_hist,
+        account_type_hist,
+        account_passed_kyc_hist,
+        account_utm_campaign,
+        account_utm_content,
+        account_utm_medium,
+        account_utm_source,
+        account_utm_term,
+        account_country_code_hist,
+        account_mode_hist,
+        primary_trading_account_id,
+        primary_trading_account_number,
+        trading_account_id,
+        trading_account_registration_datetime,
+        trading_account_registration_datetime_london,
+        trading_account_registration_datetime_london_trading_day,
+        trading_account_conditions_id_hist,
+        trading_account_assigned_user_id_hist,
+        trading_account_parent_trading_account_id_hist,
+        open_source,
+        close_source,
+        trading_account_assigned_user_name_hist,
+        open_time_ms,
+        close_time_ms,
+        open_time_setup_ms,
+        close_time_setup_ms,
+        profit_mode,
+        trade_margin,
+        account_assgined_user_name_hist,
+        account_owner_office_name_hist,
+        CAST(closing_deal_id AS INT64) AS closing_deal_id,
+        CAST(trade_id AS INT64) AS trade_id,
+        CAST(position_id AS INT64) AS position_id,
+        CAST(login AS INT64) AS login,
+        CAST(volume_std_lots AS NUMERIC) AS volume_std_lots,
+        CAST(open_price AS NUMERIC) AS open_price,
+        CAST(close_price AS NUMERIC) AS close_price,
+        CAST(open_original_client_price AS NUMERIC) AS open_original_client_price,
+        CAST(close_original_client_price AS NUMERIC) AS close_original_client_price,
+        CAST(trade_profit AS NUMERIC) AS trade_profit,
+        CAST(trade_profit_usd AS NUMERIC) AS trade_profit_usd,
+        CAST(sl AS NUMERIC) AS sl,
+        CAST(tp AS NUMERIC) AS tp,
+        CAST(open_bid AS NUMERIC) AS open_bid,
+        CAST(open_ask AS NUMERIC) AS open_ask,
+        CAST(open_confirmed_price AS NUMERIC) AS open_confirmed_price,
+        CAST(open_raw_execution_price AS NUMERIC) AS open_raw_execution_price,
+        CAST(close_bid AS NUMERIC) AS close_bid,
+        CAST(close_ask AS NUMERIC) AS close_ask,
+        CAST(close_confirmed_price AS NUMERIC) AS close_confirmed_price,
+        CAST(close_raw_execution_price AS NUMERIC) AS close_raw_execution_price,
+        CAST(open_fbr_markup_usd AS NUMERIC) AS open_fbr_markup_usd,
+        CAST(close_fbr_markup_usd AS NUMERIC) AS close_fbr_markup_usd,
+        CAST(open_ib_markup_usd AS NUMERIC) AS open_ib_markup_usd,
+        CAST(close_ib_markup_usd AS NUMERIC) AS close_ib_markup_usd,
+        CAST(open_ts_markup_usd AS NUMERIC) AS open_ts_markup_usd,
+        CAST(close_ts_markup_usd AS NUMERIC) AS close_ts_markup_usd
+    FROM final_data
+    LEFT JOIN group_symbols AS gs_close
+        ON
+            final_data.close_group = gs_close.`group`
+            AND STARTS_WITH(final_data.s_path, gs_close.path_prefix)
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY final_data.position_id, final_data.trade_id, final_data.s_path, final_data.close_group
+        -- we take the most detailed path. 
+        -- For example, if there are two options: 
+        -- Forex\FX Major\* and Forex\* 
+        -- We will take Forex\FX Major\*
+        ORDER BY gs_close.path_len DESC
+    ) = 1
+)
+
+SELECT
+    server_name,
+    closing_deal_id,
+    opening_deal_ids,
+    closing_deal_ids,
+    trade_id,
+    position_id,
+    login,
+    symbol_name,
+    is_buy,
+    open_time,
+    open_time_london,
+    open_time_london_trading_date,
+    close_time,
+    close_time_london,
+    close_time_london_trading_date,
+    volume_lots,
+    volume_std_lots,
+    qty,
+    close_qty_usd,
+    open_qty_usd,
+    qty_usd,
+    open_price,
+    close_price,
+    open_original_client_price,
+    close_original_client_price,
+    trade_profit,
+    trade_profit_usd,
+    commission_usd,
+    swap_usd,
+    admin_fee_usd,
+    sl,
+    tp,
+    comment,
+    open_group,
+    close_group,
+    open_book,
+    close_book,
+    open_markup,
+    close_markup,
+    open_spread_diff,
+    close_spread_diff,
+    rebate_payout_markup,
+    rebate_payout_commission,
+    rebate_payout_subsidy,
+    rebate_payout,
+    account_id,
+    account_registration_datetime,
+    account_registration_datetime_london,
+    account_registration_datetime_london_trading_day,
+    account_assgined_user_id_hist,
+    account_owner_office_id_hist,
+    account_parent_account_id_hist,
+    account_sales_account_id_hist,
+    account_type_hist,
+    account_passed_kyc_hist,
+    account_utm_campaign,
+    account_utm_content,
+    account_utm_medium,
+    account_utm_source,
+    account_utm_term,
+    account_country_code_hist,
+    account_mode_hist,
+    primary_trading_account_id,
+    primary_trading_account_number,
+    trading_account_id,
+    trading_account_registration_datetime,
+    trading_account_registration_datetime_london,
+    trading_account_registration_datetime_london_trading_day,
+    trading_account_conditions_id_hist,
+    trading_account_assigned_user_id_hist,
+    trading_account_parent_trading_account_id_hist,
+    open_source,
+    close_source,
+    trading_account_assigned_user_name_hist,
+    open_time_ms,
+    close_time_ms,
+    open_time_setup_ms,
+    close_time_setup_ms,
+    open_bid,
+    open_ask,
+    open_confirmed_price,
+    open_raw_execution_price,
+    close_bid,
+    close_ask,
+    close_confirmed_price,
+    close_raw_execution_price,
+    profit_mode,
+    open_fbr_markup_usd,
+    close_fbr_markup_usd,
+    open_ib_markup_usd,
+    close_ib_markup_usd,
+    open_ts_markup_usd,
+    close_ts_markup_usd,
+    trade_margin,
+    account_assgined_user_name_hist,
+    account_owner_office_name_hist
+FROM format_final_data
+==========================================================================================
+TABLE: zfx-dwh-prod.data_marts_multi_region.mt5_dubai_live01_leads
+  type: VIEW  rows: 0  size_bytes: 0
+  created: 2026-08-27 02:03:09.125000+00:00  modified: 2026-08-27 02:03:09.125000+00:00
+  description: None
+  labels: {}
+  schema:
+   - id INTEGER NULLABLE
+   - registration_datetime TIMESTAMP NULLABLE
+   - registration_datetime_london DATETIME NULLABLE
+   - registration_london_trade_date DATE NULLABLE
+   - name STRING NULLABLE
+   - owner_office_id STRING NULLABLE
+   - owner_office_name STRING NULLABLE
+   - country_of_residence STRING NULLABLE
+   - region STRING NULLABLE
+   - account_utm_campaign STRING NULLABLE
+   - account_utm_content STRING NULLABLE
+   - account_utm_medium STRING NULLABLE
+   - account_utm_source STRING NULLABLE
+   - account_utm_term STRING NULLABLE
+   - tenant_id INTEGER NULLABLE
+   - invite_referral_code STRING NULLABLE
+   - acquisition_category STRING NULLABLE
+   - acquisition_traffic_type STRING NULLABLE
+   - acquisition_channel STRING NULLABLE
+   - acquisition_url STRING NULLABLE
+   - acquisition_referral_code INTEGER NULLABLE
+   - acquisition_referral_account_id STRING NULLABLE
+   - is_lead INTEGER NULLABLE
+  VIEW QUERY:
+WITH cte_utms AS (
+    SELECT
+        id,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_source') AS STRING) AS acquisition_source,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_medium') AS STRING) AS acquisition_medium,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_campaign') AS STRING) AS acquisition_campaign,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_content') AS STRING) AS acquisition_content,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_term') AS STRING) AS acquisition_term
+    FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_users`
+)
+
+SELECT
+    fu.id, -- there is no lead_id in FXBO, should be used as lead_id and account_id
+    fu.created_at AS registration_datetime,
+    DATETIME(fu.created_at + INTERVAL 2 HOUR, 'Europe/London') AS registration_datetime_london,
+    DATE(DATETIME(fu.created_at + INTERVAL 2 HOUR, 'Europe/London')) AS registration_london_trade_date,
+    CONCAT(TRIM(fu.first_name), ' ', TRIM(fu.last_name)) AS `name`,
+    CAST(md.department_id AS STRING) AS owner_office_id,
+    d.name AS owner_office_name,
+    cd.country_name AS country_of_residence,
+    cd.continent_region_internal AS region,
+    cte_utms.acquisition_campaign AS account_utm_campaign,
+    cte_utms.acquisition_content AS account_utm_content,
+    cte_utms.acquisition_medium AS account_utm_medium,
+    cte_utms.acquisition_source AS account_utm_source,
+    cte_utms.acquisition_term AS account_utm_term,
+    -1 AS tenant_id, --artificial tenant_id for Dubai Traze
+    SAFE_CAST(NULL AS STRING) AS invite_referral_code,
+    
+  
+  
+  
+
+  
+    CASE
+      WHEN fu.referral_link_id IS NOT NULL THEN 'IB/SALES Referral'
+      WHEN aq.acquisition_category IS NOT NULL THEN aq.acquisition_category
+      WHEN fmc.title IN ('Campaign 1 (Sales)', 'Traze ZFX') THEN 'IB/SALES Referral'
+      ELSE 'Organic'
+    END
+
+  
+ AS acquisition_category,
+    
+  
+  
+  
+
+  
+    CASE
+      WHEN fu.referral_link_id IS NOT NULL THEN 'Sales/IB/IC'
+      WHEN aq.acquisition_traffic_type IS NOT NULL THEN aq.acquisition_traffic_type
+      WHEN fmc.title IN ('Campaign 1 (Sales)', 'Traze ZFX') THEN 'Sales/IB/IC'
+      ELSE 'Organic'
+    END
+
+  
+ AS acquisition_traffic_type,
+    
+  
+  
+  
+
+  
+    CASE
+      WHEN fu.referral_link_id IS NOT NULL THEN 'Sales/IB'
+      WHEN aq.acquisition_channel IS NOT NULL THEN aq.acquisition_channel
+      WHEN fmc.title IN ('Campaign 1 (Sales)', 'Traze ZFX') THEN 'Sales/IB'
+      ELSE 'Marketing' -- Organic
+    END
+
+  
+ AS acquisition_channel,
+    SAFE_CAST(NULL AS STRING) AS acquisition_url,
+    SAFE_CAST(NULL AS INT64) AS acquisition_referral_code,
+    SAFE_CAST(l.user_id AS STRING) AS acquisition_referral_account_id,
+    fu.is_lead
+FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_users` AS fu
+LEFT JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_accounts_flagged` AS af
+    ON CAST(fu.id AS STRING) = af.account_id
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers_to_departments` AS md
+    ON fu.manager_id = md.manager_id
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers_departments` AS d
+    ON md.department_id = d.id
+LEFT JOIN `zfx-dwh-prod`.`manual_dictionary`.`manual_dictionary_countries` AS cd ON fu.country = cd.country_code
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_links` AS l
+    ON fu.referral_link_id = l.id
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_marketing_links` AS mll
+    ON fu.marketing_link_id = mll.id
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_marketing_campaigns` AS fmc
+    ON mll.campaign_id = fmc.id
+LEFT JOIN cte_utms ON fu.id = cte_utms.id
+LEFT JOIN `zfx-dwh-prod`.`views`.`marketing_acquisition_traffic_types` AS aq
+    ON (
+        (cte_utms.acquisition_source = aq.acquisition_source AND cte_utms.acquisition_medium = aq.acquisition_medium)
+        OR (
+            cte_utms.acquisition_source IS NULL
+            AND cte_utms.acquisition_medium IS NOT NULL
+            AND aq.acquisition_source IS NULL
+            AND cte_utms.acquisition_medium = aq.acquisition_medium
+        )
+        OR (
+            cte_utms.acquisition_source IS NOT NULL
+            AND cte_utms.acquisition_medium IS NULL
+            AND cte_utms.acquisition_source = aq.acquisition_source
+            AND aq.acquisition_medium IS NULL
+        )
+        OR (
+            cte_utms.acquisition_source IS NULL
+            AND cte_utms.acquisition_medium IS NULL
+            AND aq.acquisition_source IS NULL
+            AND aq.acquisition_medium IS NULL
+        )
+    )
+    -- ignore row with NULLs when it's Sales/IB
+    AND NOT (
+        aq.acquisition_source IS NULL
+        AND aq.acquisition_medium IS NULL
+        AND (
+            fu.referral_link_id IS NOT NULL
+            OR fmc.title IN ('Campaign 1 (Sales)', 'Traze ZFX')
+        )
+    )
+WHERE
+    af.is_test = 0 -- excluding test accounts
+    OR fu.is_lead = 1
+==========================================================================================
+TABLE: zfx-dwh-prod.data_marts_multi_region.mt5_dubai_live01_open_trades
+  type: VIEW  rows: 0  size_bytes: 0
+  created: 2026-08-27 02:03:08.785000+00:00  modified: 2026-08-27 02:03:08.785000+00:00
+  description: None
+  labels: {}
+  schema:
+   - server_name STRING NULLABLE
+   - symbol_type STRING NULLABLE
+   - symbol_std STRING NULLABLE
+   - symbol_name STRING NULLABLE
+   - open_time TIMESTAMP NULLABLE
+   - open_time_london DATETIME NULLABLE
+   - open_time_london_trading_date DATE NULLABLE
+   - volume NUMERIC NULLABLE
+   - volume_lots NUMERIC NULLABLE
+   - open_qty_usd BIGNUMERIC NULLABLE
+   - current_qty_usd BIGNUMERIC NULLABLE
+   - commission_usd BIGNUMERIC NULLABLE
+   - swap_usd BIGNUMERIC NULLABLE
+   - sl NUMERIC NULLABLE
+   - tp NUMERIC NULLABLE
+   - comment STRING NULLABLE
+   - open_bid NUMERIC NULLABLE
+   - open_ask NUMERIC NULLABLE
+   - open_group STRING NULLABLE
+   - current_group STRING NULLABLE
+   - open_book STRING NULLABLE
+   - current_book STRING NULLABLE
+   - leverage INTEGER NULLABLE
+   - trade_margin INTEGER NULLABLE
+   - open_time_ms TIMESTAMP NULLABLE
+   - open_source STRING NULLABLE
+   - account_id STRING NULLABLE
+   - account_registration_datetime TIMESTAMP NULLABLE
+   - account_registration_datetime_london DATETIME NULLABLE
+   - account_registration_datetime_london_trading_day DATE NULLABLE
+   - account_name STRING NULLABLE
+   - account_type STRING NULLABLE
+   - account_assigned_user_id STRING NULLABLE
+   - account_assigned_user_name STRING NULLABLE
+   - account_owner_office_id STRING NULLABLE
+   - account_owner_office_name STRING NULLABLE
+   - account_parent_account_id STRING NULLABLE
+   - account_parent_account_name STRING NULLABLE
+   - account_passed_kyc BOOLEAN NULLABLE
+   - account_approved_date TIMESTAMP NULLABLE
+   - account_country_name STRING NULLABLE
+   - account_mode STRING NULLABLE
+   - primary_trading_account_id STRING NULLABLE
+   - primary_trading_account_number INTEGER NULLABLE
+   - trading_account_id STRING NULLABLE
+   - trading_account_registration_datetime TIMESTAMP NULLABLE
+   - trading_account_registration_datetime_london DATETIME NULLABLE
+   - trading_account_registration_datetime_london_trading_day DATE NULLABLE
+   - trading_account_conditions STRING NULLABLE
+   - trading_account_assigned_user_id STRING NULLABLE
+   - trading_account_assigned_user_name STRING NULLABLE
+   - trading_account_parent_trading_account_id STRING NULLABLE
+   - trading_account_parent_trading_account_number INTEGER NULLABLE
+   - last_update TIMESTAMP NULLABLE
+   - trade_id INTEGER NULLABLE
+   - login INTEGER NULLABLE
+   - is_buy BOOLEAN NULLABLE
+   - volume_std_lots NUMERIC NULLABLE
+   - signed_volume_std NUMERIC NULLABLE
+   - signed_open_qty_usd BIGNUMERIC NULLABLE
+   - signed_current_qty_usd BIGNUMERIC NULLABLE
+   - open_price NUMERIC NULLABLE
+   - current_price NUMERIC NULLABLE
+   - floating_trade_profit_usd NUMERIC NULLABLE
+  VIEW QUERY:
+WITH deal_info AS (
+    SELECT
+        d.login,
+        d.position_id,
+        SUM(d.commission) AS commission,
+        SUM(d.market_bid * d.volume) / SUM(d.volume) AS open_bid,
+        SUM(d.market_ask * d.volume) / SUM(d.volume) AS open_ask
+    FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_deals` AS d
+    WHERE
+        1 = 1
+        AND d.action IN (0, 1) -- the same as cmd
+        AND d.entry IN (0, 2) -- 'ENTRY_IN', 'ENTRY_INOUT'
+    GROUP BY 1, 2
+),
+
+part_1 AS (
+    SELECT
+        'mt5_dubai_live01' AS server_name,
+        p.position,
+        p.login,
+        s_2.symbol_type,
+        s_2.symbol_std,
+        p.symbol AS symbol_name,
+        p.time_create AS open_time,
+        p.volume,
+        p.comment,
+        di.open_bid,
+        di.open_ask,
+        tago.trading_account_group_name AS open_group,
+        -- logic as per this doc https://zealgroup.sg.larksuite.com/wiki/A729wTaJqibg0OkfoGSlJmtqgzs
+        tagc.trading_account_group_name AS current_group,
+        NULL AS trade_margin,
+        p.time_create_msc AS open_time_ms,
+        taf.account_id AS `account_id`,
+        a.created_at AS `account_registration_datetime`,
+        taf.full_name AS `account_name`,
+        taf.account_owner_id AS `account_assigned_user_id`,
+        taf.account_owner_name AS `account_assigned_user_name`,
+        taf.account_owner_office_id AS `account_owner_office_id`,
+        taf.account_owner_office_name AS `account_owner_office_name`,
+        taf.parent_id AS `account_parent_account_id`,
+        taf.parent_name AS `account_parent_account_name`,
+        a.verified_at AS `account_approved_date`,
+        taf.country_of_residence AS `account_country_name`,
+        taf.account_id AS `primary_trading_account_id`,
+        ma.registration AS `trading_account_registration_datetime`,
+        ta.trading_conditions AS `trading_account_conditions`,
+        IF(p.action = 0, 1, 0) AS is_buy,
+        DATETIME(p.time_create, 'Europe/London') AS open_time_london,
+        DATE(TIMESTAMP_ADD(DATETIME(p.time_create, 'Europe/London'), INTERVAL 120 MINUTE))
+            AS open_time_london_trading_date,
+        -- open_source TBD
+        p.volume / 10000 AS volume_lots,
+        -- FXBO
+        CASE
+        WHEN REGEXP_CONTAINS(UPPER(ta.trading_conditions), r'(ECN|PREMIER|PRO)') THEN p.volume / 10000
+        WHEN UPPER(ta.trading_conditions) LIKE '%STP%' AND NOT REGEXP_CONTAINS(p.symbol, r'(US30t|DAX30)') THEN p.volume / 10000
+        WHEN UPPER(ta.trading_conditions) LIKE '%STP%' AND p.symbol LIKE '%US30t%' THEN p.volume / 10000 / 10
+        WHEN UPPER(ta.trading_conditions) LIKE '%STP%' AND p.symbol LIKE '%DAX30%' THEN p.volume / 10000 / 25
+        WHEN UPPER(ta.trading_conditions) LIKE '%CENT%' AND NOT REGEXP_CONTAINS(p.symbol, r'(US30t|DAX30)') THEN p.volume / 10000 / 100
+        WHEN UPPER(ta.trading_conditions) LIKE '%CENT%' AND p.symbol LIKE '%US30t%' THEN p.volume / 10000 / 100 / 10
+        WHEN UPPER(ta.trading_conditions) LIKE '%CENT%' AND p.symbol LIKE '%DAX30%' THEN p.volume / 10000 / 100 / 25
+        ELSE p.volume / 10000
+    END AS volume_std_lots,
+        CASE
+            -- FOREX
+            WHEN
+                s.calc_mode IN (0, 5) AND UPPER(g.currency) != 'CNT'
+                THEN (p.volume / 10000) * s.contract_size * rao.mid
+            -- CFD
+            WHEN
+                s.calc_mode IN (2, 3, 4) AND UPPER(g.currency) != 'CNT'
+                THEN (p.volume / 10000) * p.price_open * s.contract_size * rao.mid
+            -- FUTURES
+            WHEN
+                s.calc_mode = 1 AND UPPER(g.currency) != 'CNT'
+                THEN (p.volume / 10000) * p.price_open * rao.mid * (s.tick_value / s.tick_size)
+            WHEN
+                s.calc_mode IN (0, 5) AND UPPER(g.currency) = 'CNT'
+                THEN (p.volume / 10000) * s.contract_size * rao.mid * 0.01
+            WHEN
+                s.calc_mode IN (2, 3, 4) AND UPPER(g.currency) = 'CNT'
+                THEN (p.volume / 10000) * p.price_open * s.contract_size * rao.mid * 0.01
+            WHEN
+                s.calc_mode = 1 AND UPPER(g.currency) = 'CNT'
+                THEN (p.volume / 10000) * p.price_open * rao.mid * (s.tick_value / s.tick_size) * 0.01
+        END AS open_qty_usd,
+        CASE
+            -- FOREX
+            WHEN s.calc_mode IN (0, 5) AND UPPER(g.currency) != 'CNT' THEN (p.volume / 10000) * s.contract_size * ra.mid
+            -- CFD
+            WHEN
+                s.calc_mode IN (2, 3, 4) AND UPPER(g.currency) != 'CNT'
+                THEN (p.volume / 10000) * p.price_current * s.contract_size * ra.mid
+            -- FUTURES
+            WHEN
+                s.calc_mode = 1 AND UPPER(g.currency) != 'CNT'
+                THEN (p.volume / 10000) * p.price_current * ra.mid * (s.tick_value / s.tick_size)
+            WHEN
+                s.calc_mode IN (0, 5) AND UPPER(g.currency) = 'CNT'
+                THEN (p.volume / 10000) * s.contract_size * ra.mid * 0.01
+            WHEN
+                s.calc_mode IN (2, 3, 4) AND UPPER(g.currency) = 'CNT'
+                THEN (p.volume / 10000) * p.price_current * s.contract_size * ra.mid * 0.01
+            WHEN
+                s.calc_mode = 1 AND UPPER(g.currency) = 'CNT'
+                THEN (p.volume / 10000) * p.price_current * ra.mid * (s.tick_value / s.tick_size) * 0.01
+        END AS current_qty_usd,
+        ROUND(p.price_open, CAST(s.digits AS INT64)) AS open_price,
+        ROUND(p.price_current, CAST(s.digits AS INT64)) AS current_price,
+        ROUND(p.profit * rg.mid, CAST(s.currency_profit_digits AS INT64)) AS floating_trade_profit_usd,
+        di.commission * rg.mid AS commission_usd,
+        p.storage * rg.mid AS swap_usd,
+        CAST(p.price_sl AS NUMERIC) AS sl,
+        CAST(p.price_tp AS NUMERIC) AS tp,
+        CASE
+            WHEN COALESCE(LOWER(tago.trading_account_group_name), '') LIKE r'%\\o\\%' THEN 'A'
+            WHEN COALESCE(LOWER(tago.trading_account_group_name), '') LIKE r'%\\r\\%' THEN 'B'
+        END AS `open_book`,
+        CASE
+            WHEN COALESCE(LOWER(tagc.trading_account_group_name), '') LIKE r'%\\o\\%' THEN 'A'
+            WHEN COALESCE(LOWER(tagc.trading_account_group_name), '') LIKE r'%\\r\\%' THEN 'B'
+        END AS `current_book`,
+        SAFE_CAST(ma.leverage AS INT64) AS leverage,
+        SAFE_CAST(NULL AS STRING) AS open_source,
+        DATETIME(a.created_at, 'Europe/London') AS `account_registration_datetime_london`,
+
+        -- In FXBO single mode which is the equivalent to mode B 
+        DATE(a.created_at, 'Europe/London') AS `account_registration_datetime_london_trading_day`,
+        IF(a.is_ib = 1, 'IntroducingBroker', 'IndividualClient') AS `account_type`,
+        NOT COALESCE(a.verified_at IS NULL, FALSE) AS `account_passed_kyc`,
+        SAFE_CAST(NULL AS STRING) AS `account_mode`,
+
+        SAFE_CAST(taf.account_id AS INT64) AS `primary_trading_account_number`,
+        SAFE_CAST(ma.login AS STRING) AS `trading_account_id`,
+        DATETIME(ma.registration, 'Europe/London') AS `trading_account_registration_datetime_london`,
+        DATE(ma.registration, 'Europe/London') AS `trading_account_registration_datetime_london_trading_day`,
+
+        -- There is no additional assignment for trading account, it will be the same as account assigned user
+        SAFE_CAST(taf.account_owner_id AS STRING) AS `trading_account_assigned_user_id`,
+        SAFE_CAST(taf.account_owner_name AS STRING) AS `trading_account_assigned_user_name`,
+        SAFE_CAST(taf.parent_id AS STRING) AS `trading_account_parent_trading_account_id`,
+        SAFE_CAST(taf.parent_id AS INT64) AS `trading_account_parent_trading_account_number`,
+        CAST(CURRENT_DATETIME() AS TIMESTAMP) AS `last_update`
+    FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_positions` AS p
+    INNER JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_trading_accounts_flagged` AS taf
+        ON
+            p.login = taf.login
+            AND taf.is_test = 0
+            AND taf.is_demo = 0
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_accounts` AS ma ON p.login = ma.login
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_groups` AS g ON ma.group = g.group
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_symbols` AS s ON p.symbol = s.symbol
+    LEFT JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_trading_conditions` AS ta ON g.group = ta.trading_group
+    LEFT JOIN `zfx-dwh-prod`.`rep_general`.`tbl_currency_rates` AS rao
+        ON
+            s.currency_base = rao.currency
+            AND rao.rate_date = DATE(p.time_create)
+    LEFT JOIN `zfx-dwh-prod`.`rep_general`.`tbl_currency_rates` AS rg
+        ON
+            g.currency = rg.currency
+            AND rg.rate_date = CURRENT_DATE()
+    LEFT JOIN `zfx-dwh-prod`.`rep_general`.`tbl_currency_rates` AS ra
+        ON
+            s.currency_base = ra.currency
+            AND ra.rate_date = CURRENT_DATE()
+    LEFT JOIN `zfx-dwh-prod`.`rep_general`.`symbols` AS s_2 ON p.symbol = s_2.symbol
+    LEFT JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`trading_account_group_changes_optimized` AS tago
+        ON
+            tago.server_name = 'mt5_live01'
+            AND p.login = tago.trading_account_number
+            AND p.time_create >= tago.valid_from_timestamp
+            AND p.time_create < tago.valid_to_timestamp
+    LEFT JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`trading_account_group_changes_optimized` AS tagc
+        ON
+            tagc.server_name = 'mt5_live01'
+            AND p.login = tagc.trading_account_number
+            AND CURRENT_TIMESTAMP() >= tagc.valid_from_timestamp
+            AND CURRENT_TIMESTAMP() < tagc.valid_to_timestamp
+    LEFT JOIN deal_info AS di ON p.login = di.login AND p.position = di.position_id
+    -- FXBO
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_users` AS a
+        ON COALESCE(CAST(ma.idx AS STRING), '') = COALESCE(CAST(a.id AS STRING), '')
+)
+
+SELECT
+    server_name,
+    symbol_type,
+    symbol_std,
+    symbol_name,
+    open_time,
+    open_time_london,
+    open_time_london_trading_date,
+    volume,
+    volume_lots,
+    open_qty_usd,
+    current_qty_usd,
+    commission_usd,
+    swap_usd,
+    sl,
+    tp,
+    comment,
+    open_bid,
+    open_ask,
+    open_group,
+    current_group,
+    open_book,
+    current_book,
+    leverage,
+    trade_margin,
+    open_time_ms,
+    open_source,
+    account_id,
+    account_registration_datetime,
+    account_registration_datetime_london,
+    account_registration_datetime_london_trading_day,
+    account_name,
+    account_type,
+    account_assigned_user_id,
+    account_assigned_user_name,
+    account_owner_office_id,
+    account_owner_office_name,
+    account_parent_account_id,
+    account_parent_account_name,
+    account_passed_kyc,
+    account_approved_date,
+    account_country_name,
+    account_mode,
+    primary_trading_account_id,
+    primary_trading_account_number,
+    trading_account_id,
+    trading_account_registration_datetime,
+    trading_account_registration_datetime_london,
+    trading_account_registration_datetime_london_trading_day,
+    trading_account_conditions,
+    trading_account_assigned_user_id,
+    trading_account_assigned_user_name,
+    trading_account_parent_trading_account_id,
+    trading_account_parent_trading_account_number,
+    last_update,
+    CAST(position AS INT64) AS trade_id,
+    CAST(login AS INT64) AS login,
+    IF(is_buy = 1, TRUE, FALSE) AS is_buy,
+    CAST(volume_std_lots AS NUMERIC) AS volume_std_lots,
+    CAST(IF(is_buy = 1, volume_std_lots, -volume_std_lots) AS NUMERIC) AS signed_volume_std,
+    IF(is_buy = 1, open_qty_usd, -open_qty_usd) AS signed_open_qty_usd,
+    IF(is_buy = 1, current_qty_usd, -current_qty_usd) AS signed_current_qty_usd,
+    CAST(open_price AS NUMERIC) AS open_price,
+    CAST(current_price AS NUMERIC) AS current_price,
+    CAST(floating_trade_profit_usd AS NUMERIC) AS floating_trade_profit_usd
+FROM part_1
+==========================================================================================
+TABLE: zfx-dwh-prod.data_marts_multi_region.mt5_dubai_live01_trading_accounts
+  type: VIEW  rows: 0  size_bytes: 0
+  created: 2026-08-27 02:03:36.021000+00:00  modified: 2026-08-27 02:03:36.021000+00:00
+  description: None
+  labels: {}
+  schema:
+   - trading_account_id STRING NULLABLE
+   - trading_server STRING NULLABLE
+   - account_number INTEGER NULLABLE
+   - trading_account_group STRING NULLABLE
+   - registration_datetime TIMESTAMP NULLABLE
+   - registration_datetime_london DATETIME NULLABLE
+   - registration_datetime_london_trading_day DATE NULLABLE
+   - is_deleted BOOLEAN NULLABLE
+   - is_disabled BOOLEAN NULLABLE
+   - type STRING NULLABLE
+   - trading_conditions STRING NULLABLE
+   - currency STRING NULLABLE
+   - assigned_user_id STRING NULLABLE
+   - account_owner_name STRING NULLABLE
+   - parent_trading_account_id STRING NULLABLE
+   - parent_trading_account_number INTEGER NULLABLE
+   - first_deposit_date TIMESTAMP NULLABLE
+   - last_deposit_date TIMESTAMP NULLABLE
+   - first_deposit_amount_usd BIGNUMERIC NULLABLE
+   - last_deposit_amount_usd BIGNUMERIC NULLABLE
+   - total_deposit_usd BIGNUMERIC NULLABLE
+   - net_deposit_usd BIGNUMERIC NULLABLE
+   - last_withdrawal_date TIMESTAMP NULLABLE
+   - total_withdrawal_usd BIGNUMERIC NULLABLE
+   - trading_balance_usd BIGNUMERIC NULLABLE
+   - deposit_currency STRING NULLABLE
+   - total_negative_balance_adj_usd BIGNUMERIC NULLABLE
+   - last_open_trade_datetime TIMESTAMP NULLABLE
+   - last_trade_datetime TIMESTAMP NULLABLE
+   - total_volume NUMERIC NULLABLE
+   - total_volume_fx NUMERIC NULLABLE
+   - total_volume_metal NUMERIC NULLABLE
+   - total_volume_cfd NUMERIC NULLABLE
+   - total_volume_usd BIGNUMERIC NULLABLE
+   - total_trade_profit_usd NUMERIC NULLABLE
+   - total_swaps_usd BIGNUMERIC NULLABLE
+   - total_commission_usd BIGNUMERIC NULLABLE
+   - leverage INTEGER NULLABLE
+   - total_rebates_generated_usd NUMERIC NULLABLE
+   - total_rebate_spread NUMERIC NULLABLE
+   - total_rebate_commission INTEGER NULLABLE
+   - total_rebate_subsidy INTEGER NULLABLE
+   - floating_volume NUMERIC NULLABLE
+   - floating_volume_usd BIGNUMERIC NULLABLE
+   - floating_profit_usd NUMERIC NULLABLE
+   - floating_swap_usd BIGNUMERIC NULLABLE
+   - floating_commission_usd BIGNUMERIC NULLABLE
+   - equity_usd BIGNUMERIC NULLABLE
+   - floating_values_last_update TIMESTAMP NULLABLE
+   - sale_commission INTEGER NULLABLE
+   - account_id STRING NULLABLE
+   - account_registration_datetime TIMESTAMP NULLABLE
+   - account_registration_datetime_london DATETIME NULLABLE
+   - account_registration_datetime_london_trading_day DATE NULLABLE
+   - account_name STRING NULLABLE
+   - account_is_deleted BOOLEAN NULLABLE
+   - account_type STRING NULLABLE
+   - primary_trading_account_id STRING NULLABLE
+   - primary_trading_account_number INTEGER NULLABLE
+   - account_assigned_user_name STRING NULLABLE
+   - account_onwer_office_id STRING NULLABLE
+   - account_owner_office_name STRING NULLABLE
+   - account_parent_account_id STRING NULLABLE
+   - account_parent_account_name STRING NULLABLE
+   - account_passed_kyc BOOLEAN NULLABLE
+   - account_approved_date TIMESTAMP NULLABLE
+   - account_country_name STRING NULLABLE
+   - account_sales_account_id STRING NULLABLE
+   - account_sales_account_name STRING NULLABLE
+   - account_ib_mode STRING NULLABLE
+   - account_utm_campaign STRING NULLABLE
+   - account_utm_content STRING NULLABLE
+   - account_utm_medium STRING NULLABLE
+   - account_utm_source STRING NULLABLE
+   - account_utm_term STRING NULLABLE
+   - trading_credit_usd BIGNUMERIC NULLABLE
+   - account_load_time TIMESTAMP NULLABLE
+   - comment STRING NULLABLE
+  VIEW QUERY:
+WITH blnc AS (
+    SELECT
+        taf.login,
+        taf.trading_account_group,
+        acc.leverage,
+        acc.comment,
+        (d.mid * acc.balance) AS balance,
+        (d.mid * acc.credit) AS credit
+    FROM `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_trading_accounts_flagged` AS taf
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_accounts` AS acc
+        ON taf.login = acc.login
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_groups` AS g
+        ON taf.trading_account_group = g.group
+    LEFT JOIN `zfx-dwh-prod`.`rep_general`.`tbl_currency_rates`
+        AS d ON g.currency = d.currency
+    AND d.rate_date = CURRENT_DATE()
+),
+
+trade_date AS (
+    SELECT
+        ct.login,
+        SUM(volume_std_lots) AS total_volume,
+        MAX(open_time) AS last_open_time,
+        MAX(close_time) AS last_trade_datetime,
+        SUM(
+            CASE
+                WHEN s.symbol_type = 'FX Spot' THEN ct.volume_std_lots
+                ELSE 0
+            END
+        ) AS total_volume_fx,
+        SUM(
+            CASE
+                WHEN s.symbol_type = 'Metal Spot' THEN ct.volume_std_lots
+                ELSE 0
+            END
+        ) AS total_volume_metal,
+        SUM(
+            CASE
+                WHEN (
+                    s.symbol_type IS NULL
+                    OR s.symbol_type NOT IN ('FX Spot', 'Metal Spot')
+                ) THEN ct.volume_std_lots
+                ELSE 0
+            END
+        ) AS total_volume_cfd,
+        SUM(qty_usd) AS qty_usd,
+        SUM(trade_profit_usd) AS total_trade_profit_usd,
+        SUM(swap_usd) AS total_swaps_usd,
+        SUM(commission_usd) AS total_commission_usd,
+        SUM(rebate_payout) AS total_rebates_generated_usd,
+        SUM(rebate_payout_markup) AS total_rebate_spread,
+        SUM(rebate_payout_commission) AS total_rebate_commission,
+        SUM(rebate_payout_subsidy) AS total_rebate_subsidy
+    FROM
+        `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_closed_trades` AS ct
+    LEFT JOIN `zfx-dwh-prod`.`rep_general`.`symbols` AS s ON ct.symbol_name = s.symbol
+    GROUP BY
+        ct.login
+),
+
+open AS (
+    SELECT
+        login,
+        MAX(open_time) AS open_time,
+        SUM(open_qty_usd) AS open_qty_usd
+    FROM
+        `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_open_trades`
+    GROUP BY
+        login
+),
+
+float_data AS (
+    SELECT
+        login,
+        last_update,
+        SUM(volume_std_lots) AS floating_volume,
+        SUM(open_qty_usd) AS floating_volume_usd,
+        SUM(floating_trade_profit_usd) AS floating_profit_usd,
+        SUM(swap_usd) AS floating_swap_usd,
+        SUM(commission_usd) AS floating_commission_usd
+    FROM
+        `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_open_trades`
+    GROUP BY
+        login,
+        last_update
+),
+
+cte_withdrawals AS (
+    SELECT
+        t.funds_trading_account_number,
+        MAX(
+            IF(
+                completed_transaction_type IN ('Withdrawal'),
+                transaction_datetime,
+                NULL
+            )
+        ) AS last_withdrawal_date,
+        SUM(
+            IF(
+                completed_transaction_type = 'Withdrawal',
+                t.usd_amount,
+                0
+            )
+        ) AS total_withdrawal_usd
+    FROM `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_transactions` AS t
+    WHERE completed_transaction_type IN ('Withdrawal')
+    GROUP BY
+        t.funds_trading_account_number
+),
+
+first_depo AS (
+    SELECT DISTINCT
+        t.funds_trading_account_number,
+        MIN(t.transaction_datetime) OVER (PARTITION BY t.funds_trading_account_number) AS first_deposit_date,
+        FIRST_VALUE(t.usd_amount) OVER (
+            PARTITION BY t.funds_trading_account_number
+            ORDER BY
+                t.transaction_datetime ASC
+        ) AS first_deposit_amount_usd,
+        MAX(t.transaction_datetime) OVER (PARTITION BY t.funds_trading_account_number) AS last_deposit_date,
+        FIRST_VALUE(t.usd_amount) OVER (
+            PARTITION BY t.funds_trading_account_number
+            ORDER BY
+                t.transaction_datetime DESC
+        ) AS last_deposit_amount_usd,
+        SUM(t.usd_amount) OVER (PARTITION BY t.funds_trading_account_number) AS total_deposit_usd
+    FROM `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_transactions` AS t
+    WHERE t.completed_transaction_type = 'Deposit'
+),
+
+cte_other_payments AS (
+    SELECT
+        t.funds_trading_account_number,
+        SUM(
+            CASE
+                WHEN t.completed_transaction_type = 'Zero Balance Adjustment' THEN t.usd_amount
+                ELSE 0
+            END
+        ) AS total_negative_balance_adj_usd
+    FROM `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_transactions` AS t
+    GROUP BY t.funds_trading_account_number
+)
+
+SELECT
+    SAFE_CAST(taf.login AS STRING) AS trading_account_id,
+    'mt5_dubai_live01' AS trading_server,
+    SAFE_CAST(taf.login AS INT64) AS account_number,
+    taf.trading_account_group,
+    taf.trading_account_registration_datetime AS registration_datetime,
+    DATETIME(taf.trading_account_registration_datetime + INTERVAL 2 HOUR, 'Europe/London')
+        AS registration_datetime_london,
+    taf.trading_account_registration_london_trade_date AS registration_datetime_london_trading_day,
+    IF(taf.is_enabled = 1, FALSE, TRUE) AS is_deleted, -- can be investigated futher
+    IF(taf.is_enabled = 1, FALSE, TRUE) AS is_disabled,
+    CASE
+        WHEN taf.is_demo = 1 THEN 'Demo'
+        ELSE 'Real'
+    END AS `type`,
+    tc.trading_conditions,
+    taf.trading_account_currency AS currency,
+    taf.account_owner_id AS assigned_user_id,
+    taf.account_owner_name,
+    SAFE_CAST(parent_id AS STRING) AS parent_trading_account_id,
+    SAFE_CAST(parent_id AS INT64) AS parent_trading_account_number,
+
+    SAFE_CAST(fd.first_deposit_date AS TIMESTAMP) AS first_deposit_date,
+    SAFE_CAST(fd.last_deposit_date AS TIMESTAMP) AS last_deposit_date,
+    COALESCE(fd.first_deposit_amount_usd, 0) AS first_deposit_amount_usd,
+    COALESCE(fd.last_deposit_amount_usd, 0) AS last_deposit_amount_usd,
+    COALESCE(fd.total_deposit_usd, 0) AS total_deposit_usd,
+    COALESCE(fd.total_deposit_usd, 0) + COALESCE(cw.total_withdrawal_usd, 0) AS net_deposit_usd,
+    SAFE_CAST(cw.last_withdrawal_date AS TIMESTAMP) AS last_withdrawal_date,
+    COALESCE(cw.total_withdrawal_usd, 0) AS total_withdrawal_usd,
+
+    COALESCE(blnc.balance, 0) AS trading_balance_usd,
+    taf.trading_account_currency AS deposit_currency,
+    cop.total_negative_balance_adj_usd,
+    COALESCE(open.open_time, trade_date.last_open_time) AS last_open_trade_datetime,
+    trade_date.last_trade_datetime,
+    COALESCE(trade_date.total_volume, 0) AS total_volume,
+    COALESCE(trade_date.total_volume_fx, 0) AS total_volume_fx,
+    COALESCE(trade_date.total_volume_metal, 0) AS total_volume_metal,
+    COALESCE(trade_date.total_volume_cfd, 0) AS total_volume_cfd,
+    COALESCE(trade_date.qty_usd, 0) + COALESCE(open.open_qty_usd, 0) AS total_volume_usd,
+    COALESCE(trade_date.total_trade_profit_usd, 0) AS total_trade_profit_usd,
+    COALESCE(trade_date.total_swaps_usd, 0) AS total_swaps_usd,
+    COALESCE(trade_date.total_commission_usd, 0) AS total_commission_usd,
+    SAFE_CAST(blnc.leverage AS INT64) AS leverage,
+    SAFE_CAST(trade_date.total_rebates_generated_usd AS NUMERIC) AS total_rebates_generated_usd,
+    SAFE_CAST(trade_date.total_rebate_spread AS NUMERIC) AS total_rebate_spread,
+    trade_date.total_rebate_commission,
+    trade_date.total_rebate_subsidy,
+    COALESCE(float_data.floating_volume, 0) AS floating_volume,
+    COALESCE(float_data.floating_volume_usd, 0) AS floating_volume_usd,
+    COALESCE(float_data.floating_profit_usd, 0) AS floating_profit_usd,
+    COALESCE(float_data.floating_swap_usd, 0) AS floating_swap_usd,
+    COALESCE(float_data.floating_commission_usd, 0) AS floating_commission_usd,
+
+    COALESCE(blnc.balance, 0)
+    + COALESCE(blnc.credit, 0)
+    + COALESCE(float_data.floating_profit_usd, 0)
+    + COALESCE(float_data.floating_swap_usd, 0)
+    + COALESCE(float_data.floating_commission_usd, 0) AS `equity_usd`,
+    float_data.last_update AS floating_values_last_update,
+    0 AS sale_commission, -- Partnership doesn't have Dubai Traze data
+    taf.account_id,
+    taf.account_registration_datetime,
+    DATETIME(taf.account_registration_datetime, 'Europe/London') AS account_registration_datetime_london,
+    account_registration_london_trade_date AS account_registration_datetime_london_trading_day,
+    full_name AS account_name,
+    IF(taf.is_enabled = 1, FALSE, TRUE) AS account_is_deleted,
+    taf.account_type AS `account_type`,
+    taf.account_id AS primary_trading_account_id,
+    CAST(taf.account_id AS INT64) AS primary_trading_account_number,
+    taf.account_owner_name AS account_assigned_user_name,
+    taf.account_owner_office_id AS account_onwer_office_id,
+    taf.account_owner_office_name,
+    taf.parent_id AS account_parent_account_id,
+    taf.parent_name AS account_parent_account_name,
+    COALESCE(taf.account_approved_datetime IS NOT NULL, FALSE) AS account_passed_kyc,
+    account_approved_datetime AS account_approved_date,
+    country_of_residence AS account_country_name,
+    -- there are no Sales in IB Tree curently 
+    SAFE_CAST(NULL AS STRING) AS account_sales_account_id,
+    SAFE_CAST(NULL AS STRING) AS account_sales_account_name,
+    SAFE_CAST(NULL AS STRING) AS account_ib_mode,
+
+    SAFE_CAST(JSON_EXTRACT_SCALAR(fu.utm_params, '$.utm_campaign') AS STRING) AS `account_utm_campaign`,
+    SAFE_CAST(JSON_EXTRACT_SCALAR(fu.utm_params, '$.utm_content') AS STRING) AS `account_utm_content`,
+    SAFE_CAST(JSON_EXTRACT_SCALAR(fu.utm_params, '$.utm_medium') AS STRING) AS `account_utm_medium`,
+    SAFE_CAST(JSON_EXTRACT_SCALAR(fu.utm_params, '$.utm_source') AS STRING) AS `account_utm_source`,
+    SAFE_CAST(JSON_EXTRACT_SCALAR(fu.utm_params, '$.utm_term') AS STRING) AS `account_utm_term`,
+
+    COALESCE(blnc.credit, 0) AS trading_credit_usd,
+    CAST(CURRENT_DATETIME() AS TIMESTAMP) AS account_load_time,
+    blnc.comment
+FROM `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_trading_accounts_flagged` AS taf
+LEFT JOIN blnc
+    ON taf.login = blnc.login
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_users` AS fu
+    ON taf.account_id = COALESCE(CAST(fu.id AS STRING), '')
+LEFT JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_trading_conditions` AS tc
+    ON taf.trading_account_group = tc.trading_group
+LEFT JOIN trade_date ON taf.login = trade_date.login
+LEFT JOIN open ON taf.login = open.login
+LEFT JOIN float_data ON taf.login = float_data.login
+LEFT JOIN cte_withdrawals AS cw ON taf.login = cw.funds_trading_account_number
+LEFT JOIN first_depo AS fd ON taf.login = fd.funds_trading_account_number
+LEFT JOIN cte_other_payments AS cop ON taf.login = cop.funds_trading_account_number
+WHERE
+    taf.is_test = 0
+    AND taf.is_demo = 0
+==========================================================================================
+TABLE: zfx-dwh-prod.data_marts_multi_region.mt5_dubai_live01_trading_accounts_flagged
+  type: VIEW  rows: 0  size_bytes: 0
+  created: 2026-08-27 02:03:02.068000+00:00  modified: 2026-08-27 02:03:02.068000+00:00
+  description: None
+  labels: {}
+  schema:
+   - account_id STRING NULLABLE
+   - first_name STRING NULLABLE
+   - last_name STRING NULLABLE
+   - full_name STRING NULLABLE
+   - account_type STRING NULLABLE
+   - is_employee INTEGER NULLABLE
+   - is_enabled INTEGER NULLABLE
+   - login NUMERIC NULLABLE
+   - trading_account_group STRING NULLABLE
+   - trading_account_currency STRING NULLABLE
+   - account_country_code STRING NULLABLE
+   - country_of_residence STRING NULLABLE
+   - region STRING NULLABLE
+   - parent_id STRING NULLABLE
+   - parent_name STRING NULLABLE
+   - account_owner_id STRING NULLABLE
+   - account_owner_name STRING NULLABLE
+   - account_owner_office_id STRING NULLABLE
+   - account_owner_office_name STRING NULLABLE
+   - account_registration_datetime TIMESTAMP NULLABLE
+   - account_approved_datetime TIMESTAMP NULLABLE
+   - account_registration_london_trade_date DATE NULLABLE
+   - account_approved_london_trade_date DATE NULLABLE
+   - trading_account_registration_datetime TIMESTAMP NULLABLE
+   - trading_account_registration_london_trade_date DATE NULLABLE
+   - is_test INTEGER NULLABLE
+   - is_demo INTEGER NULLABLE
+  VIEW QUERY:
+SELECT
+    CAST(fu.id AS STRING) AS account_id, -- used for is_test flag, empty id's excluded
+    TRIM(fu.first_name) AS first_name,
+    TRIM(fu.last_name) AS last_name,
+    CONCAT(TRIM(fu.first_name), ' ', TRIM(fu.last_name)) AS full_name,
+    CASE
+        WHEN fu.is_ib = 1 THEN 'IntroducingBroker'
+        WHEN fu.client_type = 'Corporate' THEN 'Institutional'
+        ELSE 'IndividualClient'
+    END AS `account_type`,
+    fu.is_employee, -- used for is_test flag
+    fu.is_enabled, -- used for is_test flag
+    acc.login,
+    acc.`group` AS trading_account_group, -- used for is_test and is_demo flags
+    currency AS trading_account_currency,
+    fu.country AS account_country_code,
+    cd.country_name AS country_of_residence,
+    cd.continent_region_internal AS region,
+    CAST(fu.partner_id AS STRING) AS parent_id,
+    CONCAT(TRIM(parent_u.first_name), ' ', TRIM(parent_u.last_name)) AS parent_name,
+    CAST(fu.manager_id AS STRING) AS account_owner_id,
+    m.full_name AS account_owner_name,
+    CAST(md.department_id AS STRING) AS account_owner_office_id,
+    d.name AS account_owner_office_name,
+    fu.created_at AS account_registration_datetime,
+    fu.verified_at AS account_approved_datetime,
+    DATE(DATETIME(fu.created_at + INTERVAL 2 HOUR, 'Europe/London')) AS account_registration_london_trade_date,
+    DATE(DATETIME(fu.verified_at + INTERVAL 2 HOUR, 'Europe/London')) AS account_approved_london_trade_date,
+    acc.registration_utc AS trading_account_registration_datetime,
+    DATE(DATETIME(acc.registration_utc + INTERVAL 2 HOUR, 'Europe/London')) AS trading_account_registration_london_trade_date,
+    -- logic for test accounts provided by Oliver Hopkins
+    CASE
+        WHEN fu.is_employee = 1 THEN 1
+        -- WHEN COALESCE(acc.`group`, '') LIKE '%demo%' THEN 1 -- moved to is_demo flag
+        WHEN LOWER(COALESCE(acc.`group`, '')) LIKE '%test%' THEN 1
+        --- accounts with null id in FXBO are considered as test accounts, according to Oliver
+        WHEN (fu.id IS NULL) THEN 1
+        --- not %test% to avoid situations when client's name contains test in his first_name
+        WHEN LOWER(TRIM(fu.first_name)) = 'test' THEN 1
+        --- not %test% to avoid situations when client's name contains test in his last_name
+        WHEN LOWER(TRIM(fu.last_name)) = 'test' THEN 1
+        ELSE 0
+    END AS is_test,
+    CASE
+        WHEN LOWER(COALESCE(acc.`group`, '')) LIKE '%demo%' THEN 1
+        ELSE 0
+    END AS is_demo
+FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_accounts` AS acc
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_users` AS fu
+    ON COALESCE(CAST(acc.idx AS STRING), '') = COALESCE(CAST(fu.id AS STRING), '')
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_users` AS parent_u
+    ON COALESCE(CAST(fu.partner_id AS STRING), '') = COALESCE(CAST(parent_u.id AS STRING), '')
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers` AS m ON fu.manager_id = m.id
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers_to_departments` AS md
+    ON fu.manager_id = md.manager_id
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers_departments` AS d
+    ON md.department_id = d.id
+LEFT JOIN `zfx-dwh-prod`.`manual_dictionary`.`manual_dictionary_countries` AS cd ON fu.country = cd.country_code
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_groups` AS g ON acc.`group` = g.`group`
+WHERE COALESCE(fu.is_lead, -1) IN (0, -1) -- leads excluded
+ORDER BY is_test, account_id
+==========================================================================================
+TABLE: zfx-dwh-prod.data_marts_multi_region.mt5_dubai_live01_trading_conditions
+  type: VIEW  rows: 0  size_bytes: 0
+  created: 2026-08-27 02:03:01.963000+00:00  modified: 2026-08-27 02:03:01.963000+00:00
+  description: None
+  labels: {}
+  schema:
+   - trading_group STRING NULLABLE
+   - server_name STRING NULLABLE
+   - trading_conditions STRING NULLABLE
+   - trading_account_type STRING NULLABLE
+  VIEW QUERY:
+SELECT
+    g.group AS trading_group,
+    'mt5_dubai_live01' AS server_name,
+    CASE
+        WHEN LOWER(g.group) LIKE '%std%' THEN 'STP Account'
+        WHEN LOWER(g.group) LIKE '%premier%' THEN 'Premier Account'
+        WHEN LOWER(g.group) LIKE '%pro%' THEN 'PRO Account'
+        WHEN LOWER(g.group) LIKE '%ecn%' THEN 'Ecn'
+        WHEN LOWER(g.group) LIKE '%cnt%' OR LOWER(g.group) LIKE '%cent%' THEN 'CENT Account'
+        ELSE 'Unknown'
+    END AS trading_conditions,
+    CASE
+        WHEN LOWER(g.group) LIKE '%hedged%' THEN 'Hedged'
+        WHEN LOWER(g.group) LIKE '%netting%' THEN 'Netting'
+        ELSE 'Unknown'
+    END AS trading_account_type
+FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_groups` AS g
+==========================================================================================
+TABLE: zfx-dwh-prod.data_marts_multi_region.mt5_dubai_live01_transactions
+  type: VIEW  rows: 0  size_bytes: 0
+  created: 2026-08-27 02:03:09.127000+00:00  modified: 2026-08-27 02:03:09.127000+00:00
+  description: None
+  labels: {}
+  schema:
+   - id STRING NULLABLE
+   - date_entered TIMESTAMP NULLABLE
+   - date_modified TIMESTAMP NULLABLE
+   - processed_date TIMESTAMP NULLABLE
+   - finance_approve_date TIMESTAMP NULLABLE
+   - cs_approve_date TIMESTAMP NULLABLE
+   - transaction_datetime TIMESTAMP NULLABLE
+   - transaction_datetime_london DATETIME NULLABLE
+   - transaction_datetime_london_trading_day DATETIME NULLABLE
+   - transaction_datetime_hong_kong DATETIME NULLABLE
+   - transaction_date DATE NULLABLE
+   - transaction_date_london DATE NULLABLE
+   - transaction_date_london_trading_day DATE NULLABLE
+   - transaction_date_hong_kong DATE NULLABLE
+   - parent_transaction_id STRING NULLABLE
+   - account_id STRING NULLABLE
+   - account_name STRING NULLABLE
+   - account_registration_datetime TIMESTAMP NULLABLE
+   - account_registration_datetime_london DATETIME NULLABLE
+   - account_registration_datetime_london_trading_day DATETIME NULLABLE
+   - account_registration_datetime_hong_kong DATETIME NULLABLE
+   - account_registration_date DATE NULLABLE
+   - account_registration_date_london DATE NULLABLE
+   - account_registration_date_london_trading_day DATE NULLABLE
+   - account_registration_date_hong_kong DATE NULLABLE
+   - account_is_deleted BOOLEAN NULLABLE
+   - account_type STRING NULLABLE
+   - account_assigned_user_id STRING NULLABLE
+   - parent_account_id STRING NULLABLE
+   - parent_account_name STRING NULLABLE
+   - parent_primary_trading_account_number INTEGER NULLABLE
+   - account_assigned_user_id_hist STRING NULLABLE
+   - account_assigned_user_name_hist STRING NULLABLE
+   - account_owner_office_name_hist STRING NULLABLE
+   - account_assigned_user_name STRING NULLABLE
+   - account_owner_office_name STRING NULLABLE
+   - account_is_deleted_hist BOOLEAN NULLABLE
+   - account_type_hist STRING NULLABLE
+   - parent_account_id_hist STRING NULLABLE
+   - parent_account_name_hist STRING NULLABLE
+   - parent_primary_trading_account_number_hist INTEGER NULLABLE
+   - account_passed_kyc BOOLEAN NULLABLE
+   - account_passed_kyc_hist BOOLEAN NULLABLE
+   - account_approved_date TIMESTAMP NULLABLE
+   - account_come_from_url STRING NULLABLE
+   - account_utm_campaign STRING NULLABLE
+   - account_utm_content STRING NULLABLE
+   - account_utm_medium STRING NULLABLE
+   - account_utm_source STRING NULLABLE
+   - account_utm_term STRING NULLABLE
+   - account_country_code STRING NULLABLE
+   - account_country_name STRING NULLABLE
+   - account_country_code_hist STRING NULLABLE
+   - account_country_name_hist STRING NULLABLE
+   - account_mode STRING NULLABLE
+   - primary_trading_account_id STRING NULLABLE
+   - primary_trading_account_number INTEGER NULLABLE
+   - primary_trading_account_type STRING NULLABLE
+   - account_mode_hist STRING NULLABLE
+   - primary_trading_account_id_hist STRING NULLABLE
+   - primary_trading_account_number_hist INTEGER NULLABLE
+   - primary_trading_account_type_hist STRING NULLABLE
+   - external_id STRING NULLABLE
+   - type STRING NULLABLE
+   - subtype STRING NULLABLE
+   - execution_type STRING NULLABLE
+   - transaction_type STRING NULLABLE
+   - completed_transaction_type STRING NULLABLE
+   - currency STRING NULLABLE
+   - amount NUMERIC NULLABLE
+   - usd_amount BIGNUMERIC NULLABLE
+   - status STRING NULLABLE
+   - comment STRING NULLABLE
+   - internal_comment STRING NULLABLE
+   - funds_account_type STRING NULLABLE
+   - funds_account_id STRING NULLABLE
+   - funds_trading_account_number INTEGER NULLABLE
+   - funds_trading_account_type STRING NULLABLE
+   - is_first BOOLEAN NULLABLE
+   - related_id STRING NULLABLE
+   - order_number INTEGER NULLABLE
+   - destination_type STRING NULLABLE
+   - destination_email STRING NULLABLE
+   - transaction_source_app_id INTEGER NULLABLE
+   - cs_status_id INTEGER NULLABLE
+   - finance_status_id INTEGER NULLABLE
+   - risk_status_id INTEGER NULLABLE
+   - funds_account_status_id INTEGER NULLABLE
+   - psp_id INTEGER NULLABLE
+   - psp_name STRING NULLABLE
+   - psp_type STRING NULLABLE
+   - psp_category STRING NULLABLE
+   - source_of_origin STRING NULLABLE
+   - not_found_in_mt4 INTEGER NULLABLE
+   - direction STRING NULLABLE
+   - psp_category_computed STRING NULLABLE
+   - psp_name_computed STRING NULLABLE
+   - payment_provider_name STRING NULLABLE
+   - transaction_technical_type STRING NULLABLE
+  VIEW QUERY:
+WITH not_found_in_mt5 AS (
+    SELECT t.id
+    -- t.mt4_ticket, t.comment, t.mt4comment, t.type, d.deal
+    FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_transactions` AS t
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_deals` AS d
+        ON CAST(t.mt4_ticket AS INT64) = CAST(d.deal AS INT64)
+    WHERE d.deal IS NULL -- tickets not found in MT5 deals
+),
+
+cte_logins_mapping AS (
+    SELECT
+        login_sid,
+        login,
+        user_id
+    FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_mt4_users`
+    WHERE user_id IS NOT NULL
+),
+
+cte_utms AS (
+    SELECT
+        CAST(id AS STRING) AS account_id,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_source') AS STRING) AS account_utm_source,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_medium') AS STRING) AS account_utm_medium,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_campaign') AS STRING) AS account_utm_campaign,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_content') AS STRING) AS account_utm_content,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(utm_params, '$.utm_term') AS STRING) AS account_utm_term
+    FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_users`
+),
+
+cte_transactions_hist AS (
+    SELECT
+        t.created_at AS date_entered,
+        t.processed_at AS processed_date,
+        af.account_type AS `account_type_hist`,
+        a_hist.assigned_user_id AS `account_assigned_user_id_hist`,
+        a_hist.assigned_user_name AS `account_assigned_user_name_hist`,
+        d.name AS `account_owner_office_name_hist`,
+
+        -- FXBO historical data not available, TODO
+        af.parent_name AS `parent_account_name_hist`,
+        tc.trading_conditions AS primary_trading_account_type_hist,
+
+        -- Country of residence in FXBO
+        af.country_of_residence AS account_country_name_hist,
+        a.country AS `account_country_code_hist`,
+
+        -- In FXBO single mode which is the equivalent to mode B 
+        'Undefined' AS `account_mode_hist`,
+
+        'Undefined' AS subtype,
+        t.processed_currency AS currency,
+        t.mt4comment AS `comment`,
+        t.comment AS internal_comment,
+        NULL AS transaction_source_app_id,
+
+        -- Not relevant in FXBO
+        NULL AS cs_status_id,
+        NULL AS finance_status_id,
+        NULL AS risk_status_id,
+        NULL AS funds_account_status_id,
+
+        'FXBO' AS source_of_origin,
+        p.display_name AS payment_provider_name,
+        af.full_name AS account_name,
+        af.registration_datetime,
+        af.registration_london_trade_date,
+        af.approved_datetime,
+        af.approved_london_trade_date,
+        af.is_enabled,
+        af.account_type,
+        af.account_owner_id,
+        af.parent_id,
+        af.parent_name,
+        a.country,
+        af.country_of_residence,
+        af.account_owner_name,
+        af.account_owner_office_name,
+        a.id AS primary_trading_account_id,
+        tc.trading_conditions,
+        cte_utms.account_utm_campaign,
+        cte_utms.account_utm_content,
+        cte_utms.account_utm_medium,
+        cte_utms.account_utm_source,
+        cte_utms.account_utm_term,
+        CAST(md.department_id AS STRING) AS `account_owner_office_id_hist`,
+        CAST(t.id AS STRING) AS id,
+        SAFE_CAST(NULL AS TIMESTAMP) AS date_modified,
+        SAFE_CAST(NULL AS TIMESTAMP) AS finance_approve_date,
+        SAFE_CAST(NULL AS TIMESTAMP) AS cs_approve_date,
+        COALESCE(t.processed_at, t.created_at) AS transaction_datetime,
+        SAFE_CAST(NULL AS STRING) AS parent_transaction_id,
+        SAFE_CAST(t.from_user_id AS STRING) AS account_id,
+        IF(af.is_enabled = 1, FALSE, TRUE) AS account_is_deleted_hist,
+
+        SAFE_CAST(af.parent_id AS STRING) AS `parent_account_id_hist`,
+        CAST(af.parent_id AS INT64) AS `parent_primary_trading_account_number_hist`,
+        IF(af.approved_datetime IS NOT NULL, TRUE, FALSE) AS `account_passed_kyc_hist`,
+        SAFE_CAST(a.id AS STRING) AS `primary_trading_account_id_hist`,
+        SAFE_CAST(a.id AS INT64) AS `primary_trading_account_number_hist`,
+        SAFE_CAST(NULL AS STRING) AS external_id,
+        CONCAT(
+            UPPER(SUBSTR(t.type, 1, 1)),
+            LOWER(SUBSTR(t.type, 2))
+        ) AS `type`,
+        CASE
+            WHEN LOWER(t.source) = 'clientarea' THEN 'Automatic'
+            WHEN LOWER(t.source) = 'crm' THEN 'Manual'
+            ELSE 'Undefined'
+        END AS execution_type,
+        CASE
+            WHEN LOWER(t.type) IN (
+                'balance correction',
+                'bonus negative balance',
+                'bonus negative credit removal'
+            ) THEN 'Balance Adjustment'
+            WHEN LOWER(t.type) IN ('bonus in') THEN 'Bonus in'
+            WHEN LOWER(t.type) IN ('bonus out') THEN 'Bonus out'
+            WHEN LOWER(t.type) IN ('cashback correction') THEN 'Cashback correction'
+            WHEN LOWER(t.type) IN ('cashback transfer in') THEN 'Cashback transfer in'
+            WHEN LOWER(t.type) IN ('cashback transfer out') THEN 'Cashback transfer out'
+            WHEN LOWER(t.type) IN ('credit') THEN 'Credit'
+            WHEN LOWER(t.type) IN ('deposit') THEN 'Deposit'
+            WHEN LOWER(t.type) IN ('ib commission') THEN 'IB commission'
+            WHEN LOWER(t.type) IN ('ib correction') THEN 'IB correction'
+            WHEN LOWER(t.type) IN ('ib transfer in') THEN 'IB Transfer in'
+            WHEN LOWER(t.type) IN ('ib transfer out') THEN 'IB Transfer out'
+            WHEN LOWER(t.type) IN ('ib withdrawal') THEN 'IB withdrawal'
+            WHEN LOWER(t.type) IN ('transfer in') THEN 'Transfer in'
+            WHEN LOWER(t.type) IN ('transfer out') THEN 'Transfer out'
+            WHEN LOWER(t.type) IN ('withdrawal') THEN 'Withdrawal'
+            WHEN
+                LOWER(t.type) IN ('negative correction balance', 'negative correction credit')
+                THEN 'Zero Balance Adjustment'
+            ELSE 'Undefined'
+        END AS transaction_type,
+
+        -- SAFE_CAST(REGEXP_EXTRACT(t.from_login_sid, r'-(\d+)$') AS STRING) AS funds_account_id,
+        CASE
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN (
+                'balance correction',
+                'bonus negative balance',
+                'bonus negative credit removal'
+            ) THEN 'Balance Adjustment'
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('bonus in') THEN 'Bonus in'
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('bonus out') THEN 'Bonus out'
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('cashback correction') THEN 'Cashback correction'
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('cashback transfer in') THEN 'Cashback transfer in'
+            WHEN
+                LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('cashback transfer out')
+                THEN 'Cashback transfer out'
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('credit') THEN 'Credit'
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('deposit') THEN 'Deposit'
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('ib commission') THEN 'IB commission'
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('ib correction') THEN 'IB correction'
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('ib transfer in') THEN 'IB Transfer in'
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('ib transfer out') THEN 'IB Transfer out'
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('ib withdrawal') THEN 'IB withdrawal'
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('transfer in') THEN 'Transfer in'
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('transfer out') THEN 'Transfer out'
+            WHEN LOWER(t.status) = 'approved' AND LOWER(t.type) IN ('withdrawal') THEN 'Withdrawal'
+            WHEN
+                LOWER(t.status) = 'approved'
+                AND LOWER(t.type) IN ('negative correction balance', 'negative correction credit')
+                THEN 'Zero Balance Adjustment'
+            ELSE 'Undefined'
+        END AS completed_transaction_type,
+        SAFE_CAST(t.processed_amount AS NUMERIC) AS amount,
+        
+    CASE 
+        WHEN t.processed_currency = 'AED' 
+            THEN processed_amount / 3.675
+        ELSE processed_amount
+    END
+ AS usd_amount,
+        CASE
+            WHEN LOWER(t.status) = 'approved' THEN 'Paid'
+            WHEN LOWER(t.status) = 'error' THEN 'Failed'
+            WHEN LOWER(t.status) = 'cancelled' THEN 'Cancelled'
+            WHEN LOWER(t.status) = 'fresh' THEN 'Fresh'
+            WHEN LOWER(t.status) = 'pending' THEN 'InProgress'
+            WHEN LOWER(t.status) = 'processing' THEN 'InProgress'
+            WHEN LOWER(t.status) = 'declined' THEN 'Rejected'
+            ELSE 'Undefined'
+        END AS status,
+        CASE
+            WHEN REGEXP_EXTRACT(t.from_login_sid, r'^(\d+)-') = '1' THEN 'Ewallet'
+            WHEN REGEXP_EXTRACT(t.from_login_sid, r'^(\d+)-') = '2' THEN 'MT5'
+            ELSE 'Undefined'
+        END AS funds_account_type,
+        SAFE_CAST(clm.login AS STRING) AS funds_account_id,
+        IF(is_ftd = 1, TRUE, FALSE) AS is_first,
+        SAFE_CAST(NULL AS STRING) AS related_id,
+        SAFE_CAST(t.id AS INT64) AS order_number,
+        -- CAST(REGEXP_EXTRACT(t.from_login_sid, r'-(\d+)$') AS INT64) AS funds_trading_account_number
+        SAFE_CAST(NULL AS STRING) AS destination_type,
+
+        SAFE_CAST(NULL AS STRING) AS destination_email,
+        SAFE_CAST(p.psp_id AS INT64) AS psp_id,
+        CASE
+            WHEN nf.id IS NOT NULL THEN 1
+            ELSE 0
+        END AS not_found_in_mt4,
+        CASE
+            WHEN LOWER(t.type) = 'deposit'
+                THEN
+                    CASE
+                        WHEN LOWER(t.source) IN ('clientarea', 'crm') THEN 'Regular'
+                        ELSE 'Uncategorized'
+                    END
+        END AS transaction_technical_type,
+        CAST(clm.login AS INT64) AS funds_trading_account_number
+    FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_transactions` AS t
+    LEFT JOIN cte_logins_mapping AS clm ON t.from_login_sid = clm.login_sid
+    LEFT JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_accounts_flagged` AS af
+        ON COALESCE(CAST(t.from_user_id AS STRING), '') = af.account_id
+    LEFT JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_trading_accounts_flagged` AS taf
+        ON
+            -- CAST(REGEXP_EXTRACT(t.from_login_sid, r'-(\d+)$') AS INT64) = taf.login
+            CAST(clm.login AS INT64) = taf.login
+            AND REGEXP_EXTRACT(t.from_login_sid, r'^(\d+)-') = '2'
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_psp_rules` AS p
+        ON t.psp_rule_id = p.id
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_users` AS a
+        ON COALESCE(CAST(t.from_user_id AS STRING), '') = COALESCE(CAST(a.id AS STRING), '')
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_mt5_dubai_live01_accounts` AS ta
+        -- ON CAST(REGEXP_EXTRACT(t.from_login_sid, r'-(\d+)$') AS INT64) = ta.login
+        ON CAST(clm.login AS INT64) = ta.login
+    LEFT JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_trading_conditions` AS tc
+        ON COALESCE(ta.group, '') = tc.trading_group
+    LEFT JOIN not_found_in_mt5 AS nf ON t.id = nf.id
+    LEFT JOIN cte_utms ON af.account_id = cte_utms.account_id
+    LEFT JOIN `zfx-dwh-prod`.`data_marts_multi_region`.`mt5_dubai_live01_accounts_assigned_user_rel_hist` AS a_hist
+        ON
+            SAFE_CAST(t.from_user_id AS STRING) = a_hist.account_id
+            AND COALESCE(t.processed_at, t.created_at) >= a_hist.valid_from_timestamp
+            AND COALESCE(t.processed_at, t.created_at) < a_hist.valid_to_timestamp
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers_to_departments` AS md
+        ON SAFE_CAST(a_hist.assigned_user_id AS STRING) = SAFE_CAST(md.manager_id AS STRING)
+    LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers_departments` AS d
+        ON md.department_id = d.id
+    WHERE
+        af.is_test = 0 -- test accounts excluded
+        AND (
+            -- test trading accounts excluded, NULL included because there is no logins for EWallets
+            (taf.is_test = 0 OR taf.is_test IS NULL)
+            OR
+            -- demo trading accounts excluded, NULL included because there is no logins for EWallets
+            (taf.is_demo = 0 OR taf.is_demo IS NULL)
+        )
+)
+
+SELECT
+    id,
+    date_entered,
+    date_modified,
+    processed_date,
+    finance_approve_date,
+    cs_approve_date,
+    transaction_datetime,
+    DATETIME(transaction_datetime, 'Europe/London') AS transaction_datetime_london,
+    DATETIME(transaction_datetime + INTERVAL 2 HOUR, 'Europe/London') AS transaction_datetime_london_trading_day,
+    DATETIME(transaction_datetime, 'Asia/Hong_Kong') AS transaction_datetime_hong_kong,
+    DATE(transaction_datetime) AS transaction_date,
+    DATE(DATETIME(transaction_datetime, 'Europe/London')) AS transaction_date_london,
+    DATE(DATETIME(transaction_datetime + INTERVAL 2 HOUR, 'Europe/London')) AS transaction_date_london_trading_day,
+    DATE(DATETIME(transaction_datetime, 'Asia/Hong_Kong')) AS transaction_date_hong_kong,
+    parent_transaction_id,
+    account_id,
+    account_name,
+    registration_datetime AS account_registration_datetime,
+    DATETIME(registration_datetime, 'Europe/London') AS account_registration_datetime_london,
+
+    DATETIME(registration_datetime + INTERVAL 2 HOUR, 'Europe/London')
+        AS account_registration_datetime_london_trading_day,
+    DATETIME(registration_datetime, 'Asia/Hong_Kong') AS account_registration_datetime_hong_kong,
+    DATE(registration_datetime) AS account_registration_date,
+    DATE(DATETIME(registration_datetime, 'Europe/London')) AS account_registration_date_london,
+    DATE(DATETIME(registration_datetime + INTERVAL 2 HOUR, 'Europe/London')) AS account_registration_date_london_trading_day,
+    DATE(DATETIME(registration_datetime, 'Asia/Hong_Kong')) AS account_registration_date_hong_kong,
+    IF(is_enabled = 1, FALSE, TRUE) AS account_is_deleted,
+    account_type AS `account_type`,
+    account_owner_id AS `account_assigned_user_id`,
+    parent_id AS `parent_account_id`,
+    parent_name AS `parent_account_name`,
+    CAST(parent_id AS INT64) AS `parent_primary_trading_account_number`, -- user id as a primary trading account
+    account_assigned_user_id_hist,
+    account_assigned_user_name_hist,
+    account_owner_office_name_hist,
+    account_owner_name AS `account_assigned_user_name`,
+    account_owner_office_name AS `account_owner_office_name`,
+
+    -- FXBO historical data not available, TODO
+    `account_is_deleted_hist`,
+    `account_type_hist`,
+    `parent_account_id_hist`,
+    `parent_account_name_hist`,
+    `parent_primary_trading_account_number_hist`,
+
+    IF(approved_datetime IS NOT NULL, TRUE, FALSE) AS `account_passed_kyc`,
+    `account_passed_kyc_hist`,
+    approved_datetime AS account_approved_date,
+
+    -- come_from_url not available in FXBO 
+    SAFE_CAST(NULL AS STRING) AS account_come_from_url,
+    account_utm_campaign,
+    account_utm_content,
+    account_utm_medium,
+    account_utm_source,
+    account_utm_term,
+
+    country AS account_country_code,
+    country_of_residence AS account_country_name,
+
+    -- FXBO historical data not available, TODO
+    `account_country_code_hist`,
+    `account_country_name_hist`,
+
+    -- In FXBO single mode which is the equivalent to mode B 
+    'Undefined' AS `account_mode`,
+
+    SAFE_CAST(primary_trading_account_id AS STRING) AS primary_trading_account_id,
+    SAFE_CAST(primary_trading_account_id AS INT64) AS primary_trading_account_number,
+    trading_conditions AS primary_trading_account_type,
+
+    -- FXBO historical data not available, TODO
+    `account_mode_hist`,
+    `primary_trading_account_id_hist`,
+    `primary_trading_account_number_hist`,
+    `primary_trading_account_type_hist`,
+
+    external_id,
+    `type`,
+    `subtype`,
+    `execution_type`,
+    `transaction_type`,
+    `completed_transaction_type`,
+    currency,
+    amount,
+    usd_amount,
+    `status`,
+    comment,
+    internal_comment,
+    funds_account_type,
+    funds_account_id,
+    funds_trading_account_number,
+    trading_conditions AS funds_trading_account_type,
+    is_first,
+    related_id,
+    order_number,
+
+    -- not relevant in FXBO
+    destination_type,
+    destination_email,
+    transaction_source_app_id,
+    cs_status_id,
+    finance_status_id,
+    risk_status_id,
+    funds_account_status_id,
+
+    psp_id,
+    COALESCE(payment_provider_name, 'Unknown') AS psp_name,
+    SAFE_CAST(NULL AS STRING) AS psp_type, -- not relevant in FXBO
+    SAFE_CAST(NULL AS STRING) AS psp_category, -- not relevant in FXBO
+    'FXBO' AS source_of_origin,
+    not_found_in_mt4,
+    CASE
+        WHEN LOWER(t.type) IN (
+            'bonus in',
+            'cashback transfer in',
+            'deposit',
+            'ib transfer in',
+            'transfer in'
+        ) THEN 'incoming'
+        WHEN LOWER(t.type) IN (
+            'bonus out',
+            'cashback transfer out',
+            'ib transfer out',
+            'transfer out',
+            'withdrawal'
+        ) THEN 'outgoing'
+        ELSE 'Undefined'
+    END AS direction,
+    CASE
+        WHEN
+            LOWER(payment_provider_name) LIKE ('crypto')
+            OR LOWER(payment_provider_name) LIKE ('digital')
+            OR LOWER(payment_provider_name) LIKE ('usdt')
+            OR LOWER(payment_provider_name) LIKE ('usdc')
+            OR LOWER(payment_provider_name) LIKE ('trc20')
+            OR LOWER(payment_provider_name) LIKE ('erc20')
+            OR LOWER(payment_provider_name) LIKE ('deus x pay deposits')
+            THEN 'Digital currency'
+        WHEN
+            LOWER(payment_provider_name) LIKE ('local bank transfer')
+            OR LOWER(payment_provider_name) LIKE ('%bank_wire%')
+            THEN 'Local Bank Transfer'
+        WHEN LOWER(payment_provider_name) IN ('scan qr') THEN 'Scan QR code'
+        WHEN
+            LOWER(payment_provider_name) IN ('credit card')
+            OR LOWER(payment_provider_name) LIKE ('%stripe%')
+            OR LOWER(payment_provider_name) LIKE ('%genius online%')
+            OR LOWER(payment_provider_name) LIKE ('%primary card%')
+            OR LOWER(payment_provider_name) LIKE ('%skrill%')
+            THEN 'Credit Card'
+        ELSE 'Unknown'
+    END AS psp_category_computed,
+    COALESCE(
+        CASE
+            WHEN payment_provider_name LIKE '%bank_wire%' THEN 'Bank Wire'
+            ELSE payment_provider_name
+        END,
+        'Unknown'
+    ) AS psp_name_computed,
+    payment_provider_name,
+    transaction_technical_type
+FROM cte_transactions_hist AS t
+==========================================================================================
+TABLE: zfx-dwh-prod.data_marts_multi_region.mt5_dubai_live01_users
+  type: VIEW  rows: 0  size_bytes: 0
+  created: 2026-08-27 02:03:01.946000+00:00  modified: 2026-08-27 02:03:01.946000+00:00
+  description: None
+  labels: {}
+  schema:
+   - user_name STRING NULLABLE
+   - full_name STRING NULLABLE
+   - registration_date TIMESTAMP NULLABLE
+   - team_name STRING NULLABLE
+   - id STRING NULLABLE
+   - first_name STRING NULLABLE
+   - last_name STRING NULLABLE
+   - modified_date TIMESTAMP NULLABLE
+   - department_name STRING NULLABLE
+   - status STRING NULLABLE
+   - address_country_name STRING NULLABLE
+   - is_deleted BOOLEAN NULLABLE
+   - employee_status STRING NULLABLE
+   - account_id STRING NULLABLE
+   - trading_account_id STRING NULLABLE
+   - update_datetime DATETIME NULLABLE
+  VIEW QUERY:
+SELECT
+    m.email AS user_name,
+    m.full_name,
+    
+    m.created_at AS registration_date,
+    CASE
+        WHEN m.id IN (
+            26,
+            43,
+            44,
+            46
+        ) THEN 'MENA Sales'
+        ELSE d.name
+    END AS team_name,
+    SAFE_CAST(m.id AS STRING) AS id,
+    REGEXP_REPLACE(full_name, r'\s+\S+$', '') AS first_name,
+    REGEXP_EXTRACT(full_name, r'(\S+)$') AS last_name,
+    CAST(NULL AS TIMESTAMP) AS modified_date,
+    CASE
+        WHEN LOWER(d.name) LIKE '%sales%' THEN 'Sales'
+        ELSE d.name
+    END AS department_name,
+    CASE
+        WHEN m.active = 1 THEN 'Active'
+        ELSE 'Inactive'
+    END AS status,
+    CAST(NULL AS STRING) AS address_country_name,
+    IF(m.active = 1, FALSE, TRUE) AS is_deleted,
+    CASE
+        WHEN m.active = 1 THEN 'Active'
+        ELSE 'Inactive'
+    END AS employee_status,
+    CAST(NULL AS STRING) AS account_id,
+    CAST(NULL AS STRING) AS trading_account_id,
+    CURRENT_DATETIME() AS update_datetime
+FROM `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers` AS m
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers_to_departments` AS md
+    ON m.id = md.manager_id
+LEFT JOIN `zfx-dwh-prod`.`operational_data_store`.`dubai_traze_fxbackoffice_managers_departments` AS d
+    ON md.department_id = d.id
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.deals
+  type: TABLE  rows: 41984847  size_bytes: 46158834027
+  created: 2026-07-29 11:17:23.320000+00:00  modified: 2026-08-27 18:08:02.409000+00:00
+  description: None
+  labels: {}
+  schema:
+   - deal BIGNUMERIC NULLABLE
+   - external_id STRING NULLABLE
+   - login BIGNUMERIC NULLABLE
+   - dealer BIGNUMERIC NULLABLE
+   - order BIGNUMERIC NULLABLE
+   - action INTEGER NULLABLE
+   - entry INTEGER NULLABLE
+   - digits INTEGER NULLABLE
+   - digits_currency INTEGER NULLABLE
+   - contract_size BIGNUMERIC NULLABLE
+   - time TIMESTAMP NULLABLE
+   - symbol STRING NULLABLE
+   - price BIGNUMERIC NULLABLE
+   - volume BIGNUMERIC NULLABLE
+   - profit BIGNUMERIC NULLABLE
+   - storage BIGNUMERIC NULLABLE
+   - commission BIGNUMERIC NULLABLE
+   - rate_profit BIGNUMERIC NULLABLE
+   - rate_margin BIGNUMERIC NULLABLE
+   - expert_id BIGNUMERIC NULLABLE
+   - position_id BIGNUMERIC NULLABLE
+   - comment STRING NULLABLE
+   - profit_raw BIGNUMERIC NULLABLE
+   - price_position BIGNUMERIC NULLABLE
+   - volume_closed BIGNUMERIC NULLABLE
+   - tick_value BIGNUMERIC NULLABLE
+   - tick_size BIGNUMERIC NULLABLE
+   - flags INTEGER NULLABLE
+   - last_ts TIMESTAMP NULLABLE
+   - time_msc TIMESTAMP NULLABLE
+   - reason INTEGER NULLABLE
+   - gateway STRING NULLABLE
+   - price_gateway BIGNUMERIC NULLABLE
+   - price_sl BIGNUMERIC NULLABLE
+   - price_tp BIGNUMERIC NULLABLE
+   - volume_ext BIGNUMERIC NULLABLE
+   - volume_closed_ext BIGNUMERIC NULLABLE
+   - fee BIGNUMERIC NULLABLE
+   - value BIGNUMERIC NULLABLE
+   - market_bid BIGNUMERIC NULLABLE
+   - market_ask BIGNUMERIC NULLABLE
+   - market_last BIGNUMERIC NULLABLE
+   - modification_flags INTEGER NULLABLE
+   - group STRING NULLABLE
+   - spread_diff INTEGER NULLABLE
+   - spread_diff_balance INTEGER NULLABLE
+   - currency STRING NULLABLE
+   - load_time TIMESTAMP NULLABLE
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.dealrecord
+  type: TABLE  rows: 23751562  size_bytes: 27782683952
+  created: 2025-06-24 16:42:25.214000+00:00  modified: 2026-05-13 11:06:13.854000+00:00
+  description: None
+  labels: {}
+  schema:
+   - id BIGNUMERIC REQUIRED
+   - sequence BIGNUMERIC NULLABLE
+   - ts TIMESTAMP REQUIRED
+   - opcode INTEGER REQUIRED
+   - deal BIGNUMERIC REQUIRED
+   - external_id STRING REQUIRED
+   - login BIGNUMERIC REQUIRED
+   - dealer BIGNUMERIC REQUIRED
+   - order BIGNUMERIC REQUIRED
+   - action INTEGER REQUIRED
+   - entry INTEGER REQUIRED
+   - digits INTEGER REQUIRED
+   - digits_currency INTEGER REQUIRED
+   - contract_size BIGNUMERIC REQUIRED
+   - time TIMESTAMP REQUIRED
+   - symbol STRING REQUIRED
+   - price BIGNUMERIC REQUIRED
+   - volume BIGNUMERIC REQUIRED
+   - profit BIGNUMERIC REQUIRED
+   - storage BIGNUMERIC REQUIRED
+   - commission BIGNUMERIC REQUIRED
+   - rate_profit BIGNUMERIC REQUIRED
+   - rate_margin BIGNUMERIC REQUIRED
+   - expert_id BIGNUMERIC REQUIRED
+   - position_id BIGNUMERIC REQUIRED
+   - comment STRING REQUIRED
+   - profit_raw BIGNUMERIC REQUIRED
+   - price_position BIGNUMERIC REQUIRED
+   - volume_closed BIGNUMERIC REQUIRED
+   - tick_value BIGNUMERIC REQUIRED
+   - tick_size BIGNUMERIC REQUIRED
+   - flags INTEGER REQUIRED
+   - time_msc TIMESTAMP REQUIRED
+   - reason INTEGER REQUIRED
+   - gateway STRING REQUIRED
+   - price_gateway BIGNUMERIC REQUIRED
+   - price_sl BIGNUMERIC REQUIRED
+   - price_tp BIGNUMERIC REQUIRED
+   - volume_ext BIGNUMERIC REQUIRED
+   - volume_closed_ext BIGNUMERIC REQUIRED
+   - fee BIGNUMERIC REQUIRED
+   - value BIGNUMERIC REQUIRED
+   - market_bid BIGNUMERIC REQUIRED
+   - market_ask BIGNUMERIC REQUIRED
+   - market_last BIGNUMERIC REQUIRED
+   - modification_flags INTEGER REQUIRED
+   - group STRING REQUIRED
+   - spread_diff INTEGER REQUIRED
+   - spread_diff_balance INTEGER REQUIRED
+   - currency STRING REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.accounts
+  type: TABLE  rows: 36587  size_bytes: 30082438
+  created: 2024-08-29 07:58:50.201000+00:00  modified: 2026-08-27 18:12:21.208000+00:00
+  description: None
+  labels: {}
+  schema:
+   - login BIGNUMERIC REQUIRED
+   - group STRING REQUIRED
+   - cert_serial_number BIGNUMERIC REQUIRED
+   - rights BIGNUMERIC REQUIRED
+   - registration TIMESTAMP REQUIRED
+   - last_access TIMESTAMP REQUIRED
+   - last_ip STRING REQUIRED
+   - name STRING REQUIRED
+   - company STRING REQUIRED
+   - account STRING REQUIRED
+   - country STRING REQUIRED
+   - language INTEGER REQUIRED
+   - city STRING REQUIRED
+   - state STRING REQUIRED
+   - zip_code STRING REQUIRED
+   - address STRING REQUIRED
+   - phone STRING REQUIRED
+   - email STRING REQUIRED
+   - id_ STRING REQUIRED
+   - status STRING REQUIRED
+   - comment STRING REQUIRED
+   - color INTEGER REQUIRED
+   - phone_password STRING REQUIRED
+   - leverage INTEGER REQUIRED
+   - agent BIGNUMERIC REQUIRED
+   - balance BIGNUMERIC REQUIRED
+   - credit BIGNUMERIC REQUIRED
+   - interest_rate BIGNUMERIC REQUIRED
+   - commission_daily BIGNUMERIC REQUIRED
+   - commission_monthly BIGNUMERIC REQUIRED
+   - commission_agent_daily BIGNUMERIC REQUIRED
+   - commission_agent_monthly BIGNUMERIC REQUIRED
+   - balance_prev_day BIGNUMERIC REQUIRED
+   - balance_prev_month BIGNUMERIC REQUIRED
+   - equity_prev_day BIGNUMERIC REQUIRED
+   - equity_prev_month BIGNUMERIC REQUIRED
+   - external_account_total INTEGER REQUIRED
+   - last_pass_change BIGNUMERIC REQUIRED
+   - registration_utc TIMESTAMP REQUIRED
+   - last_access_utc TIMESTAMP REQUIRED
+   - last_pass_change_utc TIMESTAMP REQUIRED
+   - mqid STRING REQUIRED
+   - lead_source STRING REQUIRED
+   - lead_campaign STRING NULLABLE
+   - client_id BIGNUMERIC REQUIRED
+   - first_name STRING NULLABLE
+   - last_name STRING NULLABLE
+   - middle_name STRING NULLABLE
+   - otp_secret STRING NULLABLE
+   - limit_orders INTEGER REQUIRED
+   - limit_position_value BIGNUMERIC NULLABLE
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.orders
+  type: TABLE  rows: 41555610  size_bytes: 30445572484
+  created: 2025-04-30 08:15:42.869000+00:00  modified: 2026-08-27 18:08:04.104000+00:00
+  description: None
+  labels: {}
+  schema:
+   - order BIGNUMERIC REQUIRED
+   - external_id STRING REQUIRED
+   - login BIGNUMERIC REQUIRED
+   - dealer BIGNUMERIC REQUIRED
+   - symbol STRING REQUIRED
+   - digits INTEGER REQUIRED
+   - digits_currency INTEGER REQUIRED
+   - contract_size BIGNUMERIC REQUIRED
+   - state INTEGER REQUIRED
+   - reason INTEGER REQUIRED
+   - time_setup TIMESTAMP REQUIRED
+   - time_expiration TIMESTAMP NULLABLE
+   - time_done TIMESTAMP NULLABLE
+   - type INTEGER REQUIRED
+   - type_fill INTEGER REQUIRED
+   - type_time INTEGER REQUIRED
+   - price_order BIGNUMERIC REQUIRED
+   - price_trigger BIGNUMERIC REQUIRED
+   - price_current BIGNUMERIC REQUIRED
+   - price_sl BIGNUMERIC REQUIRED
+   - price_tp BIGNUMERIC REQUIRED
+   - volume_initial BIGNUMERIC REQUIRED
+   - volume_current BIGNUMERIC REQUIRED
+   - expert_id BIGNUMERIC REQUIRED
+   - position_id BIGNUMERIC REQUIRED
+   - comment STRING REQUIRED
+   - activation_mode INTEGER REQUIRED
+   - activation_time TIMESTAMP NULLABLE
+   - activation_price BIGNUMERIC REQUIRED
+   - activation_flags INTEGER REQUIRED
+   - reconciliation_status INTEGER REQUIRED
+   - last_ts TIMESTAMP REQUIRED
+   - time_setup_msc TIMESTAMP REQUIRED
+   - time_done_msc TIMESTAMP NULLABLE
+   - rate_margin BIGNUMERIC REQUIRED
+   - position_by_id BIGNUMERIC REQUIRED
+   - modification_flags INTEGER REQUIRED
+   - volume_initial_ext BIGNUMERIC REQUIRED
+   - volume_current_ext BIGNUMERIC REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.orderrecord
+  type: TABLE  rows: 175025288  size_bytes: 137932165664
+  created: 2025-06-24 16:15:34.045000+00:00  modified: 2026-08-27 18:08:59.041000+00:00
+  description: None
+  labels: {}
+  schema:
+   - id BIGNUMERIC REQUIRED
+   - sequence BIGNUMERIC NULLABLE
+   - ts TIMESTAMP REQUIRED
+   - opcode INTEGER REQUIRED
+   - order BIGNUMERIC REQUIRED
+   - external_id STRING REQUIRED
+   - login BIGNUMERIC REQUIRED
+   - dealer BIGNUMERIC REQUIRED
+   - symbol STRING REQUIRED
+   - digits INTEGER REQUIRED
+   - digits_currency INTEGER REQUIRED
+   - contract_size BIGNUMERIC REQUIRED
+   - state INTEGER REQUIRED
+   - reason INTEGER REQUIRED
+   - time_setup TIMESTAMP REQUIRED
+   - time_expiration TIMESTAMP NULLABLE
+   - time_done TIMESTAMP NULLABLE
+   - type INTEGER REQUIRED
+   - type_fill INTEGER REQUIRED
+   - type_time INTEGER REQUIRED
+   - price_order BIGNUMERIC REQUIRED
+   - price_trigger BIGNUMERIC REQUIRED
+   - price_current BIGNUMERIC REQUIRED
+   - price_sl BIGNUMERIC REQUIRED
+   - price_tp BIGNUMERIC REQUIRED
+   - volume_initial BIGNUMERIC REQUIRED
+   - volume_current BIGNUMERIC REQUIRED
+   - expert_id BIGNUMERIC REQUIRED
+   - position_id BIGNUMERIC REQUIRED
+   - comment STRING REQUIRED
+   - activation_mode INTEGER REQUIRED
+   - activation_time TIMESTAMP NULLABLE
+   - activation_price BIGNUMERIC REQUIRED
+   - activation_flags INTEGER REQUIRED
+   - time_setup_msc TIMESTAMP REQUIRED
+   - time_done_msc TIMESTAMP NULLABLE
+   - rate_margin BIGNUMERIC REQUIRED
+   - position_by_id BIGNUMERIC REQUIRED
+   - modification_flags INTEGER REQUIRED
+   - volume_initial_ext BIGNUMERIC REQUIRED
+   - volume_current_ext BIGNUMERIC REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.userrecord
+  type: TABLE  rows: 55106214  size_bytes: 48309785649
+  created: 2026-06-15 05:25:39.794000+00:00  modified: 2026-08-27 18:41:17.518000+00:00
+  description: None
+  labels: {}
+  schema:
+   - id BIGNUMERIC REQUIRED
+   - ts TIMESTAMP REQUIRED
+   - opcode INTEGER REQUIRED
+   - login BIGNUMERIC REQUIRED
+   - group STRING REQUIRED
+   - cert_serial_number BIGNUMERIC REQUIRED
+   - rights BIGNUMERIC REQUIRED
+   - registration TIMESTAMP REQUIRED
+   - last_access TIMESTAMP REQUIRED
+   - last_ip STRING REQUIRED
+   - name STRING REQUIRED
+   - company STRING REQUIRED
+   - account STRING REQUIRED
+   - country STRING REQUIRED
+   - language INTEGER REQUIRED
+   - city STRING REQUIRED
+   - state STRING REQUIRED
+   - zip_code STRING REQUIRED
+   - address STRING REQUIRED
+   - phone STRING REQUIRED
+   - email STRING REQUIRED
+   - id_ STRING REQUIRED
+   - status STRING REQUIRED
+   - comment STRING REQUIRED
+   - color INTEGER REQUIRED
+   - phone_password STRING REQUIRED
+   - leverage INTEGER REQUIRED
+   - agent BIGNUMERIC REQUIRED
+   - balance BIGNUMERIC REQUIRED
+   - credit BIGNUMERIC REQUIRED
+   - interest_rate BIGNUMERIC REQUIRED
+   - commission_daily BIGNUMERIC REQUIRED
+   - commission_monthly BIGNUMERIC REQUIRED
+   - commission_agent_daily BIGNUMERIC REQUIRED
+   - commission_agent_monthly BIGNUMERIC REQUIRED
+   - balance_prev_day BIGNUMERIC REQUIRED
+   - balance_prev_month BIGNUMERIC REQUIRED
+   - equity_prev_day BIGNUMERIC REQUIRED
+   - equity_prev_month BIGNUMERIC REQUIRED
+   - external_account_total INTEGER REQUIRED
+   - last_pass_change BIGNUMERIC REQUIRED
+   - registration_utc TIMESTAMP REQUIRED
+   - last_access_utc TIMESTAMP REQUIRED
+   - last_pass_change_utc TIMESTAMP REQUIRED
+   - mqid STRING REQUIRED
+   - lead_source STRING NULLABLE
+   - lead_campaign STRING NULLABLE
+   - client_id BIGNUMERIC REQUIRED
+   - first_name STRING NULLABLE
+   - last_name STRING NULLABLE
+   - middle_name STRING NULLABLE
+   - otp_secret STRING NULLABLE
+   - limit_orders INTEGER REQUIRED
+   - limit_position_value BIGNUMERIC NULLABLE
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_demo01.accounts
+  type: TABLE  rows: 11978  size_bytes: 10124701
+  created: 2024-09-18 23:26:24.269000+00:00  modified: 2026-08-27 18:11:35.622000+00:00
+  description: None
+  labels: {}
+  schema:
+   - login BIGNUMERIC REQUIRED
+   - group STRING REQUIRED
+   - cert_serial_number BIGNUMERIC REQUIRED
+   - rights BIGNUMERIC REQUIRED
+   - registration TIMESTAMP REQUIRED
+   - last_access TIMESTAMP REQUIRED
+   - last_ip STRING REQUIRED
+   - name STRING REQUIRED
+   - company STRING REQUIRED
+   - account STRING REQUIRED
+   - country STRING REQUIRED
+   - language INTEGER REQUIRED
+   - city STRING REQUIRED
+   - state STRING REQUIRED
+   - zip_code STRING REQUIRED
+   - address STRING REQUIRED
+   - phone STRING REQUIRED
+   - email STRING REQUIRED
+   - id_ STRING REQUIRED
+   - status STRING REQUIRED
+   - comment STRING REQUIRED
+   - color INTEGER REQUIRED
+   - phone_password STRING REQUIRED
+   - leverage INTEGER REQUIRED
+   - agent BIGNUMERIC REQUIRED
+   - balance BIGNUMERIC REQUIRED
+   - credit BIGNUMERIC REQUIRED
+   - interest_rate BIGNUMERIC REQUIRED
+   - commission_daily BIGNUMERIC REQUIRED
+   - commission_monthly BIGNUMERIC REQUIRED
+   - commission_agent_daily BIGNUMERIC REQUIRED
+   - commission_agent_monthly BIGNUMERIC REQUIRED
+   - balance_prev_day BIGNUMERIC REQUIRED
+   - balance_prev_month BIGNUMERIC REQUIRED
+   - equity_prev_day BIGNUMERIC REQUIRED
+   - equity_prev_month BIGNUMERIC REQUIRED
+   - external_account_total INTEGER REQUIRED
+   - last_pass_change BIGNUMERIC REQUIRED
+   - registration_utc TIMESTAMP REQUIRED
+   - last_access_utc TIMESTAMP REQUIRED
+   - last_pass_change_utc TIMESTAMP REQUIRED
+   - mqid STRING REQUIRED
+   - lead_source STRING REQUIRED
+   - lead_campaign STRING NULLABLE
+   - client_id BIGNUMERIC REQUIRED
+   - first_name STRING NULLABLE
+   - last_name STRING NULLABLE
+   - middle_name STRING NULLABLE
+   - otp_secret STRING NULLABLE
+   - limit_orders INTEGER REQUIRED
+   - limit_position_value BIGNUMERIC NULLABLE
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_demo01.dailyrecord
+  type: TABLE  rows: 535794  size_bytes: 757659495
+  created: 2024-09-18 23:26:24.207000+00:00  modified: 2026-08-27 18:11:35.857000+00:00
+  description: None
+  labels: {}
+  schema:
+   - id BIGNUMERIC REQUIRED
+   - sequence BIGNUMERIC NULLABLE
+   - ts TIMESTAMP REQUIRED
+   - opcode INTEGER REQUIRED
+   - datetime TIMESTAMP REQUIRED
+   - datetime_prev TIMESTAMP REQUIRED
+   - login BIGNUMERIC REQUIRED
+   - name STRING REQUIRED
+   - group STRING REQUIRED
+   - currency STRING REQUIRED
+   - currency_digits INTEGER REQUIRED
+   - company STRING REQUIRED
+   - email STRING REQUIRED
+   - balance BIGNUMERIC REQUIRED
+   - credit BIGNUMERIC REQUIRED
+   - interest_rate BIGNUMERIC REQUIRED
+   - commission_daily BIGNUMERIC REQUIRED
+   - commission_monthly BIGNUMERIC REQUIRED
+   - agent_daily BIGNUMERIC REQUIRED
+   - agent_monthly BIGNUMERIC REQUIRED
+   - balance_prev_day BIGNUMERIC REQUIRED
+   - balance_prev_month BIGNUMERIC REQUIRED
+   - equity_prev_day BIGNUMERIC REQUIRED
+   - equity_prev_month BIGNUMERIC REQUIRED
+   - margin BIGNUMERIC REQUIRED
+   - margin_free BIGNUMERIC REQUIRED
+   - margin_level BIGNUMERIC REQUIRED
+   - margin_leverage INTEGER REQUIRED
+   - profit BIGNUMERIC REQUIRED
+   - profit_storage BIGNUMERIC REQUIRED
+   - profit_equity BIGNUMERIC REQUIRED
+   - daily_profit BIGNUMERIC REQUIRED
+   - daily_balance BIGNUMERIC REQUIRED
+   - daily_credit BIGNUMERIC REQUIRED
+   - daily_charge BIGNUMERIC REQUIRED
+   - daily_correction BIGNUMERIC REQUIRED
+   - daily_bonus BIGNUMERIC REQUIRED
+   - daily_storage BIGNUMERIC REQUIRED
+   - daily_comm_instant BIGNUMERIC REQUIRED
+   - daily_comm_round BIGNUMERIC REQUIRED
+   - daily_agent BIGNUMERIC REQUIRED
+   - daily_interest BIGNUMERIC REQUIRED
+   - position_total INTEGER REQUIRED
+   - order_total INTEGER REQUIRED
+   - profit_assets BIGNUMERIC REQUIRED
+   - profit_liabilities BIGNUMERIC REQUIRED
+   - daily_dividend BIGNUMERIC REQUIRED
+   - daily_taxes BIGNUMERIC REQUIRED
+   - daily_so_compensation BIGNUMERIC REQUIRED
+   - daily_comm_fee BIGNUMERIC REQUIRED
+   - daily_so_compensation_credit BIGNUMERIC REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_demo01.orderrecord
+  type: TABLE  rows: 42770670  size_bytes: 33688861797
+  created: 2025-08-06 15:05:06.733000+00:00  modified: 2026-08-27 18:08:04.722000+00:00
+  description: None
+  labels: {}
+  schema:
+   - id BIGNUMERIC REQUIRED
+   - sequence BIGNUMERIC NULLABLE
+   - ts TIMESTAMP REQUIRED
+   - opcode INTEGER REQUIRED
+   - order BIGNUMERIC REQUIRED
+   - external_id STRING REQUIRED
+   - login BIGNUMERIC REQUIRED
+   - dealer BIGNUMERIC REQUIRED
+   - symbol STRING REQUIRED
+   - digits INTEGER REQUIRED
+   - digits_currency INTEGER REQUIRED
+   - contract_size BIGNUMERIC REQUIRED
+   - state INTEGER REQUIRED
+   - reason INTEGER REQUIRED
+   - time_setup TIMESTAMP REQUIRED
+   - time_expiration TIMESTAMP NULLABLE
+   - time_done TIMESTAMP NULLABLE
+   - type INTEGER REQUIRED
+   - type_fill INTEGER REQUIRED
+   - type_time INTEGER REQUIRED
+   - price_order BIGNUMERIC REQUIRED
+   - price_trigger BIGNUMERIC REQUIRED
+   - price_current BIGNUMERIC REQUIRED
+   - price_sl BIGNUMERIC REQUIRED
+   - price_tp BIGNUMERIC REQUIRED
+   - volume_initial BIGNUMERIC REQUIRED
+   - volume_current BIGNUMERIC REQUIRED
+   - expert_id BIGNUMERIC REQUIRED
+   - position_id BIGNUMERIC REQUIRED
+   - comment STRING REQUIRED
+   - activation_mode INTEGER REQUIRED
+   - activation_time TIMESTAMP NULLABLE
+   - activation_price BIGNUMERIC REQUIRED
+   - activation_flags INTEGER REQUIRED
+   - time_setup_msc TIMESTAMP REQUIRED
+   - time_done_msc TIMESTAMP NULLABLE
+   - rate_margin BIGNUMERIC REQUIRED
+   - position_by_id BIGNUMERIC REQUIRED
+   - modification_flags INTEGER REQUIRED
+   - volume_initial_ext BIGNUMERIC REQUIRED
+   - volume_current_ext BIGNUMERIC REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_demo01.orders
+  type: TABLE  rows: 11043140  size_bytes: 8064372813
+  created: 2025-10-03 10:45:34.871000+00:00  modified: 2026-08-27 18:07:54.736000+00:00
+  description: None
+  labels: {}
+  schema:
+   - order BIGNUMERIC REQUIRED
+   - external_id STRING REQUIRED
+   - login BIGNUMERIC REQUIRED
+   - dealer BIGNUMERIC REQUIRED
+   - symbol STRING REQUIRED
+   - digits INTEGER REQUIRED
+   - digits_currency INTEGER REQUIRED
+   - contract_size BIGNUMERIC REQUIRED
+   - state INTEGER REQUIRED
+   - reason INTEGER REQUIRED
+   - time_setup TIMESTAMP REQUIRED
+   - time_expiration TIMESTAMP NULLABLE
+   - time_done TIMESTAMP NULLABLE
+   - type INTEGER REQUIRED
+   - type_fill INTEGER REQUIRED
+   - type_time INTEGER REQUIRED
+   - price_order BIGNUMERIC REQUIRED
+   - price_trigger BIGNUMERIC REQUIRED
+   - price_current BIGNUMERIC REQUIRED
+   - price_sl BIGNUMERIC REQUIRED
+   - price_tp BIGNUMERIC REQUIRED
+   - volume_initial BIGNUMERIC REQUIRED
+   - volume_current BIGNUMERIC REQUIRED
+   - expert_id BIGNUMERIC REQUIRED
+   - position_id BIGNUMERIC REQUIRED
+   - comment STRING REQUIRED
+   - activation_mode INTEGER REQUIRED
+   - activation_time TIMESTAMP NULLABLE
+   - activation_price BIGNUMERIC REQUIRED
+   - activation_flags INTEGER REQUIRED
+   - reconciliation_status INTEGER REQUIRED
+   - last_ts TIMESTAMP REQUIRED
+   - time_setup_msc TIMESTAMP REQUIRED
+   - time_done_msc TIMESTAMP NULLABLE
+   - rate_margin BIGNUMERIC REQUIRED
+   - position_by_id BIGNUMERIC REQUIRED
+   - modification_flags INTEGER REQUIRED
+   - volume_initial_ext BIGNUMERIC REQUIRED
+   - volume_current_ext BIGNUMERIC REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_demo01.userrecord
+  type: TABLE  rows: 7705661  size_bytes: 6785388966
+  created: 2025-10-03 10:38:41.455000+00:00  modified: 2026-08-27 18:08:00.213000+00:00
+  description: None
+  labels: {}
+  schema:
+   - id BIGNUMERIC REQUIRED
+   - ts TIMESTAMP REQUIRED
+   - opcode INTEGER REQUIRED
+   - login BIGNUMERIC REQUIRED
+   - group STRING REQUIRED
+   - cert_serial_number BIGNUMERIC REQUIRED
+   - rights BIGNUMERIC REQUIRED
+   - registration TIMESTAMP REQUIRED
+   - last_access TIMESTAMP REQUIRED
+   - last_ip STRING REQUIRED
+   - name STRING REQUIRED
+   - company STRING REQUIRED
+   - account STRING REQUIRED
+   - country STRING REQUIRED
+   - language INTEGER REQUIRED
+   - city STRING REQUIRED
+   - state STRING REQUIRED
+   - zip_code STRING REQUIRED
+   - address STRING REQUIRED
+   - phone STRING REQUIRED
+   - email STRING REQUIRED
+   - id_ STRING REQUIRED
+   - status STRING REQUIRED
+   - comment STRING REQUIRED
+   - color INTEGER REQUIRED
+   - phone_password STRING REQUIRED
+   - leverage INTEGER REQUIRED
+   - agent BIGNUMERIC REQUIRED
+   - balance BIGNUMERIC REQUIRED
+   - credit BIGNUMERIC REQUIRED
+   - interest_rate BIGNUMERIC REQUIRED
+   - commission_daily BIGNUMERIC REQUIRED
+   - commission_monthly BIGNUMERIC REQUIRED
+   - commission_agent_daily BIGNUMERIC REQUIRED
+   - commission_agent_monthly BIGNUMERIC REQUIRED
+   - balance_prev_day BIGNUMERIC REQUIRED
+   - balance_prev_month BIGNUMERIC REQUIRED
+   - equity_prev_day BIGNUMERIC REQUIRED
+   - equity_prev_month BIGNUMERIC REQUIRED
+   - external_account_total INTEGER REQUIRED
+   - last_pass_change BIGNUMERIC REQUIRED
+   - registration_utc TIMESTAMP REQUIRED
+   - last_access_utc TIMESTAMP REQUIRED
+   - last_pass_change_utc TIMESTAMP REQUIRED
+   - mqid STRING REQUIRED
+   - lead_source STRING NULLABLE
+   - lead_campaign STRING NULLABLE
+   - client_id BIGNUMERIC REQUIRED
+   - first_name STRING NULLABLE
+   - last_name STRING NULLABLE
+   - middle_name STRING NULLABLE
+   - otp_secret STRING NULLABLE
+   - limit_orders INTEGER REQUIRED
+   - limit_position_value BIGNUMERIC NULLABLE
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt4_demo_rep.accounts
+  type: TABLE  rows: 201132  size_bytes: 87936874
+  created: 2024-09-18 23:26:55.057000+00:00  modified: 2026-08-27 18:12:52.748000+00:00
+  description: None
+  labels: {}
+  schema:
+   - login INTEGER REQUIRED
+   - group STRING REQUIRED
+   - password BYTES REQUIRED
+   - enable INTEGER REQUIRED
+   - enable_change_password INTEGER REQUIRED
+   - enable_read_only INTEGER REQUIRED
+   - enable_otp INTEGER REQUIRED
+   - password_investor BYTES REQUIRED
+   - password_phone STRING REQUIRED
+   - name STRING REQUIRED
+   - country STRING REQUIRED
+   - city STRING REQUIRED
+   - state STRING REQUIRED
+   - zipcode STRING REQUIRED
+   - address STRING REQUIRED
+   - lead_source STRING REQUIRED
+   - phone STRING REQUIRED
+   - email STRING REQUIRED
+   - comment STRING REQUIRED
+   - id STRING REQUIRED
+   - status STRING REQUIRED
+   - reg_ts INTEGER REQUIRED
+   - last_ts INTEGER REQUIRED
+   - order_last_ts INTEGER REQUIRED
+   - leverage INTEGER REQUIRED
+   - agent_account INTEGER REQUIRED
+   - timestamp INTEGER REQUIRED
+   - balance BIGNUMERIC REQUIRED
+   - prevmonthbalance BIGNUMERIC REQUIRED
+   - prevbalance BIGNUMERIC REQUIRED
+   - credit BIGNUMERIC REQUIRED
+   - interestrate BIGNUMERIC REQUIRED
+   - taxes BIGNUMERIC REQUIRED
+   - send_reports INTEGER REQUIRED
+   - mqid INTEGER REQUIRED
+   - user_color INTEGER REQUIRED
+   - last_ip INTEGER REQUIRED
+   - archived INTEGER REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt4_demo_rep.orders
+  type: TABLE  rows: 92665078  size_bytes: 61453468573
+  created: 2025-01-21 09:40:33.631000+00:00  modified: 2026-05-13 05:06:13.263000+00:00
+  description: None
+  labels: {}
+  schema:
+   - order INTEGER REQUIRED
+   - login INTEGER REQUIRED
+   - symbol64 INTEGER REQUIRED
+   - symbol_name STRING REQUIRED
+   - digits INTEGER REQUIRED
+   - cmd INTEGER REQUIRED
+   - open_volume INTEGER REQUIRED
+   - volume INTEGER REQUIRED
+   - open_ts INTEGER REQUIRED
+   - state INTEGER REQUIRED
+   - open_price BIGNUMERIC REQUIRED
+   - sl BIGNUMERIC REQUIRED
+   - tp BIGNUMERIC REQUIRED
+   - close_ts INTEGER REQUIRED
+   - value_ts INTEGER REQUIRED
+   - expiration_ts INTEGER REQUIRED
+   - reason INTEGER REQUIRED
+   - conv_rates_0 BIGNUMERIC REQUIRED
+   - conv_rates_1 BIGNUMERIC REQUIRED
+   - commission BIGNUMERIC REQUIRED
+   - commission_agent BIGNUMERIC REQUIRED
+   - storage BIGNUMERIC REQUIRED
+   - close_price BIGNUMERIC REQUIRED
+   - profit BIGNUMERIC REQUIRED
+   - taxes BIGNUMERIC REQUIRED
+   - magic INTEGER REQUIRED
+   - comment STRING REQUIRED
+   - internal_id INTEGER REQUIRED
+   - margin_rate BIGNUMERIC REQUIRED
+   - mode INTEGER NULLABLE
+   - api_data_0 INTEGER REQUIRED
+   - api_data_1 INTEGER REQUIRED
+   - api_data_2 INTEGER REQUIRED
+   - api_data_3 INTEGER REQUIRED
+   - reconciliation_status INTEGER REQUIRED
+   - book_type_open INTEGER REQUIRED
+   - book_type_close INTEGER REQUIRED
+   - gw_volume INTEGER REQUIRED
+   - gw_order INTEGER REQUIRED
+   - gw_open_price INTEGER REQUIRED
+   - gw_close_price INTEGER REQUIRED
+   - std_lots BIGNUMERIC REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt4_demo_rep.userrecord
+  type: TABLE  rows: 11965775  size_bytes: 5516162451
+  created: 2024-09-18 23:11:43.837000+00:00  modified: 2026-08-27 18:08:54.836000+00:00
+  description: None
+  labels: {}
+  schema:
+   - ts INTEGER REQUIRED
+   - ts_ms INTEGER REQUIRED
+   - tm TIMESTAMP REQUIRED
+   - sequence INTEGER REQUIRED
+   - login INTEGER REQUIRED
+   - group STRING REQUIRED
+   - password BYTES REQUIRED
+   - enable INTEGER REQUIRED
+   - enable_change_password INTEGER REQUIRED
+   - enable_read_only INTEGER REQUIRED
+   - enable_otp INTEGER REQUIRED
+   - password_investor BYTES REQUIRED
+   - password_phone STRING REQUIRED
+   - name STRING REQUIRED
+   - country STRING REQUIRED
+   - city STRING REQUIRED
+   - state STRING REQUIRED
+   - zipcode STRING REQUIRED
+   - address STRING REQUIRED
+   - lead_source STRING REQUIRED
+   - phone STRING REQUIRED
+   - email STRING REQUIRED
+   - comment STRING REQUIRED
+   - id STRING REQUIRED
+   - status STRING REQUIRED
+   - reg_ts INTEGER REQUIRED
+   - last_ts INTEGER REQUIRED
+   - leverage INTEGER REQUIRED
+   - agent_account INTEGER REQUIRED
+   - timestamp INTEGER REQUIRED
+   - balance BIGNUMERIC REQUIRED
+   - prevmonthbalance BIGNUMERIC REQUIRED
+   - prevbalance BIGNUMERIC REQUIRED
+   - credit BIGNUMERIC REQUIRED
+   - interestrate BIGNUMERIC REQUIRED
+   - taxes BIGNUMERIC REQUIRED
+   - send_reports INTEGER REQUIRED
+   - mqid INTEGER REQUIRED
+   - user_color INTEGER REQUIRED
+   - last_ip INTEGER REQUIRED
+   - load_time TIMESTAMP REQUIRED

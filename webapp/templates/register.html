@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Request access - ZFX Risk Intelligence{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="brand" style="margin-bottom:20px">
+      <div class="brand-mark">Z</div>
+      <div>ZFX<small>Risk Intelligence</small></div>
+    </div>
+    <h1>Request access</h1>
+    <p class="sub">An administrator approves every account before it can sign in.</p>
+
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+    <form method="post" action="/register">
+      <div class="field">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" required>
+      </div>
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required>
+      </div>
+      <div class="field">
+        <label>Access requested</label>
+        <div style="display:flex;gap:16px;font-size:13px;color:var(--ink)">
+          <label style="display:flex;align-items:center;gap:7px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)">
+            <input type="checkbox" name="views" value="trading" checked style="width:auto"> Trading
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)">
+            <input type="checkbox" name="views" value="quant" style="width:auto"> Quant
+          </label>
+        </div>
+      </div>
+      <button class="btn-primary" type="submit" style="width:100%">Submit request</button>
+    </form>
+
+    <p style="margin:18px 0 0;font-size:13px;color:var(--ink-dim)">
+      Already have an account? <a href="/login">Sign in</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

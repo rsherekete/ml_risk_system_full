@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block title %}Copy Trader - ZFX Quant{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Copy Trader</h1>
+  <p>MT5 execution of the Quant book &mdash; expected risk against what the terminal actually holds.</p>
+</div>
+
+{% if copy_state.kill_switch %}
+<div class="alert alert-error">
+  <b>KILL SWITCH ENGAGED.</b> No orders will be sent. Release it below to resume.
+</div>
+{% elif copy_config.paper_mode or not copy_config.enabled %}
+<div class="alert alert-info">
+  <b>Paper mode.</b> Signals are evaluated, limit-checked and logged, but no order
+  reaches the broker. Arming for live execution is a deliberate, separate action.
+</div>
+{% else %}
+<div class="alert alert-error">
+  <b>LIVE EXECUTION ARMED.</b> Orders are being sent to account
+  {{ copy_config.login }} on {{ copy_config.server }}.
+</div>
+{% endif %}
+
+<div class="grid cols-4" style="margin-bottom:14px">
+  <div class="panel stat">
+    <span class="label">Engine</span>
+    <span class="value {{ 'neg' if copy_state.kill_switch else ('warn' if copy_config.paper_mode else 'pos') }}"
+          style="font-size:19px">
+      {{ 'HALTED' if copy_state.kill_switch else ('PAPER' if copy_config.paper_mode else 'LIVE') }}</span>
+    <span class="delta dim">{{ copy_state.message or 'idle' }}</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Orders sent</span>
+    <span class="value">{{ copy_state.orders_sent }}</span>
+    <span class="delta dim">{{ copy_state.orders_rejected }} rejected &middot;
+      {{ copy_state.orders_blocked }} blocked by limits</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Terminal</span>
+    <span class="value {{ 'pos' if account.available else 'neg' }}" style="font-size:19px">
+      {{ 'CONNECTED' if account.available else 'OFFLINE' }}</span>
+    <span class="delta dim">{{ account.server or account.error or 'MT5 not attached' }}</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Open positions</span>
+    <span class="value">{{ positions|length }}</span>
+    <span class="delta dim">{{ '%.2f'|format(positions|sum(attribute='lots')) }} lots</span>
+  </div>
+</div>
+
+{% if account.available %}
+<div class="grid cols-4" style="margin-bottom:14px">
+  <div class="panel stat">
+    <span class="label">Balance</span>
+    <span class="value" style="font-size:21px">{{ '{:,.2f}'.format(account.balance) }}</span>
+    <span class="delta dim">{{ account.currency }}</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Equity</span>
+    <span class="value {{ 'pos' if account.equity >= account.balance else 'neg' }}" style="font-size:21px">
+      {{ '{:,.2f}'.format(account.equity) }}</span>
+    <span class="delta {{ 'pos' if account.profit >= 0 else 'neg' }}">
+      {{ '{:+,.2f}'.format(account.profit) }} floating</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Margin used</span>
+    <span class="value" style="font-size:21px">{{ '{:,.2f}'.format(account.margin) }}</span>
+    <span class="delta dim">free {{ '{:,.2f}'.format(account.margin_free) }}</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Margin level</span>
+    <span class="value {{ 'neg' if account.margin_level and account.margin_level < 200 else 'pos' }}" style="font-size:21px">
+      {{ '{:,.0f}%'.format(account.margin_level) if account.margin_level else '--' }}</span>
+    <span class="delta dim">stop-out at 50%</span>
+  </div>
+</div>
+{% endif %}
+
+<div class="grid cols-2" style="margin-bottom:14px">
+  <div class="panel">
+    <h2>Expected versus live exposure</h2>
+    <p class="hint">
+      <b>Expected</b> is what the engine intended, from its own order log.
+      <b>Live</b> is what MT5 reports holding. They diverge through rejections,
+      partial fills, slippage and margin limits &mdash; the drift column is the number
+      worth watching, and it is why both sides are not read from the same place.
+    </p>
+    {% if drift.rows %}
+    <table>
+      <thead><tr><th>Symbol</th><th class="num">Expected</th><th class="num">Live</th>
+        <th class="num">Drift</th></tr></thead>
+      <tbody>
+      {% for row in drift.rows %}
+        <tr>
+          <td>{{ row.symbol }}</td>
+          <td class="num">{{ '%.2f'|format(row.expected_lots) }}</td>
+          <td class="num">{{ '%.2f'|format(row.live_lots) }}</td>
+          <td class="num {{ 'pos' if row.drift == 0 else 'neg' }}">{{ '%+.2f'|format(row.drift) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No orders recorded yet.</div>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <h2>Execution settings</h2>
+    <p class="hint">Limits are checked before every order, not once per cycle.</p>
+    <form method="post" action="/quant/copytrader/config">
+      <div class="grid cols-2" style="gap:12px">
+        <div class="field"><label for="login">MT5 login</label>
+          <input id="login" name="login" type="number" autocomplete="off" value="{{ copy_config.login or '' }}"></div>
+        <div class="field"><label for="server">Server</label>
+          <input id="server" name="server" type="text" value="{{ copy_config.server }}"></div>
+        <div class="field"><label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="new-password"
+            placeholder="{{ 'saved -- blank keeps it' if copy_config.password else 'required' }}"></div>
+        <div class="field"><label for="size_multiplier">Size multiplier</label>
+          <input id="size_multiplier" name="size_multiplier" type="number" step="0.01" min="0.01" max="10"
+                 value="{{ copy_config.size_multiplier }}"></div>
+        <div class="field"><label for="min_confidence">Minimum P(win)</label>
+          <input id="min_confidence" name="min_confidence" type="number" step="0.05" min="0.5" max="1"
+                 value="{{ copy_config.min_confidence }}"></div>
+        <div class="field"><label for="max_lots_per_order">Max lots / order</label>
+          <input id="max_lots_per_order" name="max_lots_per_order" type="number" step="0.01"
+                 value="{{ copy_config.max_lots_per_order }}"></div>
+        <div class="field"><label for="max_open_lots_per_symbol">Max lots / symbol</label>
+          <input id="max_open_lots_per_symbol" name="max_open_lots_per_symbol" type="number" step="0.1"
+                 value="{{ copy_config.max_open_lots_per_symbol }}"></div>
+        <div class="field"><label for="max_total_open_lots">Max total lots</label>
+          <input id="max_total_open_lots" name="max_total_open_lots" type="number" step="0.1"
+                 value="{{ copy_config.max_total_open_lots }}"></div>
+        <div class="field"><label for="max_orders_per_minute">Max orders / minute</label>
+          <input id="max_orders_per_minute" name="max_orders_per_minute" type="number" min="1" max="600"
+                 value="{{ copy_config.max_orders_per_minute }}"></div>
+        <div class="field"><label for="allowed_symbols">Allowed symbols</label>
+          <input id="allowed_symbols" name="allowed_symbols" type="text"
+                 placeholder="blank = all" value="{{ copy_config.allowed_symbols }}"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink);margin:10px 0">
+        <input type="checkbox" name="paper_mode" value="1" style="width:auto"
+               {{ 'checked' if copy_config.paper_mode }}> Paper mode (record only, never send)
+      </label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button type="submit">Save settings</button>
+        <button class="btn-primary" type="submit" name="test_connection" value="1">Test MT5 connection</button>
+        {% if not copy_config.paper_mode %}
+          <button class="btn-danger" type="submit" name="arm" value="1">Arm live execution</button>
+        {% endif %}
+      </div>
+    </form>
+    <form method="post" action="/quant/copytrader/kill" style="margin-top:12px">
+      <input type="hidden" name="engage" value="{{ '0' if copy_state.kill_switch else '1' }}">
+      <button class="{{ '' if copy_state.kill_switch else 'btn-danger' }}" type="submit" style="width:100%">
+        {{ 'Release kill switch' if copy_state.kill_switch else 'ENGAGE KILL SWITCH' }}
+      </button>
+    </form>
+  </div>
+</div>
+
+{% if positions %}
+<div class="panel" style="margin-bottom:14px">
+  <h2>Open positions</h2>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Ticket</th><th>Symbol</th><th>Side</th><th class="num">Lots</th>
+        <th class="num">Open</th><th class="num">Current</th><th class="num">Profit</th>
+        <th class="num">Swap</th><th>Opened</th></tr></thead>
+      <tbody>
+      {% for p in positions %}
+        <tr>
+          <td class="dim" style="font-family:var(--mono);font-size:11px">{{ p.ticket }}</td>
+          <td>{{ p.symbol }}</td>
+          <td class="{{ 'pos' if p.direction > 0 else 'neg' }}">{{ 'BUY' if p.direction > 0 else 'SELL' }}</td>
+          <td class="num">{{ '%.2f'|format(p.lots) }}</td>
+          <td class="num">{{ '%.5f'|format(p.open_price) }}</td>
+          <td class="num">{{ '%.5f'|format(p.current_price) }}</td>
+          <td class="num {{ 'pos' if p.profit >= 0 else 'neg' }}">{{ '{:,.2f}'.format(p.profit) }}</td>
+          <td class="num dim">{{ '{:,.2f}'.format(p.swap) }}</td>
+          <td class="dim" style="font-size:11px">{{ p.opened_at[:16].replace('T',' ') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>Dispatch signals</h2>
+  <p class="hint">
+    Sends an explicit, bounded batch through the engine &mdash; a manual action rather than
+    a background daemon, because a model that can emit thousands of signals a day is far
+    easier to reason about when a person chooses each batch. Limits and paper mode still apply.
+  </p>
+  <form method="post" action="/quant/copytrader/dispatch" class="toolbar" style="margin:0">
+    <div>
+      <label for="d-day">Day</label>
+      <select id="d-day" name="day">
+        {% for d in days or [] %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="d-hedge">Copy fraction</label>
+      <select id="d-hedge" name="hedge">
+        {% for value in [0.01, 0.02, 0.05, 0.10] %}
+          <option value="{{ value }}">{{ '{:.0%}'.format(value) }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="d-limit">Max orders</label>
+      <input id="d-limit" name="limit" type="number" min="1" max="500" value="50">
+    </div>
+    <button class="btn-primary" type="submit">
+      {{ 'Dispatch (paper)' if copy_config.paper_mode else 'DISPATCH LIVE' }}
+    </button>
+  </form>
+</div>
+
+<div class="panel">
+  <h2>Order log</h2>
+  <p class="hint">Every decision, including those refused by a limit and the reason why.</p>
+  <div class="table-scroll" style="max-height:380px">
+    <table>
+      <thead><tr><th>Time</th><th>Source account</th><th>Symbol</th><th>Side</th>
+        <th class="num">Lots</th><th class="num">P(win)</th><th>Mode</th><th>Status</th>
+        <th>Detail</th></tr></thead>
+      <tbody>
+      {% for order in orders %}
+        <tr>
+          <td class="dim" style="font-family:var(--mono);font-size:11px">
+            {{ order.created_at|timestamp }}</td>
+          <td style="font-family:var(--mono);font-size:11px">{{ order.source_account }}</td>
+          <td>{{ order.symbol }}</td>
+          <td class="{{ 'pos' if order.direction > 0 else 'neg' }}">
+            {{ 'BUY' if order.direction > 0 else 'SELL' }}</td>
+          <td class="num">{{ '%.2f'|format(order.lots) }}</td>
+          <td class="num">{{ '{:.0%}'.format(order.confidence) if order.confidence else '--' }}</td>
+          <td><span class="tag {{ 'tag-arb' if order.mode == 'paper' else 'tag-edge' }}">{{ order.mode }}</span></td>
+          <td><span class="tag {{ {'filled':'tag-edge','blocked':'tag-arb','rejected':'tag-toxic','error':'tag-toxic'}.get(order.status,'tag-neutral') }}">
+            {{ order.status }}</span></td>
+          <td class="dim" style="font-size:11px;max-width:320px">{{ order.comment }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="9" class="empty">No orders yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

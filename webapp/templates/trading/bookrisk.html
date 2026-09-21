@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Book Risk - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Book Risk</h1>
+  <p>Net exposure per instrument &mdash; the layer that addresses drawdown, not client selection.</p>
+</div>
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>Why this page exists</h2>
+  <p class="hint" style="margin:0 0 8px">
+    The firm's worst drawdown &mdash; <b>$31.3M over sixteen days in January 2026</b> &mdash; was
+    <b>84.8% XAUUSD</b>, spread across <b>12,879 accounts</b>. The per-account routing model could
+    not see it, and structurally never will: each of those clients looked individually
+    unremarkable. What was dangerous was that they <em>agreed</em>. Their mean model score was
+    0.5164 against 0.4513 for everyone else, and 0.5% of their rows cleared the hedging rule.
+  </p>
+  <p class="hint" style="margin:0">
+    Meanwhile the position was building in plain sight in the firm's own book: net gold went from
+    <b>&minus;556 lots on 2 January to 93,759 by the 19th</b>, and the worst single day landed
+    after it had already passed 65,000. So there are two different problems here.
+    <b>The edge</b> is that clients lose on average &mdash; about $250 per account-day, $1.1bn over
+    two years &mdash; and it is captured by <em>not</em> hedging, which is why the account model is
+    only ever worth around 1%. <b>The risk</b> is that clients occasionally agree, which is a
+    portfolio property and is what actually produces drawdown. This page addresses the second and
+    leaves the first alone.
+  </p>
+</div>
+
+{% if not book.available %}
+<div class="panel">
+  <div class="panel-head">
+    <h2>Not yet computed</h2>
+    <form method="post" action="/{{ view }}/bookrisk/build" style="margin:0">
+      <button class="btn" {% if book.running %}disabled{% endif %}>
+        {% if book.running %}Building&hellip;{% else %}Build now{% endif %}</button>
+    </form>
+  </div>
+  {% if book.error %}<p class="empty neg">Failed: {{ book.error }}</p>
+  {% else %}<p class="empty">Reads the full trade history and prices every position in USD, so it
+    runs in the background. Press Build now.</p>{% endif %}
+</div>
+{% else %}
+
+<div class="panel" style="margin-bottom:14px">
+  <div class="panel-head">
+    <h2>What capping net exposure would have done</h2>
+    <form method="post" action="/{{ view }}/bookrisk/build" style="margin:0">
+      <button class="btn" {% if book.running %}disabled{% endif %}>
+        {% if book.running %}Rebuilding&hellip;{% else %}Rebuild{% endif %}</button>
+    </form>
+  </div>
+  <p class="hint">
+    Exposure above the limit is treated as passed to market: the firm neither gains nor loses on
+    that share. The decision uses the <em>previous</em> day's closing exposure, never the current
+    day's outcome. Hedging is modelled frictionless, so real spread and slippage would reduce the
+    benefit &mdash; and the hedge is applied pro rata across the instrument, which is how a desk
+    flattens a net book.
+  </p>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Limit per instrument</th><th class="num">Profit</th><th class="num">vs flat</th>
+        <th class="num">Max drawdown</th><th class="num">vs flat</th>
+        <th class="num">Sharpe</th><th class="num">Calmar</th>
+        <th class="num">Days hedged</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr style="background:rgba(255,255,255,.04)">
+          <td><b>No cap (flat B-book)</b></td>
+          <td class="num">{{ '${:,.0f}'.format(book.flat_profit) }}</td>
+          <td class="num dim">&mdash;</td>
+          <td class="num">{{ '${:,.0f}'.format(book.flat_drawdown) }}</td>
+          <td class="num dim">&mdash;</td>
+          <td class="num dim">&mdash;</td><td class="num dim">&mdash;</td>
+          <td class="num dim">0</td><td class="dim">baseline</td>
+        </tr>
+      {% for r in book.rows %}
+        <tr>
+          <td>{{ '${:,.0f}M'.format(r.limit_usd / 1000000) }}</td>
+          <td class="num">{{ '${:,.0f}'.format(r.profit) }}</td>
+          <td class="num {{ 'pos' if r.profit_delta >= 0 else 'neg' }}">{{ '{:+,.0f}'.format(r.profit_delta) }}</td>
+          <td class="num">{{ '${:,.0f}'.format(r.drawdown) }}</td>
+          <td class="num {{ 'pos' if r.drawdown_delta >= 0 else 'neg' }}">{{ '{:+,.0f}'.format(r.drawdown_delta) }}</td>
+          <td class="num">{{ '{:.2f}'.format(r.sharpe) }}</td>
+          <td class="num">{{ '{:.1f}'.format(r.calmar) }}</td>
+          <td class="num dim">{{ '{:,}'.format(r.days_hedged) }}</td>
+          <td>{% if r.dominates %}<span class="pos">beats both</span>
+              {% else %}<span class="dim">trade-off</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint neg" style="margin:8px 0 0">
+    <b>Verdict on the static cap: it fails economically.</b> Every fixed limit binds on most
+    days &mdash; the book is <em>structurally</em> directional, because clients sit permanently
+    net long gold and the firm's core edge is precisely being short that crowd. A cap that fires
+    every day passes the edge to market along with the risk. What distinguished January 2026 was
+    not that exposure was large but that it was <em>abnormal</em>, which is what the policy below
+    triggers on instead.
+  </p>
+</div>
+
+{% if book.anomaly %}
+<div class="panel" style="margin-bottom:14px">
+  <h2>The conditional policy: hedge only what is abnormal</h2>
+  <p class="hint">
+    Each instrument's trigger is its <em>own</em> trailing |net exposure| percentile over the
+    previous 120 days, computed from days strictly before the decision day. On a normal day
+    nothing is hedged and the edge is untouched; on a crowding day only the share above the
+    trigger passes to market. Same honesty rules: prior-day exposure, frictionless hedge,
+    pro rata.
+  </p>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Trigger percentile</th><th class="num">Profit</th><th class="num">vs flat</th>
+        <th class="num">Max drawdown</th><th class="num">vs flat</th>
+        <th class="num">Sharpe</th><th class="num">Calmar</th>
+        <th class="num">Days hedged</th><th>Verdict</th></tr></thead>
+      <tbody>
+      {% for r in book.anomaly %}
+        <tr>
+          <td>{{ '{:.1%}'.format(r.percentile) }}</td>
+          <td class="num">{{ '${:,.0f}'.format(r.profit) }}</td>
+          <td class="num {{ 'pos' if r.profit_delta >= 0 else 'neg' }}">{{ '{:+,.0f}'.format(r.profit_delta) }}</td>
+          <td class="num">{{ '${:,.0f}'.format(r.drawdown) }}</td>
+          <td class="num {{ 'pos' if r.drawdown_delta >= 0 else 'neg' }}">{{ '{:+,.0f}'.format(r.drawdown_delta) }}</td>
+          <td class="num">{{ '{:.2f}'.format(r.sharpe) }}</td>
+          <td class="num">{{ '{:.1f}'.format(r.calmar) }}</td>
+          <td class="num dim">{{ '{:,}'.format(r.days_hedged) }}</td>
+          <td>{% if r.dominates %}<span class="pos">beats both</span>
+              {% else %}<span class="dim">trade-off</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="panel">
+  <h2>Where the exposure actually is</h2>
+  <p class="hint">
+    Instrument variants are grouped by underlying &mdash; XAUUSD, XAUUSDe and XAUUSD247 are one
+    risk, and counting them separately is what let a single crowded position look like several
+    small ones. Notional is USD, priced from each venue's own contract size for the raw ticker.
+  </p>
+  <div class="table-scroll" style="max-height:420px">
+    <table>
+      <thead><tr><th>Instrument</th><th class="num">Gross USD</th><th class="num">Mean net USD</th>
+        <th class="num">Max |net| USD</th><th class="num">Client P&amp;L</th></tr></thead>
+      <tbody>
+      {% for r in book.instruments %}
+        <tr>
+          <td><b>{{ r.canonical }}</b></td>
+          <td class="num">{{ '${:,.1f}bn'.format(r.gross_usd / 1000000000) }}</td>
+          <td class="num {{ 'pos' if r.mean_net >= 0 else 'neg' }}">{{ '${:,.1f}M'.format(r.mean_net / 1000000) }}</td>
+          <td class="num">{{ '${:,.1f}M'.format(r.max_abs_net / 1000000) }}</td>
+          <td class="num {{ 'neg' if r.client_pnl >= 0 else 'pos' }}">{{ '${:,.0f}'.format(r.client_pnl) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint" style="margin:8px 0 0">
+    Client P&amp;L is coloured from the <em>firm's</em> point of view: green where clients lost
+    (the firm earned), red where clients won.
+  </p>
+</div>
+
+{% endif %}
+{% endblock %}

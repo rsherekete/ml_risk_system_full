@@ -1,0 +1,25 @@
+syntax = "proto3";
+package oms_mt4;
+
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "Zeal.OMS.MT4.Events.Contract.Quotes";
+option java_package = "com.zeal.oms.mt4.events.contract.quotes";
+option cc_enable_arenas = true;
+
+message Quote {
+  google.protobuf.Timestamp timestamp = 1;
+  string symbol = 2;
+
+  oneof Event {
+    QuoteGenerated quoteGenerated = 10;
+  }
+}
+message QuoteGenerated {
+  string symbol = 1;
+  google.protobuf.Timestamp Ctm = 2;
+  string bank = 3;
+  double bid = 4;
+  double ask = 5;
+  string feeder = 6;
+}

@@ -1,0 +1,123 @@
+{
+  "window_days": 7,
+  "horizons_seconds": [
+    0.1,
+    0.2,
+    0.3,
+    0.5,
+    1,
+    5,
+    60
+  ],
+  "flag_markout_bps": {
+    "0.1": 0.75,
+    "0.2": 1.0,
+    "0.3": 1.25,
+    "0.5": 1.5,
+    "1": 1.5,
+    "5": 2.0
+  },
+  "early_horizons_seconds": [
+    0.1,
+    0.2,
+    0.3,
+    0.5
+  ],
+  "fallback_early_horizons_seconds": [
+    1,
+    5
+  ],
+  "quote_throttle_ms": 200,
+  "quote_age_tolerance_ms": 100,
+  "min_decay_pct": 50.0,
+  "directional_markout_bps": 3.0,
+  "neutral_band_bps": 0.5,
+  "max_hold_seconds": 120,
+  "min_trade_profit_usd": 1.0,
+  "min_flagged_trades": 5,
+  "illiquid_spread_ratio": 1.5,
+  "independent_check": true,
+  "tiers": {
+    "escalate": 75,
+    "restrict": 55,
+    "monitor": 35
+  },
+  "complex_filter": "risk >= 70",
+  "actions": {
+    "escalate": {
+      "treatment": "SOR: pin to B-book off + feed delay",
+      "delay_ms": 250,
+      "requote_bps": 1.0,
+      "review": true
+    },
+    "restrict": {
+      "treatment": "SOR: feed delay on quotes",
+      "delay_ms": 120,
+      "requote_bps": 0.5,
+      "review": false
+    },
+    "monitor": {
+      "treatment": "watchlist only",
+      "delay_ms": 0,
+      "requote_bps": 0.0,
+      "review": false
+    }
+  },
+  "shadow_mode": true,
+  "excluded_symbols": [],
+  "excluded_account_groups": [],
+  "check_total_realized_pnl": false,
+  "min_total_realized_pnl_usd": 0.0,
+  "min_early_hit_rate_pct": 0.0,
+  "min_event_success_rate_pct": 0.0,
+  "min_profit_concentration_pct": 0.0,
+  "min_confidence": 40.0,
+  "max_price_age_ms": 60000,
+  "score_weights": {
+    "early_markout": 0.2,
+    "early_hit_rate": 0.15,
+    "price_age": 0.2,
+    "decay_consistency": 0.15,
+    "event_count": 0.1,
+    "profit_concentration": 0.1,
+    "reference": 0.1
+  },
+  "score_calibration": {
+    "mode": "population",
+    "percentile": 99,
+    "min_trades": 20
+  },
+  "score_floor": {
+    "early_markout_bps": 0.25,
+    "early_hit_rate_excess": 0.1,
+    "price_age_share": 0.02,
+    "event_count": 5,
+    "profit_concentration": 0.05
+  },
+  "score_scale": {
+    "early_markout_bps": null,
+    "early_hit_rate_excess": 0.4,
+    "price_age_share": 0.1,
+    "event_count": 20,
+    "profit_concentration": 0.5,
+    "confidence_min_trades": 50
+  },
+  "profile_params": {
+    "cluster_window_s": 300,
+    "cluster_min_events": 3,
+    "replication_bucket_s": 2,
+    "replication_min_accounts": 3,
+    "symbol_concentration": 0.8
+  },
+  "reference_feed_enabled": true,
+  "reference_price_delay_ms": 500,
+  "reference_divergence_bps": 1.0,
+  "reference_lead_bps": 1.0,
+  "reference_server_offsets_h": [
+    2,
+    3
+  ],
+  "reference_max_pairs": 2000,
+  "reference_fetch_timeout_s": 1800,
+  "architecture_min_events": 10
+}

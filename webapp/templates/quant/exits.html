@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Exit Policy - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Exit Policy</h1>
+  <p>Where a copied trade actually closes &mdash; and whether that beats mirroring the client.</p>
+</div>
+
+{% if not exits or not exits.available %}
+<div class="panel">
+  <p class="empty">
+    No copied trades to measure{% if exits and exits.rule %} under the current rule
+    ({{ exits.rule }}){% endif %}. Train a model or loosen the routing threshold.
+  </p>
+</div>
+{% else %}
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>The question</h2>
+  <p class="hint" style="margin:0 0 8px">
+    Every backtest elsewhere on this site assumes the copy book mirrors the client's whole round
+    trip &mdash; in at their entry, out at their exit. That is a real policy, but it inherits the
+    client's worst habit: holding losers. An independent exit cannot make a bad signal good; it can
+    stop one trade destroying a month.
+  </p>
+  <p class="hint" style="margin:0">
+    <b>Scope:</b> measured only on the {{ '{:,}'.format(exits.trades) }} trades the model would
+    actually copy ({{ exits.rule }}, {{ '{:.2%}'.format(exits.share_of_flow) }} of flow).
+    Evaluating exits across all client flow would answer a question the desk never asks &mdash;
+    it only chooses an exit for trades it has taken on.
+  </p>
+</div>
+
+{% if not exits.path_aware %}
+<div class="panel" style="margin-bottom:14px;border-left:3px solid #ff4d6d">
+  <h2 class="neg">These stop and target results are not evidence</h2>
+  <p class="hint" style="margin:0 0 8px">
+    The warehouse stores entry and exit, <b>not the path between them</b>, so there is no intrabar
+    high or low. A stop is therefore applied to the trade's <em>realised</em> outcome &mdash; and a
+    stop applied that way <b class="neg">can only ever increase total profit</b>. It truncates
+    losses and touches nothing else. Every changed trade is, by construction, a loss made smaller.
+  </p>
+  <p class="hint" style="margin:0">
+    So a stop row showing "+$5.2M vs mirror" is measuring the arithmetic of truncation, not the
+    value of the policy. The real cost of stops &mdash; trades that dipped through the level and
+    would have recovered &mdash; is invisible here and is exactly what makes stops expensive in
+    practice. <b>Do not set stops from this table.</b> Settling it needs the minute-bar replay in
+    <code>tick_bars.excursions</code>: once each trade carries its worst adverse and best
+    favourable excursion, this page evaluates against what price actually did and the warning
+    disappears. The <b>mirror</b> row and the <b>tail-loss</b> column remain informative.
+  </p>
+</div>
+{% else %}
+<div class="panel" style="margin-bottom:14px;border-left:3px solid #2ee6a8">
+  <h2 class="pos">Path-aware</h2>
+  <p class="hint" style="margin:0">
+    Each trade carries its worst adverse and best favourable excursion from a minute-bar replay,
+    so a stop is tested against what price actually did: a trade that dipped through the level and
+    recovered is correctly counted as stopped. These results are comparable.
+  </p>
+</div>
+{% endif %}
+
+{% if exits.days < 180 %}
+<div class="panel" style="margin-bottom:14px;border-left:3px solid #ffb454">
+  <p class="hint" style="margin:0">
+    <b>Short window.</b> This model artefact covers {{ exits.days }} days with
+    {{ exits.losing_days }} losing day{{ '' if exits.losing_days == 1 else 's' }}. Maximum
+    drawdown over such a window is not a drawdown estimate, and any policy that removes the one
+    bad day will show zero drawdown and an infinite Calmar. Those cells are arithmetic, not
+    performance. Retrain on the full two years before reading them.
+  </p>
+</div>
+{% endif %}
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>Policies, ranked by Calmar</h2>
+    <span class="hint">{{ exits.dominating }} beat mirroring on both profit and drawdown</span>
+  </div>
+  <p class="hint">
+    <b>mirror</b> closes when the client closes &mdash; the incumbent every other policy must beat.
+    <b>stop</b> caps the loss at a multiple of the trade's expected profit; <b>target</b> takes
+    profit at a multiple; <b>bracket</b> does both; <b>time</b> closes after a fixed hold.
+    {% if not exits.has_hold %}<br><span class="dim">Time-based policies are not shown: this
+    frame has no close time, so a holding period cannot be derived and guessing one would invent
+    the result.</span>{% endif %}
+  </p>
+  <div class="table-scroll" style="max-height:520px">
+    <table>
+      <thead><tr>
+        <th>Policy</th><th class="num">Stop</th><th class="num">Target</th>
+        <th class="num">Hold</th>
+        <th class="num">Total P&amp;L</th><th class="num">vs mirror</th>
+        <th class="num">Max DD</th><th class="num">vs mirror</th>
+        <th class="num">Calmar</th><th class="num">Win rate</th>
+        <th class="num">Worst trade</th><th class="num">Tail loss</th><th>Verdict</th>
+      </tr></thead>
+      <tbody>
+      {# NaN is TRUTHY, so `if r.stop_multiple` rendered "nanx" for policies the
+         multiple does not apply to; x == x is the NaN test. #}
+      {% for r in exits.rows %}
+        <tr{% if r.policy == 'mirror' %} style="background:rgba(255,255,255,.04)"{% endif %}>
+          <td><b>{{ r.policy }}</b></td>
+          <td class="num dim">{{ '{:.1f}x'.format(r.stop_multiple) if r.stop_multiple is defined and r.stop_multiple == r.stop_multiple and r.stop_multiple else '--' }}</td>
+          <td class="num dim">{{ '{:.1f}x'.format(r.target_multiple) if r.target_multiple is defined and r.target_multiple == r.target_multiple and r.target_multiple else '--' }}</td>
+          <td class="num dim">{{ '{:.0f}h'.format(r.max_hold_hours) if r.max_hold_hours is defined and r.max_hold_hours == r.max_hold_hours and r.max_hold_hours else '--' }}</td>
+          <td class="num">{{ '${:,.0f}'.format(r.total_pnl) }}</td>
+          <td class="num {{ 'pos' if r.pnl_vs_mirror > 0 else ('neg' if r.pnl_vs_mirror < 0 else 'dim') }}">
+            {{ '{:+,.0f}'.format(r.pnl_vs_mirror) if r.policy != 'mirror' else '--' }}</td>
+          <td class="num">{{ '${:,.0f}'.format(r.max_drawdown) }}</td>
+          <td class="num {{ 'pos' if r.dd_vs_mirror > 0 else ('neg' if r.dd_vs_mirror < 0 else 'dim') }}">
+            {{ '{:+,.0f}'.format(r.dd_vs_mirror) if r.policy != 'mirror' else '--' }}</td>
+          <td class="num">{{ '{:.2f}'.format(r.calmar) }}</td>
+          <td class="num dim">{{ '{:.1%}'.format(r.win_rate) }}</td>
+          <td class="num neg">{{ '${:,.0f}'.format(r.worst_trade) }}</td>
+          <td class="num dim">{{ '{:.1%}'.format(r.tail_loss_share) }}</td>
+          <td>{% if r.policy == 'mirror' %}<span class="dim">baseline</span>
+              {% elif r.biased %}<span style="color:#ffb454">APPROXIMATION</span>
+              {% elif r.dominates %}<span class="pos">beats both</span>
+              {% else %}<span class="dim">trade-off</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint" style="margin:8px 0 0;color:#ffb454">
+    <b>The `time` rows are labelled APPROXIMATION for a reason: do not trust them.</b> A time
+    exit here credits the trade with its realised P&amp;L scaled linearly by the share of the
+    holding period elapsed &mdash; it never looks at the price path, because minute bars say where
+    price went, not what the position was worth at each moment. P&amp;L does not accrue linearly
+    (most of these trades' P&amp;L arrives in bursts), so "close after 1h and keep 1h/hold of the
+    final P&amp;L" manufactures a smooth curve with almost no drawdown. That is why the top rows
+    look remarkable and differ only in their Hold column &mdash; they are the same arithmetic at
+    1h, 4h and 24h. Settling time exits honestly needs a mark-to-market replay against the bars,
+    which the data supports but this table does not yet do. The stop / target / bracket rows ARE
+    path-aware and are trustworthy.
+  </p>
+  <p class="hint" style="margin:8px 0 0">
+    <b>Tail loss</b> is the share of all losses coming from the worst 1% of trades &mdash; the
+    number a stop exists to move. A policy that improves total P&amp;L without cutting the tail has
+    probably just trimmed ordinary losers, and will not protect against the trade that matters.
+  </p>
+</div>
+
+{% endif %}
+{% endblock %}

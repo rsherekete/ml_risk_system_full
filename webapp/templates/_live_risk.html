@@ -1,0 +1,37 @@
+{# Live risk panel, shared by the Trading and Quant views.
+   Deliberately explicit about provenance: this screen is only meaningful when
+   the Kafka consumer is actually connected, so a disconnected state is shown as
+   a diagnosis rather than an empty chart that reads as "no risk". #}
+<div class="page-head">
+  <h1>Live Risk</h1>
+  <p>Real-time flow from the {{ view|capitalize }} book &mdash; last {{ retention_days }} days from the event stream.</p>
+</div>
+
+<div class="panel" id="live-status" style="margin-bottom:14px">
+  <h2>Stream status</h2>
+  <div class="empty" id="status-body">Checking connectivity…</div>
+</div>
+
+<div class="grid cols-2" id="live-charts" style="display:none">
+  <div class="panel">
+    <h2>Activity <span class="live" id="live-dot">streaming</span></h2>
+    <p class="hint">Events and distinct accounts per hour.</p>
+    <div id="activity" class="chart"></div>
+  </div>
+  <div class="panel">
+    <h2>Exposure by symbol</h2>
+    <p class="hint">Volume over the retained window.</p>
+    <div id="exposure" class="chart"></div>
+  </div>
+</div>
+
+<div class="panel" id="live-table" style="display:none;margin-top:14px">
+  <h2>Symbol breakdown</h2>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Symbol</th><th class="num">Events</th><th class="num">Accounts</th>
+        <th class="num">Volume</th><th class="num">Client P&amp;L</th></tr></thead>
+      <tbody id="exposure-rows"></tbody>
+    </table>
+  </div>
+</div>

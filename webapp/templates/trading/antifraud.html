@@ -1,0 +1,2567 @@
+{% extends "base.html" %}
+{% block title %}AntiFraud - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  {% if af_only == 'latency' %}
+  <h1>Latency Arbitrage</h1>
+  <p>Trades that received a favourable price move within milliseconds of the fill
+     and whose advantage then faded — fast, transient exploitation of a stale or
+     delayed broker price. Every flag carries its markout checkpoints and tick
+     coverage. Screening output for investigation, not a fraud determination.</p>
+  {% elif af_only == 'toxic' %}
+  <h1>Toxic Flow</h1>
+  <p>Accounts whose trades keep moving in their favour after entry, at a level and
+     frequency that is unusually adverse for the broker. At 5s and 60s a trade must
+     also sit in its symbol's top 5% of markouts. Screening output for
+     investigation, not a fraud determination.</p>
+  {% else %}
+  <h1>AntiFraud &amp; Behavioural Profiling</h1>
+  <p>Evidence-based client classification across nine behavioural profiles, with
+     configurable rules, action-impact testing, and CSV export. Scored on the
+     five-axis architecture: strength, confidence, stability, severity, evidence.</p>
+  {% endif %}
+</div>
+
+{# In the beta each engine is its own top-level section, so the rail and its
+   collapse control are hidden -- but still RENDERED. Removing the button broke
+   the whole page: the script wires it at top level, so a missing element threw
+   before any pane was shown or any table loaded. #}
+<button class="af-rail-reopen" id="af-rail-reopen" title="Open sections"
+        {% if af_only %}hidden{% endif %}>❯</button>
+<div class="af-layout{{ ' af-solo' if af_only }}">
+<nav class="af-rail" id="af-rail"{% if af_only %} hidden{% endif %}>
+  <div class="af-rail-head">Sections
+    <button class="af-rail-hide" id="af-rail-hide" title="Collapse">❮</button></div>
+  <button class="af-tab on" data-af="rules">
+    <span class="glyph">☰</span>
+    <span class="t"><b>Rules &amp; Coverage</b><small>Category registry, definitions, field universe</small></span></button>
+  <button class="af-tab" data-af="profiling">
+    <span class="glyph">◈</span>
+    <span class="t"><b>Behavioural Profiling</b><small>All categories, 5-axis scores</small></span></button>
+  <button class="af-tab" data-af="latency">
+    <span class="glyph">⚡</span>
+    <span class="t"><b>Latency Arbitrage</b><small>ML rule · tick markouts · SOR actions</small></span></button>
+  <button class="af-tab" data-af="toxic">
+    <span class="glyph">☣</span>
+    <span class="t"><b>Toxic Flow</b><small>P1 Engine B · persistent adverse markout</small></span></button>
+  <!-- dynamic use_ml rule tabs inject here (registry order) -->
+  <span id="af-dynamic-tabs"></span>
+  <button class="af-tab" data-af="ml">
+    <span class="glyph">∴</span>
+    <span class="t"><b>ML Anomaly</b><small>IsolationForest overlay</small></span></button>
+  <button class="af-tab" data-af="action">
+    <span class="glyph">⚗</span>
+    <span class="t"><b>Action Testing</b><small>What-ifs incl. tick-true feed delay</small></span></button>
+  <button class="af-tab" data-af="universe">
+    <span class="glyph">◎</span>
+    <span class="t"><b>Universe</b><small>One label across all three systems</small></span></button>
+  <button class="af-tab" data-af="markout">
+    <span class="glyph">∷</span>
+    <span class="t"><b>Markout Grid</b><small>2-D horizons, anomaly-coloured</small></span></button>
+  <button class="af-tab" data-af="forecast">
+    <span class="glyph">⌛</span>
+    <span class="t"><b>Early Warning</b><small>Who qualifies in the next 5 days</small></span></button>
+  <button class="af-tab" data-af="alerts">
+    <span class="glyph">🔔</span>
+    <span class="t"><b>Alerts</b><small>Builder, autopilot, analysis</small></span></button>
+  <button class="af-tab" data-af="eventimpact">
+    <span class="glyph">💥</span>
+    <span class="t"><b>Event Impact</b><small>Who was hit, how much, what to do</small></span></button>
+</nav>
+<div class="af-content">
+
+<!-- ============ PROFILING ============ -->
+<section class="af-panel" id="af-profiling">
+  <div class="toolbar" style="flex-wrap:wrap;gap:12px;align-items:flex-end">
+    <div><label>Profile (active rules only)</label>
+      <select id="af-profile" style="min-width:180px"><option value="">All active rules</option></select></div>
+    <div><label>Search account</label>
+      <input id="af-search" placeholder="account key…" style="width:180px"></div>
+    <div><label>As-of day (blank = today)</label>
+      <input id="af-asof" type="date" style="width:150px"></div>
+    <div><label>Range start (blank = last 24 live hours)</label>
+      <input id="af-start" type="date" style="width:150px"></div>
+    <button class="btn" id="af-refresh">Refresh</button>
+    <button class="btn" id="af-sortreset" title="Clear the sort chain">Reset sort</button>
+    <span class="dim" id="af-count"></span>
+    <span class="dim" id="af-parity" style="color:#22d3ee"></span>
+    <span class="dim" id="af-sortchain"></span>
+  </div>
+  <div class="card">
+    <h3>Consolidated client profiles <span class="dim" style="font-weight:400">every ACTIVE rule from Rules &amp; Coverage — an inactive rule contributes nothing</span></h3>
+    <div style="max-height:560px;overflow:auto"><table class="af-table">
+      <thead id="af-head"><tr>
+        <th data-k="account">Account</th>
+        <th data-k="profile">Profile</th>
+        <th data-k="risk" class="num">Risk</th>
+        <th data-k="confidence" class="num">Conf</th>
+        <th data-k="consistency" class="num">Consist</th>
+        <th data-k="persistence" class="num">Persist</th>
+        <th data-k="econ_usd" class="num">Impact $</th>
+        <th data-k="ml" class="num" title="Fits-the-category-NOW model">ML</th>
+        <th data-k="ew" class="num" title="Early warning: rule holds over the next 5 days with equity rising">EW 5D</th>
+        <th data-k="behavioural" class="num">Behav</th>
+        <th data-k="stale_share" class="num">Stale%</th>
+        <th data-k="illiquid_share" class="num">Illiq%</th>
+        <th data-k="indep_share" class="num">LP✓</th>
+        <th data-k="event_share" class="num">Event%</th>
+        <th data-k="flagged" class="num">Flagged</th>
+        <th data-k="med_hold_s" class="num">Med hold</th>
+        <th data-k="best_markout_bps" class="num">Best mk</th>
+        <th data-k="verdict">Verdict</th>
+        <th>Min action → breakeven</th>
+        <th>Max action (implementable)</th>
+        <th>Override</th>
+        <th title="Required to override">Comment</th></tr></thead>
+      <tbody id="af-rows"><tr><td colspan="22" class="dim">loading…</td></tr></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ============ ML ANOMALY ============ -->
+<section class="af-panel" id="af-ml">
+  <p class="hint">Unsupervised IsolationForest over the behavioural feature space,
+    run alongside the rules. It catches multivariate patterns no single threshold
+    describes; each score ships with its top contributing features (in σ), so an
+    ML flag is as explainable as a rule flag. Cross-reference with the rule flags
+    to prioritise — an account both rules AND the model flag is the strongest signal.</p>
+  <div class="toolbar"><div style="align-self:end"><button class="btn" id="ml-refresh">Run ML scan</button></div>
+    <div style="align-self:end" class="dim" id="ml-count"></div></div>
+  <div class="table-wrap" style="max-height:560px;overflow:auto">
+    <table class="af-table"><thead><tr>
+      <th class="num">ML anomaly</th><th>Account</th><th>Top contributing features (σ)</th>
+    </tr></thead><tbody id="ml-rows"><tr><td colspan="3" class="dim">Click "Run ML scan".</td></tr></tbody></table>
+  </div>
+</section>
+
+<!-- ============ ALERTS ============ -->
+<section class="af-panel" id="af-alerts">
+  <div class="card" style="margin-bottom:16px">
+    <h3>🧭 Alert builder</h3>
+    <p class="hint">Compose an alert from a data source, a field, and a
+      condition. It evaluates on its own frequency, delivers to its webhook
+      (or the server's <code>LARK_WEBHOOK</code>), and is saved to <b>your</b>
+      profile — it survives restarts. Every firing is recorded below with
+      delivery confirmation straight from Lark's response.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+      <label>Name<input id="ab-name" placeholder="big loser closed" style="width:150px"></label>
+      <label>Source<select id="ab-source" style="width:210px"></select></label>
+      <label>Field<select id="ab-field" style="width:220px"></select></label>
+      <label>Condition<select id="ab-op" style="width:70px">
+        <option>&gt;</option><option>&gt;=</option><option>&lt;</option><option>&lt;=</option></select></label>
+      <label>Value<input id="ab-value" type="number" step="any" style="width:110px"></label>
+      <label>Every (min)<input id="ab-freq" type="number" min="1" value="5" style="width:90px"></label>
+      <label>Webhook (blank = server default)
+        <input id="ab-hook" placeholder="https://open.larksuite.com/…" style="width:250px"></label>
+      <button class="btn" id="ab-save">Create alert</button>
+    </div>
+    <div id="ab-expr-row" style="display:none;margin-top:8px">
+      <label>Expression (condition then compares the COUNT of matching accounts)
+        <input id="ab-expr" placeholder="profit_factor > 2 and scalp_rate > 0.5"
+               style="width:100%;font-family:JetBrains Mono,monospace"></label>
+    </div>
+    <div class="dim" id="ab-fielddoc" style="margin-top:8px;font-size:12px"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h3>📈 Alert analysis</h3>
+    <table class="af-table"><thead><tr><th>Alert</th><th>Rule</th>
+      <th class="num">Fires</th><th class="num">Delivered</th>
+      <th>Last fired</th><th>Observed (recent)</th></tr></thead>
+      <tbody id="an-rows"><tr><td class="dim" colspan="6">Loads with the tab.</td></tr></tbody></table>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h3>My alerts</h3>
+    <table class="af-table"><thead><tr><th>Alert</th><th>Rule</th>
+      <th>Every</th><th>State</th><th></th></tr></thead>
+      <tbody id="ab-rows"><tr><td class="dim">Loading…</td></tr></tbody></table>
+    <div id="ab-history" style="margin-top:14px"></div>
+  </div>
+
+  <div class="af-grid">
+    <div class="card">
+      <h3>🛰 Profile-flag autopilot</h3>
+      <p class="hint">When armed, NEW flags above the priority bar are pushed to
+        Lark <b>as they are generated</b> (checked every poll interval on the
+        freshest data), and a <b>daily digest of every standing flag</b> goes out
+        at the configured London hour. Requires <code>LARK_WEBHOOK</code> in the
+        server environment. Live flags run off the MySQL-refreshed caches today;
+        they move to the Kafka event stream when the production feed is wired.</p>
+      <label style="display:flex;flex-direction:row;align-items:center;gap:10px">
+        <input type="checkbox" id="ap-on" style="width:auto"> <b>Autopilot armed</b></label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px">
+        <label>Min priority<input id="ap-prio" type="number" value="60" style="width:110px"></label>
+        <label>Digest hour (London)<input id="ap-hour" type="number" min="0" max="23" value="7" style="width:110px"></label>
+        <label>Poll minutes<input id="ap-poll" type="number" min="1" value="5" style="width:110px"></label>
+      </div>
+      <div style="margin-top:12px"><button class="btn" id="ap-save">Save autopilot</button>
+        <span class="dim" id="ap-msg"></span></div>
+    </div>
+    <div class="card">
+      <h3>Manual send / dry run</h3>
+      <p class="hint">One-off push of new high-priority flags. De-duplicated —
+        a standing flag alerts once. Blank webhook = dry run (counts only).</p>
+      <label>Webhook URL (optional override)
+        <input id="lark-url" placeholder="https://open.larksuite.com/open-apis/bot/v2/hook/…" style="width:100%"></label>
+      <label>Minimum priority<input id="lark-prio" type="number" value="50" style="width:120px"></label>
+      <div style="margin-top:10px"><button class="btn" id="lark-send">Send / dry-run</button>
+        <span class="dim" id="lark-msg"></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CLIENT SCREENING DRAWER ============ -->
+<div id="af-drawer" class="af-drawer">
+  <div class="af-drawer-inner">
+    <button class="af-close" id="drawer-close">✕</button>
+    <div id="drawer-body"></div>
+  </div>
+</div>
+
+<!-- ============ ACTION TESTING ============ -->
+<section class="af-panel" id="af-action">
+  <div class="toolbar">
+    <div><label>Account key</label>
+      <input id="at-account" placeholder="server:login" style="width:240px"></div>
+    <div style="align-self:end"><button class="btn" id="at-run">Run action test</button></div>
+    <div style="align-self:end" class="dim" id="at-meta"></div>
+  </div>
+  <p class="hint">Backtests desk interventions on this client's own trade history.
+    Broker P&amp;L is the negative of client P&amp;L on internalised flow, so a cost
+    to the client is a gain to the book. The recommendation is the mildest action
+    with the best broker-P&amp;L improvement.</p>
+  <div id="at-reco"></div>
+  <div id="at-results" class="af-grid"></div>
+</section>
+
+<!-- ============ UNIVERSE ============ -->
+<section class="af-panel" id="af-universe">
+  <p class="hint">The <b>single source of truth</b>: every account's unified
+    classification. The highest-priority AntiFraud flag claims the
+    <b>Primary</b> label; with no flag, the routing taxonomy (the same one the
+    Client Intelligence and A-Book tabs use) stands. Columns show every
+    system's view side by side — a new rule added in Rules &amp; Coverage
+    appears here (and everywhere) automatically.</p>
+  <div class="toolbar" style="flex-wrap:wrap;gap:12px">
+    <div><label>As-of day (blank = today)<input id="un-asof" type="date"></label></div>
+    <div><label>Range start<input id="un-start" type="date"></label></div>
+    <div><label>Range end<input id="un-end" type="date"></label></div>
+    <div style="align-self:end"><button class="btn" id="un-load">Load</button></div>
+    <div style="align-self:end" class="dim" id="un-count"></div>
+  </div>
+  <div class="table-wrap" style="max-height:560px;overflow:auto">
+    <table class="af-table"><thead id="un-head"></thead>
+      <tbody id="un-rows"><tr><td class="dim">Press Load.</td></tr></tbody></table>
+  </div>
+</section>
+
+<!-- ============ MARKOUT GRID ============ -->
+<section class="af-panel" id="af-markout">
+  <p class="hint">Each point is an account: X and Y are its mean post-trade
+    markouts at the two chosen horizons over the date range (default last 90
+    days). Filtered to the most extreme percentile; coloured by ML anomaly.
+    Positive = the client's fills systematically run in their favour —
+    the adverse-selection quadrant is top-right.</p>
+  <div class="toolbar" style="flex-wrap:wrap;gap:12px">
+    <div><label>X horizon<select id="mg-x"></select></label></div>
+    <div><label>Y horizon<select id="mg-y"></select></label></div>
+    <div><label>Percentile<input id="mg-pct" type="number" value="95" min="0" max="99.9" style="width:90px"></label></div>
+    <div><label>Start<input id="mg-start" type="date"></label></div>
+    <div><label>End<input id="mg-end" type="date"></label></div>
+    <div style="align-self:end"><button class="btn" id="mg-load">Plot</button></div>
+    <div style="align-self:end" class="dim" id="mg-meta"></div>
+  </div>
+  <div id="mg-chart" style="height:520px"></div>
+</section>
+
+<!-- ============ EARLY WARNING ============ -->
+<section class="af-panel" id="af-forecast">
+  <p class="hint">Foresight, not hindsight: a separate model per rule predicts
+    the probability that an account <b>not currently qualifying</b> joins that
+    rule within the horizon — trained on the corpus's own history of who
+    converted, against the LIVE rule definitions (edit a rule and the forecast
+    retrains). First run trains the models and takes a minute or two.</p>
+  <div class="toolbar">
+    <div><label>Horizon (days)<input id="fc-h" type="number" value="5" min="1" max="20" style="width:90px"></label></div>
+    <div style="align-self:end"><button class="btn" id="fc-run">Run forecast</button></div>
+    <div style="align-self:end" class="dim" id="fc-meta"></div>
+  </div>
+  <div id="fc-results" class="af-grid"></div>
+</section>
+
+<!-- ============ RULES & COVERAGE ============ -->
+{# Which pane opens is decided SERVER-SIDE. Leaving it to JS meant any script
+   error anywhere on the page left the beta showing Rules & Coverage under a
+   "Latency Arbitrage" heading. #}
+<section class="af-panel{{ '' if af_only else ' on' }}" id="af-rules">
+  <!-- ======== CATEGORY REGISTRY (dynamic, per-user) ======== -->
+  <div class="card" style="margin-bottom:14px">
+    <h3>Category Registry <span class="dim" style="font-weight:400" id="reg-source"></span></h3>
+    <p class="hint">Every category the whole system runs on. Edit the complex-rule
+      definition, toggle <b>Active</b> (inactive categories vanish from every tab) and
+      <b>Use ML</b> (the category gets its own tab and a dedicated trained model).
+      Your saved definitions apply whenever you're logged in; Restore returns to the
+      admin defaults. <b>Autocomplete</b>: type in a definition box and matching
+      fields pop up; Tab inserts.</p>
+    <details id="reg-universe-top" style="margin:8px 0" open>
+      <summary style="cursor:pointer;color:#22d3ee">Field universe — every feature usable in a definition (with definitions)</summary>
+      <input id="reg-field-filter" placeholder="filter fields…" style="margin:8px 0;width:260px">
+      <div style="max-height:220px;overflow:auto">
+        <table class="af-table"><thead><tr><th>Field</th><th>Definition</th></tr></thead>
+        <tbody id="reg-fields"></tbody></table>
+      </div>
+    </details>
+    <div id="reg-cards"></div>
+    <div id="reg-suggest" style="position:absolute;z-index:60;display:none;
+      background:#0e1626;border:1px solid #22d3ee;border-radius:6px;
+      max-height:180px;overflow:auto;font-family:JetBrains Mono,monospace;
+      font-size:12px;min-width:260px"></div>
+    <div class="toolbar" style="margin-top:10px;gap:10px">
+      <button class="btn" id="reg-add">+ Add category</button>
+      <button class="btn" id="reg-save">Save my definitions</button>
+      <button class="btn" id="reg-save-admin" title="Admins only">Save as admin defaults</button>
+      <button class="btn" id="reg-restore">Restore defaults</button>
+      <span class="dim" id="reg-msg"></span>
+    </div>
+  </div>
+  <!-- legacy numeric threshold cards removed: the Category Registry above is
+       the single control surface driving rule- and ML-based detection. -->
+  <div id="rules-cards" style="display:none"></div>
+
+  <!-- legacy custom-watch-rule / coverage cards removed: the Category
+       Registry above is the single complex-rule control surface. -->
+
+  <details style="margin-top:16px">
+    <summary class="dim" style="cursor:pointer">Advanced: raw rules JSON</summary>
+    <div class="card" style="margin-top:10px">
+      <textarea id="rules-json" spellcheck="false"
+        style="width:100%;height:280px;font-family:JetBrains Mono,monospace;font-size:12px"></textarea>
+      <div style="margin-top:10px">
+        <button class="btn" id="rules-save">Save rules</button>
+        <span class="dim" id="rules-msg"></span>
+      </div>
+    </div>
+  </details>
+</section>
+
+<!-- ============ LATENCY ARBITRAGE ============ -->
+<section class="af-panel{{ ' on' if af_only == 'latency' }}" id="af-latency">
+  <!-- HEADER: title, mode, range, actions -->
+  <div class="la2-head">
+    <div class="la2-title">
+      <h2>Latency Arbitrage</h2>
+      <span id="la-mode" class="la2-pill">mode …</span>
+    </div>
+    <div class="la2-controls">
+      <label>As of <input id="la-asof" type="date" title="Blank = live (today)"></label>
+      <label>From <input id="la-start" type="date" title="Blank = the last 24 live hours"></label>
+      <button class="btn btn-primary" id="la-rescan">Rescan</button>
+      <details class="la2-menu">
+        <summary class="btn" title="More actions">⋯</summary>
+        <div class="la2-menu-list">
+          <button class="btn btn-sm" id="la-train">Retrain ML model</button>
+          <a class="btn btn-sm" href="/trading/latency_arb.csv" download>Export CSV</a>
+        </div>
+      </details>
+    </div>
+  </div>
+  <div id="la-health" class="la2-health">loading…</div>
+
+  <!-- DECISION TILES -->
+  <div id="la-tiles" class="la2-tiles"></div>
+
+  <!-- TRIAGE TABLE -->
+  <div class="card la2-card">
+    <div class="la2-tablebar">
+      <div id="la-filters" class="la2-filters"></div>
+      <input id="la-search" type="search" placeholder="Search account" class="la2-search">
+    </div>
+    <div class="la2-tablewrap"><table class="af-table la2-table">
+      <thead id="la-head"><tr>
+        <th data-k="account">Client</th>
+        <th data-k="risk" class="num" title="Latency Risk Score 0–100 (spec §5.3) and its band">Risk</th>
+        <th data-k="confidence" class="num" title="How much to trust the score: sample size, data quality, repetition across days, reference validation">Confidence</th>
+        <th title="Behaviour profiles found (spec §5.4), in plain words">Evidence</th>
+        <th data-k="latency_events" class="num" title="Latency events (fast, paid, early advantage that fades) and the client P&amp;L on them">Events · P&amp;L</th>
+        <th data-k="reference_confirmed_share" class="num" title="Share of latency events the independent reference venues confirm as latency: broker price behind, or led by, a covering reference venue (any one is enough by default)">Ref ✓</th>
+        <th data-k="verdict_rank" title="Verdict from the band; capped at Monitor when a gate fails">Recommended</th>
+        <th data-k="review" title="Operator review — open the client to confirm or dismiss">Review</th>
+      </tr></thead>
+      <tbody id="la-rows"><tr><td colspan="8" class="dim">loading…</td></tr></tbody>
+    </table></div>
+    <div id="la-foot" class="la2-foot dim"></div>
+  </div>
+
+  <!-- SECONDARY (collapsed) -->
+  <details class="card la2-more" id="la-near-sec">
+    <summary><b>Closest to the threshold</b> <span id="la-near-sum" class="dim"></span></summary>
+    <p class="dim la2-note">Accounts with latency events that are not in the table — below the Monitor band (25) or with fewer than the minimum latency events — ranked by score weighted by repetition, with what holds each one back.</p>
+    <div id="la-near"></div>
+  </details>
+  <details class="card la2-more" id="la-feed-sec">
+    <summary><b>Feed conditions</b> <span id="la-feed-sum" class="dim"></span></summary>
+    <p class="dim la2-note">Spec §5.5: when the broker's own price feed creates the opportunity (stale prices that several clients profit from), fix the feed before acting on clients. Constituent feed IDs are not recorded, so this is per server feed and symbol.</p>
+    <div id="la-rootcause"></div>
+    <div id="la-replicated"></div>
+  </details>
+  <details class="card la2-more">
+    <summary><b>Trend</b> <span class="dim">last 30 scanned days</span></summary>
+    <div id="la-trend" class="dim">loading…</div>
+  </details>
+  <details class="card la2-more">
+    <summary><b>Model quality</b> <span class="dim">detector accuracy and targets</span></summary>
+    <div id="la-kpis" class="la2-kpis">loading…</div>
+  </details>
+  <details class="card la2-more">
+    <summary><b>Rules</b> <span class="dim">shadow mode and table filter</span></summary>
+    <div class="la2-rules">
+      <div class="la2-check"><input type="checkbox" id="lr-shadow"><span>Shadow mode — log decisions, don't act</span></div>
+      <div class="la2-grow">
+        <span class="la2-flabel">Table filter <span class="dim">— display only; detection, audit and automation tags always use every client</span></span>
+        <input id="lr-complex" placeholder="e.g. risk >= 25 and latency_events >= 10" spellcheck="false" autocomplete="off">
+        <span class="dim la2-fhelp">Fields: risk, confidence, latency_events, econ_usd, reference_confirmed_share, early_hit_rate, profit_concentration, bench_diff_bps, ml, stale_share. Operators: &gt; &gt;= &lt; &lt;= == != and or not. Leave empty to show everything.</span>
+      </div>
+      <button class="btn" id="lr-save">Apply</button>
+      <span id="lr-msg" class="la2-fmsg"></span>
+    </div>
+    <p class="dim la2-note">Verdicts follow the spec bands: emerging ≥25 and moderate ≥50 → Monitor · high ≥70 → Restrict · critical ≥85 → Escalate, capped at Monitor when a gate fails. Detection thresholds, gates, exclusions and weights are in the raw rules JSON on the Rules &amp; Coverage tab.</p>
+  </details>
+  <details class="card la2-more">
+    <summary><b>Audit log</b> <span class="dim">automated decisions and reviews</span></summary>
+    <div class="la2-tablewrap"><table class="af-table">
+      <thead><tr><th>When</th><th>Client</th><th>Verdict</th><th class="num">Risk</th><th>Action</th><th>Mode</th><th>By</th><th>Status</th></tr></thead>
+      <tbody id="la-audit"></tbody>
+    </table></div>
+  </details>
+
+  <!-- CLIENT DRAWER -->
+  <div class="af-drawer" id="la-drawer">
+    <div class="af-drawer-inner la2-drawer">
+      <button class="af-close" id="la-drawer-close" title="Close">×</button>
+      <div id="la-drawer-body"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TOXIC FLOW (P1 ENGINE B, spec s5) ============ -->
+<section class="af-panel{{ ' on' if af_only == 'toxic' }}" id="af-toxic">
+  <div class="la2-head">
+    <div class="la2-title">
+      <h2>Toxic Flow</h2>
+      <span id="tf-mode" class="la2-pill">mode …</span>
+      <span class="tf2-sub">P1 Engine B · flow that stays adverse after the fill</span>
+    </div>
+    <div class="la2-controls">
+      <button class="btn btn-primary" id="tf-rescan"
+              title="Rebuilds the shared markout engine: Engine A and B refresh together">Rescan</button>
+      <details class="la2-menu">
+        <summary class="btn" title="More actions">⋯</summary>
+        <div class="la2-menu-list">
+          <a class="btn btn-sm" href="/trading/toxic_flow.csv" download>Export CSV</a>
+          <a class="btn btn-sm" href="/api/antifraud/toxic/tags" target="_blank">Automation feed (JSON)</a>
+        </div>
+      </details>
+    </div>
+  </div>
+  <div id="tf-health" class="la2-health">loading…</div>
+
+  <!-- DECISION TILES: the s10 states, newest evidence first -->
+  <div id="tf-tiles" class="la2-tiles"></div>
+
+  <!-- TRIAGE TABLE -->
+  <div class="card la2-card">
+    <div class="la2-tablebar">
+      <div id="tf-filters" class="la2-filters"></div>
+      <input id="tf-search" type="search" placeholder="Search account" class="la2-search">
+    </div>
+    <div class="la2-tablewrap"><table class="af-table la2-table">
+      <thead><tr id="tf-head"></tr></thead>
+      <tbody id="tf-rows"></tbody>
+    </table></div>
+    <div id="tf-foot" class="la2-foot"></div>
+  </div>
+
+  <details class="card la2-more">
+    <summary>How the book splits <span class="la2-hint">s5.3 curve signatures and s9 markout signatures</span></summary>
+    <div id="tf-split" class="tf2-split"></div>
+  </details>
+
+  <details class="card la2-more">
+    <summary>Score model <span class="la2-hint">s5.4 weights, calibration and what is unavailable</span></summary>
+    <div id="tf-model"></div>
+  </details>
+
+  <details class="card la2-more">
+    <summary>Trend <span class="la2-hint">daily toxicity and adverse-selection cost</span></summary>
+    <div id="tf-trend"></div>
+  </details>
+
+  <details class="card la2-more">
+    <summary>Thresholds <span class="la2-hint">s5.1 sharp deals and s5.2 toxicity parameters</span></summary>
+    <div id="tf-rules" class="tf2-rules"></div>
+    <div class="la2-rulebar">
+      <label class="la2-check"><input type="checkbox" id="tfr-shadow"> Shadow mode (log only, apply nothing)</label>
+      <button class="btn btn-primary btn-sm" id="tfr-save">Save</button>
+      <span id="tfr-msg" class="la2-hint"></span>
+    </div>
+  </details>
+
+  <details class="card la2-more">
+    <summary>Decision log <span class="la2-hint">every state change and analyst decision</span></summary>
+    <div class="la2-tablewrap"><table class="af-table">
+      <thead><tr><th>When</th><th>Client</th><th>State</th><th class="num">Score</th><th class="num">Conf</th><th>Action</th><th>Mode</th><th>By</th><th>Status</th></tr></thead>
+      <tbody id="tf-audit"></tbody>
+    </table></div>
+  </details>
+
+  <!-- CLIENT DRAWER -->
+  <div class="af-drawer" id="tf-drawer">
+    <div class="af-drawer-inner la2-drawer">
+      <button class="af-close" id="tf-drawer-close" title="Close">×</button>
+      <div id="tf-drawer-body"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EVENT IMPACT ============ -->
+<section class="af-panel" id="af-eventimpact">
+  <div class="toolbar" style="flex-wrap:wrap;gap:12px;align-items:flex-end">
+    <div><label>Auto-detected moves (tick tape, 7d)</label>
+      <select id="ei-auto" style="min-width:240px"><option value="">choose&hellip;</option></select></div>
+    <div><label>Economic calendar <a href="https://www.investing.com/economic-calendar/" target="_blank" style="color:#22d3ee">investing.com ↗</a></label>
+      <select id="ei-cal" style="min-width:280px"><option value="">live macro events (LDN times)&hellip;</option></select></div>
+    <div><label>Start (LDN, to the second)</label><input id="ei-start" placeholder="2026-09-05 13:30:00" style="width:165px"></div>
+    <div><label>End (LDN)</label><input id="ei-end" placeholder="2026-09-05 13:45:00" style="width:165px"></div>
+    <div><label>Symbols (canonical, comma)</label><input id="ei-symbols" placeholder="XAUUSD" style="width:150px"></div>
+    <div><label>Sig. loss $</label><input id="ei-loss" value="500" style="width:70px"></div>
+    <div><label>Sig. profit $</label><input id="ei-profit" value="500" style="width:70px"></div>
+    <button class="btn" id="ei-nfp-sep4" title="Run the fixed 4 September 2026 NFP window: 13:29–13:31 London, XAUUSD">📌 4 Sep NFP</button>
+    <button class="btn" id="ei-nfp" title="Run the most recent NFP on the calendar (first Friday of the month, 13:30 London), XAUUSD ±1 min">📌 Last NFP</button>
+    <button class="btn" id="ei-run">Analyze</button>
+    <a class="btn" id="ei-xlsx" style="display:none" title="Download the full report as a formatted Excel workbook (Summary, All results, per-segment tabs)">⭳ Excel</a>
+    <span class="dim" id="ei-msg"></span>
+  </div>
+  <div id="ei-kpis" class="pcard-row" style="display:flex;flex-wrap:wrap;margin:12px 0"></div>
+  <div class="af-chips" id="ei-segments"></div>
+  <div class="card">
+    <div class="toolbar" style="margin-bottom:6px">
+      <button class="btn btn-sm" id="ei-sortreset" title="Clear the sort chain">Reset sort</button>
+      <span class="dim" id="ei-sortchain"></span>
+    </div>
+    <div style="max-height:460px;overflow:auto"><table class="af-table">
+      <thead id="ei-head"><tr><th data-k="primary_account" title="The client's primary account (report primary, else the oldest account); a client's accounts are listed together">Primary</th>
+        <th data-k="account" title="This row's account (sub-account); every figure is this account's own">Account</th>
+        <th data-k="subaccounts" class="num" title="Other linked accounts of this client (any server) / how many of them traded in the window">Sub-acc</th>
+        <th data-k="segment">Segment</th><th data-k="impact">Impact</th>
+        <th data-k="client_class">Class</th>
+        <th data-k="abuse_reasons">Abuse flags (why)</th>
+        <th data-k="window_pnl" class="num">Window P&amp;L</th>
+        <th data-k="net_revenue" class="num" title="Net deposits (rebates excluded) − equity now, over every linked account">Net revenue</th>
+        <th data-k="notional_usd_monthly" class="num" title="USD notional traded per active month, lifetime, all linked accounts">Notional/mo</th>
+        <th data-k="life_rebates" class="num" title="In-account rebate credits, lifetime, all linked accounts">Rebates</th>
+        <th data-k="window_closes" class="num">Closes</th>
+        <th data-k="act_d1" class="num">Act &times;1d</th>
+        <th data-k="act_d5" class="num">Act &times;5d</th>
+        <th data-k="vol_d5" class="num">Vol &times;5d</th>
+        <th data-k="wd_d1" class="num">Wd 1d $</th>
+        <th data-k="wd_d5" class="num">Wd 5d $</th>
+        <th data-k="anomaly" class="num">Anomaly</th>
+        <th data-k="abuse_label">Abuse label</th></tr></thead>
+      <tbody id="ei-rows"><tr><td colspan="12" class="dim">pick an event window and Analyze</td></tr></tbody>
+    </table></div>
+  </div>
+  <p class="dim" id="ei-notes" style="font-size:11px;margin-top:8px"></p>
+</section>
+</div><!-- /af-content -->
+</div><!-- /af-layout -->
+
+<style>
+.af-subnav{display:flex;gap:6px;margin:0 0 18px}
+/* Collapsible section rail -- the hub's design language, docked left */
+.af-layout{display:flex;gap:18px;align-items:flex-start}
+/* Beta: no section rail, so the content takes the full width. */
+.af-layout.af-solo{gap:0}
+.af-layout.af-solo .af-content{width:100%}
+.af-content{flex:1;min-width:0}
+.af-rail{width:236px;flex:0 0 auto;position:sticky;top:120px;
+  background:rgba(13,18,32,.82);border:1px solid #1b2438;border-radius:14px;
+  padding:10px;backdrop-filter:blur(8px);
+  transition:margin-left .3s cubic-bezier(.4,0,.2,1),opacity .22s,transform .3s}
+.af-rail-head{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:#55637d;padding:4px 10px 10px;display:flex;justify-content:space-between;
+  align-items:center}
+.af-rail-hide,.af-rail-reopen{background:none;border:1px solid #26324a;
+  color:#8b9ab4;border-radius:8px;cursor:pointer;font-size:12px;
+  padding:3px 9px;transition:all .2s}
+.af-rail-hide:hover,.af-rail-reopen:hover{border-color:#22d3ee;color:#22d3ee;
+  box-shadow:0 0 14px rgba(34,211,238,.2)}
+.af-rail .af-tab{display:flex;align-items:center;gap:10px;width:100%;
+  text-align:left;padding:10px 12px;margin-bottom:4px;border-radius:10px;
+  background:transparent;border:1px solid transparent;color:#8b9ab4;
+  cursor:pointer;transition:all .2s}
+.af-rail .af-tab:hover{background:rgba(34,211,238,.06);color:#e6edf7;
+  transform:translateX(3px)}
+.af-rail .af-tab.on{background:rgba(34,211,238,.1);color:#e6edf7;
+  border-color:rgba(34,211,238,.35)}
+.af-rail .af-tab .glyph{width:30px;height:30px;border-radius:8px;display:flex;
+  align-items:center;justify-content:center;font-size:14px;flex:0 0 auto;
+  background:linear-gradient(135deg,rgba(34,211,238,.16),rgba(124,140,255,.12));
+  border:1px solid #26324a}
+.af-rail .af-tab .t{display:flex;flex-direction:column;line-height:1.25}
+.af-rail .af-tab .t b{font-size:12.5px}
+.af-rail .af-tab .t small{color:#55637d;font-size:9.5px}
+/* collapsed: rail slides off-screen left; a chevron brings it back */
+.af-rail-reopen{position:fixed;left:10px;top:130px;z-index:40;display:none;
+  padding:8px 10px;border-radius:10px;background:rgba(13,18,32,.9)}
+body.af-rail-collapsed .af-rail{margin-left:-260px;opacity:0;transform:translateX(-30px)}
+body.af-rail-collapsed .af-rail-reopen{display:block;animation:pageIn .3s ease}
+.af-panel{display:none}.af-panel.on{display:block;animation:pageIn .3s ease}
+/* explained rules cards */
+.rules-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.rule-card{background:#0e1626;border:1px solid #1b2438;border-radius:12px;padding:16px;
+  transition:border-color .2s}
+.rule-card:hover{border-color:#26324a}
+.rule-card h4{margin:0 0 4px;font-size:13px;color:#e6edf7}
+.rule-card .obj{font-size:11px;color:#55637d;margin-bottom:10px}
+.rule-card .sev{float:right;font-family:JetBrains Mono,monospace;font-size:10px;
+  color:#ffb020}
+.rule-field{display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;
+  padding-bottom:10px;border-bottom:1px dashed rgba(27,36,56,.6)}
+.rule-field:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.rule-field input{width:92px;flex:0 0 auto;font-family:JetBrains Mono,monospace}
+.rule-field .doc{font-size:11px;color:#8b9ab4;line-height:1.4}
+.rule-field .doc b{color:#e6edf7;font-size:11.5px;display:block}
+.rule-field .doc .dir{color:#55637d;font-style:italic}
+.af-chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.af-chip{padding:5px 12px;border:1px solid #1b2438;border-radius:20px;font-size:12px;
+  cursor:pointer;color:#9fb0c8;background:#0e1626}
+.af-chip.on{border-color:#22d3ee;color:#22d3ee}
+.af-table{width:100%;border-collapse:collapse;font-size:13px}
+.af-table th{text-align:left;color:#55637d;font-size:11px;text-transform:uppercase;
+  letter-spacing:.5px;padding:8px 10px;border-bottom:1px solid #1b2438;cursor:pointer;position:sticky;top:0;background:#0a0e18}
+.af-table td{padding:7px 10px;border-bottom:1px solid rgba(27,36,56,.5)}
+.af-table tr:hover td{background:rgba(34,211,238,.04)}
+.af-table .num{text-align:right;font-variant-numeric:tabular-nums}
+.af-bar{height:6px;border-radius:3px;background:#1b2438;overflow:hidden;min-width:46px;display:inline-block}
+.af-bar>i{display:block;height:100%;background:linear-gradient(90deg,#22d3ee,#7c8cff)}
+.af-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.af-grid{grid-template-columns:1fr}}
+.card{background:#0e1626;border:1px solid #1b2438;border-radius:12px;padding:18px}
+.card h3{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:#7e8fab;margin:0 0 12px}
+.reco{background:linear-gradient(90deg,rgba(46,230,168,.12),transparent);
+  border:1px solid #1e4d3d;border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.af-drawer{position:fixed;inset:0;background:rgba(4,7,14,.6);display:none;z-index:50}
+.af-drawer.on{display:block}
+.af-drawer-inner{position:absolute;right:0;top:0;bottom:0;width:min(720px,92vw);
+  background:#0a0e18;border-left:1px solid #1b2438;padding:24px;overflow:auto}
+.af-close{position:absolute;top:14px;right:18px;background:none;border:none;
+  color:#7e8fab;font-size:20px;cursor:pointer}
+.pcard{display:inline-block;background:#0e1626;border:1px solid #1b2438;border-radius:10px;
+  padding:10px 14px;margin:4px 6px 4px 0;font-size:12px}
+.pcard b{font-size:14px;color:#22d3ee}
+/* ---- Latency Arbitrage (decision-first layout) ---- */
+.la2-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.la2-title{display:flex;align-items:center;gap:12px}
+.la2-title h2{margin:0;font-size:20px;color:#e6edf7;letter-spacing:.2px}
+.la2-pill{font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid #26324a;color:#8b9ab4}
+.la2-pill.live{border-color:rgba(255,77,109,.5);color:#ff4d6d}
+.la2-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.la2-controls label{font-size:11px;color:#55637d;display:flex;align-items:center;gap:6px}
+.la2-controls input[type=date]{width:140px}
+.la2-menu{position:relative}
+.la2-menu summary{list-style:none;cursor:pointer}
+.la2-menu summary::-webkit-details-marker{display:none}
+.la2-menu-list{position:absolute;right:0;top:calc(100% + 6px);z-index:20;background:#0a0e18;border:1px solid #26324a;
+  border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:180px}
+.la2-health{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11.5px;color:#8b9ab4;margin:0 0 14px}
+.la2-h.warn{color:#ffb020}
+.la2-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.la2-tile{display:flex;flex-direction:column;gap:4px;text-align:left;background:#0e1626;border:1px solid #1b2438;
+  border-radius:12px;padding:14px 16px;color:#8b9ab4;cursor:default;font:inherit;transition:border-color .2s,background .2s}
+.la2-tile[data-f]{cursor:pointer}
+.la2-tile[data-f]:hover{border-color:#26324a;background:#101a2d}
+.la2-tile.on{border-color:rgba(34,211,238,.55);box-shadow:inset 0 0 0 1px rgba(34,211,238,.2)}
+.la2-tile-l{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#7e8fab}
+.la2-tile b{font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.la2-tile-s{font-size:11px;color:#55637d}
+.la2-card{padding:0;overflow:hidden}
+.la2-tablebar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #1b2438}
+.la2-filters{display:flex;gap:6px;flex-wrap:wrap}
+.la2-chip{font:inherit;font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid #1b2438;background:transparent;color:#8b9ab4;cursor:pointer}
+.la2-chip b{color:#e6edf7;margin-left:4px}
+.la2-chip.on{border-color:#22d3ee;color:#22d3ee}
+.la2-search{width:200px}
+.la2-tablewrap{overflow-x:auto;max-height:560px;overflow-y:auto}
+.la2-table td{vertical-align:middle;padding:10px 12px}
+.la2-table th{padding:9px 12px}
+.la2-table th.sorted{color:#22d3ee}
+.la2-table th.sorted::after{content:" " attr(data-dir)}
+.la2-row{cursor:pointer}
+.la2-row:focus{outline:1px solid rgba(34,211,238,.5);outline-offset:-1px}
+.la2-acc{color:#e6edf7;font-weight:600;display:block}
+.la2-sub{display:block;font-size:10.5px;color:#55637d;font-weight:400}
+.la2-score{font-size:15px;color:#e6edf7;margin-right:8px}
+.la2-band,.la2-verdict{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;white-space:nowrap;
+  color:var(--c);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 10%,transparent)}
+.la2-conf{display:inline-block;width:46px;height:5px;border-radius:3px;background:#1b2438;overflow:hidden;vertical-align:middle;margin-right:6px}
+.la2-conf>i{display:block;height:100%;background:#22d3ee}
+.la2-evcell{max-width:280px}
+.la2-ev{display:inline-block;font-size:11px;padding:2px 8px;margin:1px 4px 1px 0;border-radius:6px;background:#121a2c;color:#c5d0e0;border:1px solid #1b2438}
+.la2-ev.warn{color:#ffb020;border-color:rgba(255,176,32,.35)}
+.la2-more-n{font-size:11px;color:#55637d;margin-left:2px}
+.la2-cap{display:inline-block;font-size:10px;margin-left:6px;color:#ffb020;border-bottom:1px dotted #ffb020;cursor:help}
+.la2-rev{font-size:12px;color:#22d3ee;white-space:nowrap}
+.la2-rev.ok{color:#34d399}.la2-rev.no{color:#ff6b81}
+.la2-empty{padding:28px 16px!important;text-align:center;color:#8b9ab4}
+.la2-foot{padding:10px 16px;font-size:11px;border-top:1px solid #1b2438}
+.la2-more{margin-top:12px;padding:12px 16px}
+.la2-more>summary{cursor:pointer;font-size:13px;color:#e6edf7}
+.la2-more>summary .dim{font-size:12px;margin-left:6px}
+.la2-more h4,.la2-drawer h4{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#7e8fab;margin:18px 0 8px}
+.la2-note{font-size:11.5px;margin:10px 0 0;line-height:1.45}
+.la2-kpis{margin-top:10px}
+.la2-rules{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin-top:12px}
+.la2-rules .la2-grow{flex:1;min-width:300px;display:flex;flex-direction:column;gap:5px}
+.la2-flabel{font-size:12px;color:#c5d0e0}
+.la2-fhelp{font-size:11px;line-height:1.4}
+.la2-rules #lr-complex{width:100%;box-sizing:border-box;font-family:Consolas,"SF Mono",monospace;font-variant-ligatures:none}
+.la2-check{display:flex;align-items:center;gap:8px;font-size:12px;color:#c5d0e0;align-self:center}
+.la2-check input{width:auto;margin:0}
+.la2-fmsg{font-size:12px;color:#8b9ab4;align-self:center}
+.la2-fmsg.ok{color:#2ee6a8}.la2-fmsg.warn{color:#ffb020}
+.la2-stack{display:flex;height:8px;border-radius:4px;overflow:hidden;background:#121a2c;gap:2px}
+.la2-stack i{display:block;height:100%}
+/* drawer */
+.la2-drawer{width:min(640px,94vw)}
+.la2-dh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding-right:44px}
+.la2-dh h2{margin:2px 0 0;font-size:22px}
+.la2-dh h2 a{color:#e6edf7}
+.la2-dscore{text-align:right}
+.la2-dscore b{display:block;font-size:34px;line-height:1;color:#e6edf7;margin-bottom:6px}
+.la2-dverdict{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:12px;font-size:12.5px;color:#c5d0e0}
+.la2-alert{margin-top:12px;padding:9px 12px;border-radius:8px;font-size:12px;color:#ffb020;
+  background:rgba(255,176,32,.07);border:1px solid rgba(255,176,32,.3)}
+.la2-evlist .la2-ev{font-size:12px;padding:4px 10px}
+.la2-comp{display:grid;grid-template-columns:1fr 120px 64px;gap:10px;align-items:center;font-size:12px;color:#c5d0e0;padding:4px 0}
+.la2-comp-bar{height:6px;border-radius:3px;background:#1b2438;overflow:hidden}
+.la2-comp-bar>i{display:block;height:100%;background:#22d3ee;border-radius:3px}
+.la2-comp b{text-align:right;font-variant-numeric:tabular-nums;color:#e6edf7}
+.la2-comp small{color:#55637d;font-weight:400}
+.la2-legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11.5px;color:#c5d0e0;margin-bottom:4px}
+.la2-leg{display:inline-flex;align-items:center;gap:6px}
+.la2-chart{position:relative}
+.la2-chart svg{width:100%;height:auto;display:block}
+.la2-ax{fill:#55637d;font-size:10px}
+.la2-lab{fill:#c5d0e0;font-size:10.5px}
+.la2-tip{position:absolute;top:8px;background:#0e1626;border:1px solid #26324a;border-radius:8px;padding:8px 10px;
+  font-size:11.5px;pointer-events:none;min-width:170px}
+.la2-tip-h{color:#8b9ab4;margin-bottom:4px}
+.la2-tip-r{display:flex;align-items:center;gap:8px}
+.la2-tip-r i{width:12px;height:2px;display:inline-block}
+.la2-tip-r b{color:#e6edf7;font-variant-numeric:tabular-nums}
+.la2-tip-r span{color:#8b9ab4}
+.la2-facts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.la2-fact{background:#0e1626;border:1px solid #1b2438;border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.la2-fact span{font-size:10.5px;color:#7e8fab}
+.la2-fact b{font-size:13.5px;color:#e6edf7;font-weight:600}
+.la2-fact small{font-size:10.5px;color:#55637d;font-weight:400}
+.la2-cps{display:flex;flex-wrap:wrap;gap:6px}
+.la2-cp{font-size:11.5px;color:#8b9ab4;background:#0e1626;border:1px solid #1b2438;border-radius:6px;padding:4px 8px}
+.la2-cp b{color:#e6edf7}
+.la2-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;color:#c5d0e0}
+.la2-actions>div{background:#0e1626;border:1px solid #1b2438;border-radius:8px;padding:8px 10px}
+.la2-actions a{color:#22d3ee;margin-left:6px}
+.la2-tags{display:flex;flex-wrap:wrap;gap:6px}
+.la2-tag{font-family:JetBrains Mono,monospace;font-size:11px;padding:3px 7px;border-radius:6px;background:#0e1626;border:1px solid #26324a;color:#c5d0e0;cursor:help}
+#la-note{width:100%;box-sizing:border-box;resize:vertical;font:inherit;font-size:12.5px}
+.la2-review{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+#af-latency.la2-loading .la2-tiles,#af-latency.la2-loading .la2-card{opacity:.55;transition:opacity .2s}
+@media(max-width:700px){.la2-facts,.la2-actions{grid-template-columns:1fr}.la2-comp{grid-template-columns:1fr 70px 56px}}
+/* latency override states */
+.la-dec.la-on-c{background:#0f2e1f;border-color:#34d399;color:#34d399}
+.la-dec.la-on-d{background:#33121a;border-color:#ff6b81;color:#ff6b81}
+tr.la-confirm td{background:rgba(52,211,153,.05)}
+tr.la-dismiss td{background:rgba(255,107,129,.05);opacity:.65}
+#la-head th[data-k],#ei-head th[data-k]{cursor:pointer}
+#la-head th[data-k]:hover,#ei-head th[data-k]:hover{color:#22d3ee}
+/* ---- TOXIC FLOW (P1 Engine B). Reuses the la2-* shell; tf2-* is only what
+   Engine B adds: the curve sparkline, the split bars and the state colours. */
+.tf2-sub{font-size:12px;color:#7e8fab}
+#tf-head th[data-k]{cursor:pointer}
+#tf-head th[data-k]:hover{color:#22d3ee}
+#af-toxic.la2-loading .la2-tiles,#af-toxic.la2-loading .la2-card{opacity:.55;transition:opacity .2s}
+.tf2-state{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #26324a;color:#8b9ab4;white-space:nowrap}
+.tf2-state.s-critical_review{background:#33121a;border-color:#ff4d6d;color:#ff4d6d}
+.tf2-state.s-urgent_evidence_review{background:#331a12;border-color:#fb923c;color:#fb923c}
+.tf2-state.s-high_priority_review{background:#2a2412;border-color:#ffb020;color:#ffb020}
+.tf2-state.s-manual_investigation{background:#1a2033;border-color:#7c8cff;color:#9aa8ff}
+.tf2-state.s-enhanced_monitoring{background:#12222e;border-color:#22d3ee;color:#22d3ee}
+.tf2-spark{display:block}
+.tf2-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.tf2-bar{display:flex;align-items:center;gap:8px;font-size:12px;color:#c5d0e0;margin:5px 0}
+.tf2-bar .lab{flex:0 0 132px;color:#8b9ab4}
+.tf2-bar .track{flex:1;height:7px;background:#0e1626;border:1px solid #1b2438;border-radius:4px;overflow:hidden}
+.tf2-bar .fill{height:100%;background:#22d3ee}
+.tf2-bar .fill.warn{background:#ffb020}.tf2-bar .fill.bad{background:#ff4d6d}
+.tf2-bar .val{flex:0 0 66px;text-align:right;font-family:JetBrains Mono,monospace;font-size:11.5px}
+.tf2-rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px 18px}
+.tf2-rules label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;color:#8b9ab4}
+.tf2-rules input{width:96px;background:#0b1220;border:1px solid #26324a;border-radius:6px;color:#e6edf7;padding:4px 7px;font:inherit;font-size:12px}
+.tf2-unavail{background:#2a1a12;border:1px solid #6b3a12;border-radius:8px;padding:9px 11px;font-size:12px;color:#ffb37a;margin:10px 0}
+.tf2-weights{display:grid;grid-template-columns:1fr 62px 1fr;gap:6px 10px;align-items:center;font-size:12px;color:#c5d0e0}
+.tf2-weights .w{font-family:JetBrains Mono,monospace;color:#8b9ab4;text-align:right}
+.tf2-h{font-size:12.5px;color:#e6edf7;margin:14px 0 6px;font-weight:600}
+.la2-hint{font-size:11.5px;color:#7e8fab;font-weight:400}
+.la2-rulebar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:12px}
+#tf-note{width:100%;box-sizing:border-box;resize:vertical;font:inherit;font-size:12.5px}
+</style>
+
+<script>
+(function(){
+  const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+  $$(".af-tab").forEach(t=>t.onclick=()=>{
+    $$(".af-tab").forEach(x=>x.classList.remove("on"));
+    $$(".af-panel").forEach(x=>x.classList.remove("on"));
+    t.classList.add("on"); $("#af-"+t.dataset.af).classList.add("on");
+    if(t.dataset.af==="rules"||t.dataset.af==="alerts") loadRules();
+    if(t.dataset.af==="alerts"){loadAlerts();loadAnalysis();}
+    if(t.dataset.af==="universe") loadUniverse();
+    if(t.dataset.af==="latency") loadLatency();
+    if(t.dataset.af==="toxic") loadToxic();
+    if(t.dataset.af==="eventimpact") loadEvents();
+  });
+  const PROF={persistent_edge:"Persistent Edge",toxic_flow:"Toxic Flow",
+    high_magnitude:"High Magnitude",scalper:"Scalper",news_vol:"News/Event/Vol",
+    bonus_arb:"Bonus Arb",swap_arb:"Swap Arb",martingale:"Martingale",
+    high_exposure_recovery:"High Exp/Recovery"};
+  let profRows=[], profChain=[], profSummaries={};
+
+  function bar(v){return `<span class="af-bar" style="width:60px"><i style="width:${Math.max(0,Math.min(100,v))}%"></i></span>`;}
+  function profDraw(){
+    const q=($("#af-search").value||"").toLowerCase();
+    const pf=$("#af-profile").value;
+    let rows=profRows.filter(r=>(!pf||r.profile===pf)
+      &&(!q||String(r.account).toLowerCase().includes(q)));
+    const s=pf?profSummaries[pf]:null;
+    $("#af-parity").textContent=s
+      ?`${pf}: ${rows.length} rows — mirrors its tab (${s.shown} shown there)`
+        +(s.rule_hits!=null?` · hindsight total ${s.rule_hits.toLocaleString()} of ${(s.n_accounts||0).toLocaleString()} (= Rules & Coverage chip)`:"")
+        +(s.in_range!=null&&s.in_range>s.shown?` · ${s.in_range.toLocaleString()} in range (top ${s.shown} by activity shown)`:"")
+        +(s.flagged_trades!=null?` · ${s.flagged_trades.toLocaleString()} flagged trades`:"")
+      :"";
+    if(profChain.length) rows=[...rows].sort((a,b)=>{
+      for(const {k,dir} of profChain){
+        const av=a[k]??-Infinity,bv=b[k]??-Infinity;
+        const c=(typeof av==="number"&&typeof bv==="number")?av-bv:String(av).localeCompare(String(bv));
+        if(c) return c*dir;
+      }
+      return 0;
+    });
+    $("#af-sortchain").textContent=profChain.length
+      ?("sort: "+profChain.map(c=>`${c.k}${c.dir<0?"↓":"↑"}`).join(" → ")):"";
+    const pct=v=>v==null?"—":(v*100).toFixed(0)+"%";
+    $("#af-rows").innerHTML=rows.length?rows.map(x=>{
+      const dec=laDecisions[x.account];
+      return `<tr class="${dec?("la-"+dec):""}">
+        <td><a href="/trading/account?account=${encodeURIComponent(x.account)}">${x.account}</a></td>
+        <td><span class="af-chip">${x.profile}</span></td>
+        <td class="num">${x.risk!=null?`<b>${x.risk}</b> ${bar(x.risk)}`:"—"}</td>
+        <td class="num">${pct(x.confidence)}</td>
+        <td class="num">${pct(x.consistency)}</td>
+        <td class="num">${pct(x.persistence)}</td>
+        <td class="num">${x.econ_usd!=null?"$"+(x.econ_usd||0).toLocaleString():"—"}</td>
+        <td class="num" style="${(x.ml||0)>=.5?'color:#ffb020':''}">${pct(x.ml)}</td>
+        <td class="num" style="${(x.ew||0)>=.5?'color:#22d3ee':''}">${pct(x.ew)}</td>
+        <td class="num">${pct(x.behavioural)}</td>
+        <td class="num">${pct(x.stale_share)}</td>
+        <td class="num">${pct(x.illiquid_share)}</td>
+        <td class="num">${x.indep_share==null?"—":pct(x.indep_share)}</td>
+        <td class="num">${pct(x.event_share)}</td>
+        <td class="num">${x.flagged!=null?`${x.flagged}/${x.trades}`:(x.rule_hit?"✓ rule":"ml only")}</td>
+        <td class="num">${x.med_hold_s!=null?x.med_hold_s+"s":"—"}</td>
+        <td class="num">${x.best_markout_bps??"—"}</td>
+        <td><span class="af-chip ${x.verdict==='escalate'?'on':''}">${x.verdict}</span></td>
+        <td class="dim" style="font-size:11px">${x.action_min||"—"}</td>
+        <td class="dim" style="font-size:11px">${x.action_max||"—"}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-sm prof-dec ${dec==='confirm'?'la-on-c':''}" data-acc="${x.account}" data-d="confirm" title="Confirm — comment required; click again to deselect">✓</button>
+          <button class="btn btn-sm prof-dec ${dec==='dismiss'?'la-on-d':''}" data-acc="${x.account}" data-d="dismiss" title="Dismiss — comment required; click again to deselect">✗</button></td>
+        <td class="dim" style="font-size:11px;max-width:160px">${laNotes[x.account]||"—"}</td></tr>`;
+    }).join(""):'<tr><td colspan="22" class="dim">No accounts match in the selected range — adjust filters, or a scan may still be building.</td></tr>';
+    $$(".prof-dec").forEach(b=>b.onclick=async()=>{
+      const d=laDecisions[b.dataset.acc]===b.dataset.d?"clear":b.dataset.d;
+      let note="";
+      if(d!=="clear"){
+        note=(window.prompt(`Comment (REQUIRED) — why ${d} ${b.dataset.acc}?`,laNotes[b.dataset.acc]||"")||"").trim();
+        if(!note){alert("Override not permitted without a comment.");return;}
+      }
+      const r=await (await fetch("/api/antifraud/latency/decide",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({account:b.dataset.acc,decision:d,note})})).json();
+      if(r.error){alert(r.error);return;}
+      if(d==="clear"){delete laDecisions[b.dataset.acc];delete laNotes[b.dataset.acc];}
+      else{laDecisions[b.dataset.acc]=d;laNotes[b.dataset.acc]=note;}
+      profDraw();
+    });
+  }
+  $$("#af-head th[data-k]").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k, at=profChain.findIndex(c=>c.k===k);
+    if(at>=0) profChain[at].dir*=-1; else profChain.push({k,dir:-1});
+    profDraw();
+  });
+  $("#af-sortreset").onclick=()=>{profChain=[];profDraw();};
+
+  // ---- client screening drawer ----
+  const PROFNAME=PROF;
+  async function screen(acc){
+    $("#af-drawer").classList.add("on");
+    $("#drawer-body").innerHTML=`<h2 style="margin-top:0">${acc}</h2><p class="dim">Loading dossier…</p>`;
+    const d=await (await fetch("/api/antifraud/client?account="+encodeURIComponent(acc))).json();
+    if(d.error){$("#drawer-body").innerHTML=`<h2>${acc}</h2><p class="dim">${d.error}</p>`;return;}
+    let html=`<h2 style="margin-top:0">${acc}</h2>`;
+    html+=`<h3 style="color:#7e8fab;font-size:12px;text-transform:uppercase">Behavioural profiles</h3>`;
+    html+= (d.profiles&&d.profiles.length)? d.profiles.map(p=>`<span class="pcard">
+      ${PROFNAME[p.profile]||p.profile}<br><b>${p.score}</b> · conf ${p.confidence}% · sev ${p.severity}
+      <br><span class="dim">${p.why}</span></span>`).join("") : '<p class="dim">No rule flags.</p>';
+    if(d.ml){html+=`<h3 style="color:#7e8fab;font-size:12px;text-transform:uppercase;margin-top:16px">ML anomaly</h3>
+      <span class="pcard"><b>${d.ml.ml_anomaly}</b><br><span class="dim">${d.ml.ml_why||''}</span></span>`;}
+    if(d.markout&&d.markout.post){html+=`<h3 style="color:#7e8fab;font-size:12px;text-transform:uppercase;margin-top:16px">Post-trade markout (adverse selection)</h3><div id="mk-chart" style="height:200px"></div>`;}
+    html+=`<h3 style="color:#7e8fab;font-size:12px;text-transform:uppercase;margin-top:16px">Recent trades (${(d.trades||[]).length})</h3>
+      <div style="max-height:240px;overflow:auto"><table class="af-table"><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th class="num">Lots</th><th class="num">P&L</th></tr></thead><tbody>
+      ${(d.trades||[]).slice(0,60).map(t=>`<tr><td class="dim">${(t.open_time||'').slice(0,16)}</td><td>${t.symbol||''}</td><td>${t.cmd||''}</td><td class="num">${t.volume_lots||''}</td><td class="num ${(+t.net_profit>=0)?'':'dim'}">${(+t.net_profit||0).toFixed(2)}</td></tr>`).join("")}
+      </tbody></table></div>`;
+    html+=`<div style="margin-top:14px"><button class="btn" onclick="afActionFor('${acc}')">Run action test →</button>
+      <a class="btn" href="/trading/account?account=${encodeURIComponent(acc)}">Full account detail →</a></div>`;
+    $("#drawer-body").innerHTML=html;
+    if(d.markout&&d.markout.post&&window.zfxChart){
+      const hs=Object.keys(d.markout.post), vs=hs.map(h=>d.markout.post[h]);
+      zfxChart($("#mk-chart"),{grid:zfxTheme.grid,xAxis:{type:"category",data:hs,...zfxTheme.axis},
+        yAxis:{type:"value",...zfxTheme.axis},tooltip:{...zfxTheme.tooltip,trigger:"axis"},
+        series:[{type:"line",data:vs,smooth:true,areaStyle:{opacity:.15},lineStyle:{color:"#ff4d6d"},itemStyle:{color:"#ff4d6d"}}]});
+    }
+  }
+  window.afActionFor=(acc)=>{$$(".af-tab").forEach(x=>x.classList.remove("on"));
+    $$(".af-panel").forEach(x=>x.classList.remove("on"));
+    document.querySelector('.af-tab[data-af="action"]').classList.add("on");
+    $("#af-action").classList.add("on");$("#af-drawer").classList.remove("on");
+    $("#at-account").value=acc;$("#at-run").click();};
+  $("#drawer-close").onclick=()=>$("#af-drawer").classList.remove("on");
+  $("#af-drawer").onclick=e=>{if(e.target.id==="af-drawer")$("#af-drawer").classList.remove("on");};
+  async function load(){
+    $("#af-count").textContent="loading…";
+    const p=new URLSearchParams({as_of:$("#af-asof").value||"",
+      start:$("#af-start").value||""});
+    const r=await (await fetch("/api/antifraud/profiling?"+p)).json();
+    if(r.error){$("#af-count").textContent=r.error;return;}
+    profRows=r.rows||[];profSummaries=r.summaries||{};
+    const sel=$("#af-profile"), cur=sel.value;
+    sel.innerHTML='<option value="">All active rules</option>'+
+      (r.profiles||[]).map(pr=>`<option${pr===cur?" selected":""}>${pr}</option>`).join("");
+    $("#af-count").textContent=`${r.n_rows||profRows.length} rows · active ${r.range_start||""} → ${r.range_end||"now"}`
+      +(r.building&&r.building.length?` · still building: ${r.building.join(", ")} (auto-refreshes)`:"");
+    if(r.building&&r.building.length){
+      clearTimeout(window._afPoll);window._afPoll=setTimeout(load,15000);
+    }
+    profDraw();
+  }
+  $("#af-refresh").onclick=load; $("#af-profile").onchange=profDraw;
+  $("#af-asof").onchange=load; $("#af-start").onchange=load;
+  $("#af-search").addEventListener("keyup",()=>profDraw());
+  load();
+
+  // ---- action testing ----
+  async function runAT(){
+    const acc=$("#at-account").value.trim(); if(!acc)return;
+    $("#at-results").innerHTML='<div class="dim">Running…</div>'; $("#at-reco").innerHTML="";
+    const r=await (await fetch("/api/antifraud/action_test?account="+encodeURIComponent(acc))).json();
+    if(r.error){$("#at-results").innerHTML=`<div class="dim">${r.error}</div>`;return;}
+    $("#at-meta").textContent=`${r.trades} trades · broker P&L $${r.base_broker_pnl.toLocaleString()} · client P&L $${r.base_client_pnl.toLocaleString()}`;
+    if(r.recommendation){const b=r.recommendation;
+      $("#at-reco").innerHTML=`<div class="reco"><b style="color:#2ee6a8">Recommended: ${b.label} ${b.magnitude} ${b.unit}</b>
+        — broker P&L +$${b.delta.toLocaleString()} → $${b.new_broker_pnl.toLocaleString()}</div>`;}
+    $("#at-results").innerHTML=Object.entries(r.actions).map(([k,a])=>`
+      <div class="card"><h3>${a.label}</h3><table class="af-table"><thead><tr>
+        <th>${a.unit}</th><th class="num">Δ broker P&L</th><th class="num">New broker P&L</th></tr></thead>
+        <tbody>${a.curve.map(p=>`<tr><td>${p.magnitude}</td>
+          <td class="num ${p.broker_pnl_delta>0?'':'dim'}">${p.broker_pnl_delta==null?'needs tick data':'$'+p.broker_pnl_delta.toLocaleString()}</td>
+          <td class="num">${p.new_broker_pnl==null?'—':'$'+p.new_broker_pnl.toLocaleString()}</td></tr>`).join("")}
+        </tbody></table></div>`).join("");
+  }
+  $("#at-run").onclick=runAT;
+  $("#at-account").addEventListener("keyup",e=>{if(e.key==="Enter")runAT();});
+
+  // ---- collapsible section rail (matches the hub) ----
+  function setRail(collapsed){
+    document.body.classList.toggle("af-rail-collapsed",collapsed);
+    try{localStorage.setItem("af-rail",collapsed?"1":"0");}catch(e){}
+  }
+  // Null-safe: these controls are absent in single-pane (beta) layouts, and a
+  // throw here aborts the whole script -- every table on the page with it.
+  if($("#af-rail-hide")) $("#af-rail-hide").onclick=()=>setRail(true);
+  if($("#af-rail-reopen")) $("#af-rail-reopen").onclick=()=>setRail(false);
+  try{if(localStorage.getItem("af-rail")==="1")setRail(true);}catch(e){}
+
+  // ---- rules: explained cards + custom watch rules + autopilot ----
+  let RULES=null, SCHEMA={}, ALERTS={};
+  async function loadRules(){
+    const r=await (await fetch("/api/antifraud/rules")).json();
+    RULES=r.rules||{}; SCHEMA=r.schema||{}; ALERTS=r.alerts||{};
+    $("#rules-json").value=JSON.stringify(RULES,null,2);
+    $("#rules-cards").innerHTML=Object.entries(RULES)
+      .filter(([p])=>!p.startsWith("_"))
+      .map(([p,fields])=>`<div class="rule-card">
+        <span class="sev">sev ${ (r.severity||{})[p]??'—' }</span>
+        <h4>${PROF[p]||p}</h4>
+        <div class="obj">${(r.profiles||{})[p]||''}</div>
+        ${Object.entries(fields).map(([f,v])=>{
+          const doc=((SCHEMA[p]||{})[f])||{};
+          return `<div class="rule-field">
+            <input type="number" step="any" value="${v}" data-p="${p}" data-f="${f}"
+                   class="rule-input" title="${doc.format||''}">
+            <div class="doc"><b>${doc.label||f} <span class="dim">(${doc.format||'number'})</span></b>
+              ${doc.meaning||''} <span class="dir">${doc.direction||''}</span></div>
+          </div>`;}).join("")}
+        <button class="btn btn-sm rule-apply" data-p="${p}" style="margin-top:8px">Apply</button>
+        <span class="dim rule-msg" data-p="${p}"></span>
+      </div>`).join("");
+    $$(".rule-apply").forEach(b=>b.onclick=async()=>{
+      const p=b.dataset.p;
+      $$(`.rule-input[data-p="${p}"]`).forEach(i=>{RULES[p][i.dataset.f]=parseFloat(i.value);});
+      const ok=await saveRules();
+      document.querySelector(`.rule-msg[data-p="${p}"]`).textContent=
+        ok?"saved ✓ (re-classifying)":"save failed";
+    });
+    $("#ap-on").checked=!!ALERTS.autopilot;
+    $("#ap-prio").value=ALERTS.min_priority??60;
+    $("#ap-hour").value=ALERTS.digest_hour_london??7;
+    $("#ap-poll").value=ALERTS.poll_minutes??5;
+  }
+  async function saveRules(){
+    try{
+      const r=await (await fetch("/api/antifraud/rules",{method:"POST",
+        headers:{"Content-Type":"application/json"},body:JSON.stringify(RULES)})).json();
+      $("#rules-json").value=JSON.stringify(RULES,null,2);
+      return !!r.ok;
+    }catch(e){return false;}
+  }
+  $("#rules-save").onclick=async()=>{
+    try{RULES=JSON.parse($("#rules-json").value);
+      const ok=await saveRules();
+      $("#rules-msg").textContent=ok?"saved — refresh Profiling to re-classify":"save failed";
+      loadRules();
+    }catch(e){$("#rules-msg").textContent="invalid JSON: "+e.message;}
+  };
+  $("#ap-save").onclick=async()=>{
+    const body={autopilot:$("#ap-on").checked,
+      min_priority:parseFloat($("#ap-prio").value||"60"),
+      digest_hour_london:parseInt($("#ap-hour").value||"7"),
+      poll_minutes:parseFloat($("#ap-poll").value||"5")};
+    const r=await (await fetch("/api/antifraud/alerts",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
+    $("#ap-msg").textContent=r.ok
+      ?(body.autopilot?"armed ✓ — new flags as generated; digest at "
+        +body.digest_hour_london+":00 London":"disarmed")
+      :(r.error||"failed");
+  };
+
+  // ---- user alert builder ----
+  let CAT={};
+  async function loadAlerts(){
+    const r=await (await fetch("/api/alerts")).json();
+    CAT=r.catalog||{};
+    const src=$("#ab-source");
+    src.innerHTML=Object.entries(CAT).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("");
+    fillFields();
+    drawAlerts(r.alerts||[]);
+  }
+  function fillFields(){
+    const s=$("#ab-source").value, fields=(CAT[s]||{}).fields||{};
+    $("#ab-field").innerHTML=Object.keys(fields).map(f=>`<option>${f}</option>`).join("");
+    docField();
+  }
+  function docField(){
+    const s=$("#ab-source").value, f=$("#ab-field").value;
+    $("#ab-fielddoc").textContent=((CAT[s]||{}).fields||{})[f]||"";
+  }
+  $("#ab-source").onchange=fillFields;
+  $("#ab-field").onchange=docField;
+  $("#ab-save").onclick=async()=>{
+    const spec={name:$("#ab-name").value.trim(),source:$("#ab-source").value,
+      field:$("#ab-field").value,op:$("#ab-op").value,
+      value:parseFloat($("#ab-value").value||"0"),
+      freq_minutes:parseFloat($("#ab-freq").value||"5"),
+      webhook:$("#ab-hook").value.trim(),
+      expr:$("#ab-expr").value.trim()};
+    await fetch("/api/alerts",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(spec)});
+    loadAlerts();
+  };
+  function drawAlerts(list){
+    $("#ab-rows").innerHTML=list.length?list.map(a=>`<tr>
+      <td><b>${a.name}</b></td>
+      <td class="dim">${a.source}.${a.field} ${a.op} ${a.value}
+        ${a.webhook?'· own webhook':''}</td>
+      <td class="num">${a.freq_minutes}m</td>
+      <td>${a.enabled?(a.last_state?'<span style="color:#ffb020">● firing</span>'
+        :'<span style="color:#2ee6a8">● armed</span>'):'<span class="dim">○ off</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm ab-hist" data-id="${a.id}">history</button>
+        <button class="btn btn-sm ab-tog" data-id="${a.id}" data-on="${a.enabled?0:1}">
+          ${a.enabled?'disable':'enable'}</button>
+        <button class="btn btn-sm ab-del" data-id="${a.id}">✕</button></td></tr>`).join("")
+      :'<tr><td colspan="5" class="dim">No alerts yet — build one above.</td></tr>';
+    $$(".ab-del").forEach(b=>b.onclick=async()=>{
+      const fd=new FormData();fd.append("id",b.dataset.id);
+      await fetch("/api/alerts/delete",{method:"POST",body:fd});loadAlerts();});
+    $$(".ab-tog").forEach(b=>b.onclick=async()=>{
+      const fd=new FormData();fd.append("id",b.dataset.id);fd.append("on",b.dataset.on);
+      await fetch("/api/alerts/toggle",{method:"POST",body:fd});loadAlerts();});
+    $$(".ab-hist").forEach(b=>b.onclick=()=>showHistory(b.dataset.id));
+  }
+  async function showHistory(id){
+    const r=await (await fetch("/api/alerts/history?id="+id)).json();
+    const rows=r.history||[];
+    $("#ab-history").innerHTML=`<h3 style="font-size:12px;text-transform:uppercase;
+      color:#7e8fab">Sent history — alert #${id}</h3>`
+      +(rows.length?`<table class="af-table"><thead><tr><th></th><th>When</th>
+        <th class="num">Observed</th><th>Message</th><th>Comment</th></tr></thead><tbody>
+        ${rows.map(h=>`<tr>
+          <td title="${h.delivered?'delivered (Lark confirmed)':'delivery FAILED: '+(h.response||'')}">
+            ${h.delivered?'<span style="color:#2ee6a8;font-size:15px">✓</span>'
+                         :'<span style="color:#ff4d6d;font-size:15px">✗</span>'}</td>
+          <td class="dim">${new Date(h.fired_at*1000).toLocaleString()}</td>
+          <td class="num">${(+h.observed).toFixed(2)}</td>
+          <td class="dim" style="font-size:11px;max-width:340px">${(h.message||'').replace(/</g,'&lt;')}</td>
+          <td><input placeholder="add note…" value="${(h.comment||'').replace(/"/g,'&quot;')}"
+               data-hid="${h.id}" class="ab-note" style="width:150px"></td></tr>`).join("")}
+        </tbody></table>`
+        :'<p class="dim">No firings yet.</p>');
+    $$(".ab-note").forEach(i=>i.onchange=async()=>{
+      const fd=new FormData();fd.append("id",i.dataset.hid);fd.append("text",i.value);
+      await fetch("/api/alerts/comment",{method:"POST",body:fd});});
+  }
+  // expr box appears for antifraud.expr alerts
+  function maybeExpr(){
+    const on=$("#ab-source").value==="antifraud"&&$("#ab-field").value==="expr";
+    $("#ab-expr-row").style.display=on?"block":"none";
+  }
+  $("#ab-source").addEventListener("change",()=>setTimeout(maybeExpr,0));
+  $("#ab-field").addEventListener("change",maybeExpr);
+
+  async function loadAnalysis(){
+    const r=await (await fetch("/api/alerts/analysis")).json();
+    const rows=r.alerts||[];
+    $("#an-rows").innerHTML=rows.length?rows.map(a=>{
+      const spark=(a.series||[]).slice(-20).map(s=>
+        `<span title="${new Date(s.t*1000).toLocaleString()} · ${s.v}"
+          style="display:inline-block;width:7px;height:7px;border-radius:50%;
+          margin-right:2px;background:${s.ok?'#2ee6a8':'#ff4d6d'}"></span>`).join("");
+      return `<tr><td><b>${a.name}</b>${a.enabled?'':' <span class="dim">(off)</span>'}</td>
+        <td class="dim" style="font-size:11px">${a.rule}</td>
+        <td class="num">${a.fires}</td>
+        <td class="num">${a.delivered}${a.delivery_rate!=null?` (${Math.round(a.delivery_rate*100)}%)`:''}</td>
+        <td class="dim">${a.last_fired?new Date(a.last_fired*1000).toLocaleString():'—'}</td>
+        <td>${spark||'<span class="dim">—</span>'}</td></tr>`;}).join("")
+      :'<tr><td colspan="6" class="dim">No alerts yet.</td></tr>';
+  }
+
+  // ---- universe ----
+  function renderUniverse(r){
+    if(r.error){$("#un-rows").innerHTML=`<tr><td class="dim">${r.error}</td></tr>`;return;}
+    $("#un-count").textContent=(r.total||0)+" accounts";
+    const cols=r.columns||[];
+    $("#un-head").innerHTML="<tr>"+cols.map(c=>`<th>${c.replace(/^af_/,'').replace(/_/g,' ')}</th>`).join("")+"</tr>";
+    $("#un-rows").innerHTML=(r.rows||[]).map(row=>"<tr>"+cols.map(c=>{
+      let v=row[c];
+      if(c==="account_key")return `<td><a href="#" class="af-screen" data-acc="${v}">${v}</a></td>`;
+      if(c==="primary")return `<td><b style="color:#22d3ee">${v??'—'}</b></td>`;
+      if(typeof v==="number")v=v.toFixed(1);
+      return `<td class="${typeof row[c]==='number'?'num':'dim'}">${v??'—'}</td>`;
+    }).join("")+"</tr>").join("");
+    $$("#un-rows .af-screen").forEach(a=>a.onclick=e=>{e.preventDefault();screen(a.dataset.acc);});
+  }
+  function loadUniverse(){
+    zfxRun("universe", document.querySelector("#af-universe .table-scroll") || $("#un-rows").closest("table"),
+      async (signal)=>{
+        const p=new URLSearchParams({as_of:$("#un-asof").value,
+          start:$("#un-start").value,end:$("#un-end").value});
+        const r=await (await fetch("/api/antifraud/universe?"+p,{signal})).json();
+        if(r.error) throw new Error(r.error);
+        return r;
+      }, {label:"Building the unified universe…", render:renderUniverse,
+          restore:(prev)=>{ if(prev) renderUniverse(prev); }});
+  }
+  $("#un-load").onclick=loadUniverse;
+
+  // ---- markout grid ----
+  const HORIZONS=["markout_1m","markout_5m","markout_30m","markout_1h",
+                  "markout_4h","markout_1d","markout_3d"];
+  $("#mg-x").innerHTML=HORIZONS.map(h=>`<option ${h==='markout_5m'?'selected':''}>${h}</option>`).join("");
+  $("#mg-y").innerHTML=HORIZONS.map(h=>`<option ${h==='markout_1h'?'selected':''}>${h}</option>`).join("");
+  function renderMarkout(r){
+    if(r.error){$("#mg-meta").textContent=r.error;return;}
+    $("#mg-meta").textContent=`${(r.points||[]).length} shown of ${r.total_accounts} accounts · ${r.window.start} → ${r.window.end}`;
+    const pts=(r.points||[]).map(p=>({value:[p.x,p.y],account:p.account,
+      trades:p.trades,anomaly:p.anomaly??0,primary:p.primary}));
+    const chart=window.zfxChart(document.getElementById("mg-chart"),{
+      ...{grid:window.zfxTheme.grid},
+      xAxis:{name:r.hx,...window.zfxTheme.axis,scale:true},
+      yAxis:{name:r.hy,...window.zfxTheme.axis,scale:true},
+      tooltip:{...window.zfxTheme.tooltip,formatter:d=>
+        `${d.data.account}<br>${r.hx}: ${d.value[0].toExponential(2)}<br>`
+        +`${r.hy}: ${d.value[1].toExponential(2)}<br>trades ${d.data.trades}`
+        +`<br>anomaly ${d.data.anomaly?.toFixed?.(0)??'—'} · ${d.data.primary??''}`},
+      visualMap:{min:0,max:100,dimension:null,show:true,right:8,top:20,
+        text:["anomalous","normal"],inRange:{color:["#26527d","#22d3ee","#ffb020","#ff4d6d"]},
+        textStyle:{color:"#8b9ab4"}},
+      series:[{type:"scatter",data:pts.map(p=>({...p,
+        value:[...p.value],visualMapValue:p.anomaly})),
+        symbolSize:d=>Math.min(26,6+Math.log1p(d.trades??1)*2.4),
+        encode:{tooltip:[0,1]},
+        itemStyle:{opacity:.85}}]});
+    // colour by anomaly: map through visualMap on a 3rd dim
+    chart.setOption({series:[{data:pts.map(p=>({value:[p.value[0],p.value[1],p.anomaly],
+      account:p.account,trades:p.trades,anomaly:p.anomaly,primary:p.primary}))}],
+      visualMap:{dimension:2}});
+    chart.on("click",d=>{if(d.data&&d.data.account)screen(d.data.account);});
+  }
+  $("#mg-load").onclick=()=>{
+    zfxRun("markout", document.getElementById("mg-chart"), async (signal)=>{
+      const p=new URLSearchParams({hx:$("#mg-x").value,hy:$("#mg-y").value,
+        percentile:$("#mg-pct").value,start:$("#mg-start").value,end:$("#mg-end").value});
+      const r=await (await fetch("/api/antifraud/markout_grid?"+p,{signal})).json();
+      if(r.error) throw new Error(r.error);
+      return r;
+    }, {label:"Building markout grid…", render:renderMarkout,
+        onError:e=>{$("#mg-meta").textContent="load failed: "+e.message+" (kept last result)";}});
+  };
+
+  // ---- early warning ----
+  function renderForecast(r){
+    if(r.error){$("#fc-meta").textContent=r.error;return;}
+    $("#fc-meta").textContent=`trained in ${r.trained_minutes}m · horizon ${r.horizon_days}d`;
+    let html="";
+    for(const [profile,d] of Object.entries(r.profiles||{})){
+      html+=`<div class="card"><h3>${PROF[profile]||profile}
+        <span class="dim" style="float:right;font-size:10px">AUC ${d.holdout_auc??'—'} · ${d.conversions_trained_on} conversions</span></h3>
+        <p class="hint" style="margin:0 0 8px">drivers: ${(d.drivers||[]).join(", ")}</p>
+        <table class="af-table"><tbody>
+        ${(d.watchlist||[]).slice(0,12).map(w=>`<tr>
+          <td><a href="#" class="af-screen" data-acc="${w.account_key}">${w.account_key}</a></td>
+          <td class="num"><b>${(w.probability*100).toFixed(1)}%</b></td></tr>`).join("")
+          ||'<tr><td class="dim">no accounts above 5%</td></tr>'}
+        </tbody></table></div>`;
+    }
+    for(const [profile,reason] of Object.entries(r.skipped||{}))
+      html+=`<div class="card"><h3 class="dim">${PROF[profile]||profile}</h3>
+        <p class="hint">skipped: ${reason}</p></div>`;
+    $("#fc-results").innerHTML=html||'<div class="dim">nothing trainable</div>';
+    $$("#fc-results .af-screen").forEach(a=>a.onclick=e=>{e.preventDefault();screen(a.dataset.acc);});
+  }
+  $("#fc-run").onclick=()=>{
+    $("#fc-meta").textContent="training per-rule models…";
+    zfxRun("forecast", document.getElementById("fc-results"), async (signal)=>{
+      const r=await (await fetch("/api/antifraud/forecast?horizon="+$("#fc-h").value,{signal})).json();
+      if(r.error) throw new Error(r.error);
+      return r;
+    }, {label:"Training per-rule models — cancel any time…", render:renderForecast,
+        restore:(prev)=>{ if(prev) renderForecast(prev); else $("#fc-meta").textContent="cancelled"; },
+        onError:e=>{$("#fc-meta").textContent="failed: "+e.message+" (kept last result)";}});
+  };
+
+  // ---- ML anomaly ----
+  $("#ml-refresh").onclick=async()=>{
+    $("#ml-rows").innerHTML='<tr><td colspan="3" class="dim">Fitting IsolationForest…</td></tr>';
+    const r=await (await fetch("/api/antifraud/ml")).json();
+    if(r.error){$("#ml-rows").innerHTML=`<tr><td colspan="3" class="dim">${r.error}</td></tr>`;return;}
+    $("#ml-count").textContent=(r.total||0)+" accounts scored";
+    $("#ml-rows").innerHTML=(r.rows||[]).map(x=>`<tr>
+      <td class="num"><b>${x.ml_anomaly}</b></td>
+      <td><a href="#" class="af-screen" data-acc="${x.account_key}">${x.account_key}</a></td>
+      <td class="dim" style="font-size:12px">${x.ml_why||''}</td></tr>`).join("")
+      || '<tr><td colspan="3" class="dim">Insufficient data for ML scan.</td></tr>';
+    $$("#ml-rows .af-screen").forEach(a=>a.onclick=e=>{e.preventDefault();screen(a.dataset.acc);});
+  };
+
+  // ---- Lark ----
+  $("#lark-send").onclick=async()=>{
+    $("#lark-msg").textContent="sending…";
+    const r=await (await fetch("/api/antifraud/lark",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({webhook:$("#lark-url").value||null,min_priority:+$("#lark-prio").value})})).json();
+    $("#lark-msg").textContent=r.error?r.error:
+      (r.reason?`${r.reason} — ${r.would_send||0} would send`:`sent ${r.sent} of ${r.candidates} candidates`);
+  };
+
+  /* ============ LATENCY ARBITRAGE ============ */
+  /* Decision-first layout: tiles say how many clients need a decision, one
+     triage table lists them, and everything behind a score lives in the
+     client drawer. laDecisions / laNotes are shared with the Profiling and
+     dynamic rule tabs (operator reviews). */
+  let laDecisions={}, laNotes={};
+  const LA={result:null,rows:[],filter:"action",search:"",sort:{k:"verdict_rank",dir:-1},open:null,catalog:{}};
+  fetch("/api/antifraud/latency/tags?catalog_only=1").then(r=>r.json()).then(d=>{(d.catalog||[]).forEach(t=>LA.catalog[t.tag]=t);}).catch(()=>{});
+  const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const LA_BAND={critical:{c:"#ff4d6d",t:"Critical"},high:{c:"#fb923c",t:"High"},moderate:{c:"#ffb020",t:"Moderate"},
+    emerging:{c:"#7c8cff",t:"Emerging"},normal:{c:"#55637d",t:"Normal"}};
+  const LA_VERDICT={escalate:{c:"#ff4d6d",t:"Escalate",rank:3},restrict:{c:"#fb923c",t:"Restrict",rank:2},
+    monitor:{c:"#8b9ab4",t:"Monitor",rank:1}};
+  const LA_EVIDENCE={
+    L1:["Behind reference","Repeated fills while the broker price sat behind the independent reference market (L1)"],
+    L2:["Fast markout","Consistently favourable price move within 100 ms – 1 s of the fill (L2)"],
+    L3:["Fading edge","The early advantage fades by 60 s — the latency signature (L3)"],
+    L4:["Reference led","Entered after the reference moved but before the broker quote did (L4)"],
+    L5:["Short-hold scalps","Very short holds with repeated quick profits (L5)"],
+    L7:["Clustered","Latency events arrive in bursts (L7)"],
+    L8:["One symbol","Latency events concentrated in one symbol (L8)"],
+    L9:["Replicated","Several accounts profit on the same price at the same moment — check the feed first (L9)"],
+    L10:["Profit from events","Most of the profit comes from latency events (L10)"]};
+  const LA_GATE={confidence:"low confidence",not_replicated:"replicated across accounts — check the feed first",
+    market_data_condition:"inside a broker feed condition — check the feed first",
+    early_hit_rate:"early hit rate below the minimum",event_success_rate:"event success below the minimum",
+    profit_concentration:"profit from events below the minimum",realized_pnl:"realised P&L below the minimum"};
+  const LA_COMP=[["c_early_markout","Early markout vs normal flow",20],["c_early_hit_rate","Early hit rate vs normal flow",15],
+    ["c_price_age","Stale broker quotes (beyond 200 ms throttle)",20],["c_decay_consistency","Advantage fades by 60 s",15],
+    ["c_event_count","Repeated latency events",10],["c_profit_concentration","Profit from latency events",10],
+    ["c_reference","Confirmed by the reference market",10]];
+  const LA_H=["100ms","200ms","300ms","500ms","1s","5s","60s"];
+  const laPct=v=>v==null?"—":Math.round(v*100)+"%";
+  const laUsd=v=>v==null?"—":(v<0?"−$":"$")+Math.abs(Math.round(v)).toLocaleString();
+  const laNum=(v,d=2)=>v==null?"—":Number(v).toFixed(d);
+
+  function laCounts(rows){
+    return {action:rows.filter(x=>x.verdict==="escalate"||x.verdict==="restrict").length,
+      monitor:rows.filter(x=>x.verdict==="monitor").length,
+      open:rows.filter(x=>!laDecisions[x.account]).length,all:rows.length};
+  }
+
+  function laHealth(r){
+    const item=(ok,txt,title)=>`<span class="la2-h ${ok?"":"warn"}" title="${esc(title||"")}">${ok?"●":"▲"} ${esc(txt)}</span>`;
+    const when=String(r.generated_at||"").slice(0,16).replace("T"," ");
+    const ref=r.reference||{}, mt4=r.mt4_ms_times||{};
+    const parts=[
+      `<span class="la2-h" title="Scan window: the last 7 days of closed trades">Scanned ${esc(when)} UTC${r.from_disk||r.stale?" · cached":""}</span>`,
+      `<span class="la2-h">${(r.n_trades||0).toLocaleString()} trades · ${(r.n_flagged_trades||0).toLocaleString()} latency events</span>`,
+      item((r.tick_coverage||0)>=.8,`Tick coverage ${Math.round((r.tick_coverage||0)*100)}%`,"Share of trades with broker ticks through the 60 s horizon"),
+      item(r.ms_fill_share!=null&&r.ms_fill_share>=.5,`Millisecond fills ${r.ms_fill_share==null?"—":Math.round(r.ms_fill_share*100)+"%"}`,
+        mt4.mt4_trades?`MT4 trades matched to Kafka millisecond times: ${(mt4.mt4_ms_opens||0).toLocaleString()} of ${mt4.mt4_trades.toLocaleString()}`:"Sub-second horizons need millisecond fill times"),
+      ...(ref.feeds&&Object.keys(ref.feeds).length
+        // One item per independent reference venue (Vantage, IC Markets, ...).
+        ? Object.entries(ref.feeds).map(([k,f])=>{
+            const fe=(((ref.fetch||{}).feeds||{})[k]||{}).fetch||{};
+            const err=f.error||fe.error;
+            return item(!err&&f.coverage!=null&&f.coverage>=.8,
+              err?`${f.label||k} error`:`${f.label||k} ${Math.round((f.coverage||0)*100)}%`,
+              err||`Qualifying trades covered by the ${f.label||k} reference`+(k===Object.keys(ref.feeds)[0]&&ref.agreement
+                ?` · both venues cover ${(ref.agreement.covered_by_all||0).toLocaleString()} trades; dislocation on all ${ref.agreement.dislocation_on_all} vs any ${ref.agreement.dislocation_on_any}`:""));})
+        : [item(ref.coverage!=null&&ref.coverage>=.8,ref.coverage!=null?`Reference feed ${Math.round(ref.coverage*100)}%`:(ref.error?"Reference feed error":"Reference feed —"),
+            ref.error||"Qualifying trades covered by the independent reference")])];
+    const au=r.autoscan||{};
+    if(au.enabled) parts.push(`<span class="la2-h" title="The scan refreshes itself; press Rescan for an immediate one">⟳ auto-rescan every ${au.interval_minutes} min${au.running?" · running now":au.seconds_until_next!=null?` · next in ${Math.ceil(au.seconds_until_next/60)} min`:""}${au.last_duration_s?` · last took ${Math.round(au.last_duration_s)} s`:""}</span>`);
+    if(r.rules_changed) parts.push(item(false,"Rules changed — rescan","Rules were edited after this scan"));
+    if(r.tape_error) parts.push(item(false,"Tick store busy",r.tape_error));
+    if(r.complex_filter_error) parts.push(item(false,"Table filter error",r.complex_filter_error));
+    $("#la-health").innerHTML=parts.join("");
+    const live=r.mode==="live";
+    $("#la-mode").textContent=live?"Acting on verdicts":"Shadow mode · logging only";
+    $("#la-mode").className="la2-pill"+(live?" live":"");
+  }
+
+  function laTiles(r){
+    const rows=r.rows||[], c=laCounts(rows);
+    const nEsc=rows.filter(x=>x.verdict==="escalate").length;
+    const impact=rows.reduce((s,x)=>s+Math.max(0,x.econ_usd||0),0);
+    const prec=r.verification&&r.verification.precision!=null?r.verification.precision:null;
+    const feeds=(r.root_cause||[]).filter(x=>x.architecture_risk===true).length;
+    const repl=(r.spec&&r.spec.replicated_conditions)||0;
+    const tile=(label,value,sub,color,filter,title)=>
+      `<button class="la2-tile ${filter&&LA.filter===filter?"on":""}" ${filter?`data-f="${filter}"`:""} title="${esc(title)}">
+        <span class="la2-tile-l">${label}</span><b style="color:${color}">${value}</b><span class="la2-tile-s">${sub}</span></button>`;
+    $("#la-tiles").innerHTML=
+      tile("Needs action",c.action,`${nEsc} escalate · ${c.action-nEsc} restrict`,c.action?"#ff4d6d":"#2ee6a8","action",
+        "High or critical band with every gate passed — click to list")+
+      tile("Monitor",c.monitor,"lower bands or capped by a gate",c.monitor?"#e6edf7":"#8b9ab4","monitor",
+        "Watchlist: emerging or moderate band, or a higher band capped by a failed gate — click to list")+
+      tile("To review",c.open,"no operator decision yet",c.open?"#ffb020":"#2ee6a8","open",
+        "Shown clients without a confirm or dismiss decision — click to list")+
+      tile("Client P&L on events",laUsd(impact),prec!=null?`≈ ${laUsd(impact*prec)} after false positives`:"shown clients, scan window","#e6edf7",null,
+        "What the shown clients made on latency events"+(prec!=null?` · discounted by the realised model precision (${Math.round(prec*100)}%)`:""))+
+      tile("Feed conditions",feeds+repl,(feeds||repl)?`${feeds} feed · ${repl} replicated moments`:"none detected",(feeds||repl)?"#ffb020":"#2ee6a8","feed",
+        "Pricing conditions to fix before acting on clients (spec §5.5) — click to open");
+    $$("#la-tiles .la2-tile[data-f]").forEach(b=>b.onclick=()=>{
+      if(b.dataset.f==="feed"){const d=$("#la-feed-sec");d.open=true;d.scrollIntoView({behavior:"smooth",block:"start"});return;}
+      LA.filter=b.dataset.f;laTiles(LA.result);laDraw();
+    });
+  }
+
+  function laSortVal(x,k){
+    if(k==="verdict_rank") return (LA_VERDICT[x.verdict]?.rank||0)*1000+(x.risk||0);
+    if(k==="review") return laDecisions[x.account]?1:0;
+    if(k==="latency_events") return x.latency_events??x.flagged??0;
+    return x[k];
+  }
+  function laVisible(){
+    const q=LA.search.trim().toLowerCase();
+    let rows=LA.rows.filter(x=>
+      (LA.filter==="all"||(LA.filter==="action"&&(x.verdict==="escalate"||x.verdict==="restrict"))
+        ||(LA.filter==="monitor"&&x.verdict==="monitor")||(LA.filter==="open"&&!laDecisions[x.account]))
+      &&(!q||String(x.account).toLowerCase().includes(q)));
+    const {k,dir}=LA.sort;
+    return rows.sort((a,b)=>{
+      const av=laSortVal(a,k)??-Infinity, bv=laSortVal(b,k)??-Infinity;
+      const c=(typeof av==="number"&&typeof bv==="number")?av-bv:String(av).localeCompare(String(bv));
+      return c*dir||((b.risk||0)-(a.risk||0));
+    });
+  }
+  function laEvidence(x,max){
+    const codes=String(x.profiles||"").split(",").filter(Boolean);
+    const shown=codes.slice(0,max||codes.length).map(p=>{
+      const e=LA_EVIDENCE[p]||[p,p];
+      return `<span class="la2-ev ${p==="L9"?"warn":""}" title="${esc(e[1])}">${esc(e[0])}</span>`;}).join("");
+    return (shown||'<span class="dim">—</span>')+(max&&codes.length>max?`<span class="la2-more-n" title="${esc(codes.slice(max).map(p=>(LA_EVIDENCE[p]||[p])[0]).join(", "))}">+${codes.length-max}</span>`:"");
+  }
+  function laDraw(){
+    const rows=laVisible(), c=laCounts(LA.rows);
+    $("#la-filters").innerHTML=[["action","Needs action"],["monitor","Monitor"],["open","To review"],["all","All"]]
+      .map(([f,t])=>`<button class="la2-chip ${LA.filter===f?"on":""}" data-f="${f}">${t} <b>${c[f]}</b></button>`).join("");
+    $$("#la-filters .la2-chip").forEach(b=>b.onclick=()=>{LA.filter=b.dataset.f;laTiles(LA.result);laDraw();});
+    $$("#la-head th[data-k]").forEach(th=>{
+      const on=th.dataset.k===LA.sort.k;
+      th.classList.toggle("sorted",on);th.dataset.dir=on?(LA.sort.dir<0?"↓":"↑"):"";
+    });
+    const empty={action:"No client needs action right now.",monitor:"No clients on the watchlist.",
+      open:"Every shown client has been reviewed.",all:"No clients over the threshold in this range."}[LA.filter];
+    $("#la-rows").innerHTML=rows.length?rows.map(x=>{
+      const [server,login]=String(x.account).includes(":")?String(x.account).split(":"):["",x.account];
+      const band=LA_BAND[x.band]||LA_BAND.normal, v=LA_VERDICT[x.verdict]||{c:"#8b9ab4",t:x.verdict};
+      const dec=laDecisions[x.account];
+      const gates=String(x.gates_failed||"").split(",").filter(Boolean);
+      const events=x.latency_events??x.flagged;
+      return `<tr class="la2-row ${dec?"la-"+dec:""}" data-acc="${esc(x.account)}" tabindex="0">
+        <td><b class="la2-acc">${esc(login)}</b><span class="la2-sub">${esc(server)}</span></td>
+        <td class="num"><b class="la2-score">${Math.round(x.risk||0)}</b><span class="la2-band" style="--c:${band.c}">${band.t}</span></td>
+        <td class="num"><span class="la2-conf"><i style="width:${Math.round((x.confidence||0)*100)}%"></i></span> ${laPct(x.confidence)}</td>
+        <td class="la2-evcell">${laEvidence(x,3)}</td>
+        <td class="num">${events??"—"}<span class="la2-sub">${laUsd(x.econ_usd)}</span></td>
+        <td class="num">${x.flag_refcov?laPct(x.reference_confirmed_share):'<span class="dim" title="No reference tick covered this client\'s events">—</span>'}</td>
+        <td><span class="la2-verdict" style="--c:${v.c}">${esc(v.t)}</span>${gates.length?`<span class="la2-cap" title="${esc("Capped at Monitor: "+gates.map(g=>LA_GATE[g]||g).join("; "))}">capped</span>`:""}</td>
+        <td>${dec==="confirm"?'<span class="la2-rev ok">✓ Confirmed</span>':dec==="dismiss"?'<span class="la2-rev no">✗ Dismissed</span>':'<span class="la2-rev">Review ›</span>'}</td></tr>`;
+    }).join(""):`<tr><td colspan="8" class="la2-empty">${empty}</td></tr>`;
+    $$("#la-rows tr.la2-row").forEach(tr=>{
+      tr.onclick=()=>laOpen(tr.dataset.acc);
+      tr.onkeydown=e=>{if(e.key==="Enter")laOpen(tr.dataset.acc);};
+    });
+    const r=LA.result||{};
+    $("#la-foot").textContent=`Showing ${rows.length} of ${LA.rows.length} clients active ${r.range_start||""} → ${r.range_end||"now"}`
+      +(r.n_scan!=null?` · ${r.n_scan} over the threshold in the full 7-day scan`:"")
+      +(r.complex_filter?` · table filter: ${r.complex_filter}`:"")+" · click a row for the evidence";
+  }
+  $$("#la-head th[data-k]").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k;
+    LA.sort=LA.sort.k===k?{k,dir:-LA.sort.dir}:{k,dir:k==="account"?1:-1};
+    laDraw();
+  });
+  $("#la-search").oninput=e=>{LA.search=e.target.value;laDraw();};
+
+  /* Markout curve: the client's mean markout against the broker tape and
+     against the independent reference's executable price, per horizon. */
+  function laChart(x){
+    const series=[
+      {name:"Broker tape",color:"#22d3ee",dash:"",vals:LA_H.map(h=>x["mo_"+h+"_bps"])},
+      {name:"Reference (executable)",color:"#a78bfa",dash:"6 4",vals:LA_H.map(h=>x["ref_mo_exec_"+h+"_bps"])}]
+      .filter(s=>s.vals.some(v=>v!=null));
+    if(!series.length) return '<p class="dim">No tick coverage for this client.</p>';
+    const W=560,Hh=210,L=44,R=132,T=14,B=30;
+    const all=series.flatMap(s=>s.vals).filter(v=>v!=null).concat([0]);
+    let lo=Math.min(...all),hi=Math.max(...all);const pad=Math.max((hi-lo)*.12,.2);lo-=pad;hi+=pad;
+    // Horizons evenly spaced: they are the spec's seven fixed checkpoints,
+    // and a time-proportional axis crushes 100-500 ms into one label.
+    const px=i=>L+i/6*(W-L-R), py=v=>T+(hi-v)/(hi-lo)*(Hh-T-B);
+    const ticks=[lo+(hi-lo)*.1,hi-(hi-lo)*.1].filter(t=>Math.abs(py(t)-py(0))>14);
+    let g=ticks.map(t=>`<line x1="${L}" x2="${W-R}" y1="${py(t)}" y2="${py(t)}" stroke="#1b2438"/><text x="${L-6}" y="${py(t)+4}" text-anchor="end" class="la2-ax">${t.toFixed(1)}</text>`).join("");
+    g+=`<line x1="${L}" x2="${W-R}" y1="${py(0)}" y2="${py(0)}" stroke="#55637d" stroke-dasharray="2 3"/><text x="${L-6}" y="${py(0)+4}" text-anchor="end" class="la2-ax">0</text>`;
+    g+=LA_H.map((h,i)=>`<text x="${px(i)}" y="${Hh-10}" text-anchor="middle" class="la2-ax">${h}</text>`).join("");
+    series.forEach(s=>{
+      const pts=s.vals.map((v,i)=>v==null?null:[px(i),py(v)]);
+      const d=pts.reduce((acc,p,i)=>p?acc+(acc&&pts[i-1]?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1):acc,"");
+      g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-dasharray="${s.dash}"/>`;
+      g+=pts.map(p=>p?`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${s.color}" stroke="#0a0e18" stroke-width="2"/>`:"").join("");
+      const last=[...pts].reverse().find(Boolean);
+      if(last) g+=`<text x="${last[0]+10}" y="${last[1]+4}" class="la2-lab">${esc(s.name)}</text>`;
+    });
+    const legend=series.map(s=>`<span class="la2-leg"><svg width="22" height="8"><line x1="0" x2="22" y1="4" y2="4" stroke="${s.color}" stroke-width="2" stroke-dasharray="${s.dash}"/></svg>${esc(s.name)}</span>`).join("");
+    return `<div class="la2-legend">${legend}<span class="la2-leg dim">bps · 0 = entry price · above zero favours the client</span></div>
+      <div class="la2-chart" data-series='${esc(JSON.stringify(series.map(s=>({n:s.name,c:s.color,v:s.vals}))))}'>
+        <svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Markout curve by horizon">${g}
+          <line class="la2-cross" x1="0" x2="0" y1="${T}" y2="${Hh-B}" stroke="#8b9ab4" visibility="hidden"/>
+          <rect x="${L}" y="${T}" width="${W-L-R}" height="${Hh-T-B}" fill="transparent" class="la2-hit"/></svg>
+        <div class="la2-tip" hidden></div></div>`;
+  }
+  function laChartHover(root){
+    const box=root.querySelector(".la2-chart"); if(!box) return;
+    const svg=box.querySelector("svg"), cross=svg.querySelector(".la2-cross"), tip=box.querySelector(".la2-tip");
+    const series=JSON.parse(box.dataset.series), W=560, L=44, R=132;
+    const px=i=>L+i/6*(W-L-R);
+    svg.querySelector(".la2-hit").onpointermove=e=>{
+      const rect=svg.getBoundingClientRect(), vx=(e.clientX-rect.left)/rect.width*W;
+      let best=0;LA_H.forEach((_,i)=>{if(Math.abs(px(i)-vx)<Math.abs(px(best)-vx))best=i;});
+      cross.setAttribute("x1",px(best));cross.setAttribute("x2",px(best));cross.setAttribute("visibility","visible");
+      tip.replaceChildren();
+      const head=document.createElement("div");head.className="la2-tip-h";head.textContent=LA_H[best]+" after the fill";tip.appendChild(head);
+      series.forEach(s=>{
+        const row=document.createElement("div");row.className="la2-tip-r";
+        const key=document.createElement("i");key.style.background=s.c;
+        const val=document.createElement("b");val.textContent=s.v[best]==null?"—":Number(s.v[best]).toFixed(2)+" bps";
+        const nm=document.createElement("span");nm.textContent=s.n;
+        row.append(key,val,nm);tip.appendChild(row);
+      });
+      tip.hidden=false;
+      const left=(px(best)/W)*rect.width;
+      tip.style.left=Math.min(left+12,rect.width-190)+"px";
+    };
+    svg.querySelector(".la2-hit").onpointerleave=()=>{cross.setAttribute("visibility","hidden");tip.hidden=true;};
+  }
+
+  function laOpen(account){
+    const x=LA.rows.find(r=>r.account===account); if(!x) return;
+    LA.open=account;
+    const band=LA_BAND[x.band]||LA_BAND.normal, v=LA_VERDICT[x.verdict]||{c:"#8b9ab4",t:x.verdict};
+    const gates=String(x.gates_failed||"").split(",").filter(Boolean);
+    const dec=laDecisions[account];
+    const comps=LA_COMP.map(([k,label,w])=>{
+      const c=x[k]==null?0:x[k], pts=c*w;
+      return `<div class="la2-comp"><span>${label}</span><span class="la2-comp-bar"><i style="width:${Math.round(c*100)}%"></i></span><b>${pts.toFixed(1)}<small> / ${w}</small></b></div>`;
+    }).join("");
+    const fact=(label,value,title)=>`<div class="la2-fact" title="${esc(title||"")}"><span>${label}</span><b>${value}</b></div>`;
+    const facts=[
+      fact("Latency events",`${x.latency_events??x.flagged??"—"} <small>of ${x.qualifying??"—"} fast paid trades</small>`),
+      fact("Client P&L on events",laUsd(x.econ_usd)),
+      fact("Early hit rate",`${laPct(x.early_hit_rate)} <small>normal flow ${laPct(x.bench_hit)}</small>`,"Share of trades positive in the early window"),
+      fact("Early markout vs normal",`${laNum(x.bench_diff_bps)} bps`,"Average early markout above the population's"),
+      fact("Advantage fades by 60 s",laPct(x.c_decay_consistency),"Share of early hits whose advantage faded"),
+      fact("Profit from events",laPct(x.profit_concentration)),
+      fact("Fills behind reference",`${laPct(x.dislocation_share)} <small>${x.disloc_hits??0} with early gain</small>`),
+      fact("Reference led broker",`${laPct(x.leadlag_share)} <small>${x.leadlag_hits??0} with early gain</small>`),
+      fact("Reference confirms",x.flag_refcov?laPct(x.reference_confirmed_share):"—","Latency events confirmed as latency by the reference"),
+      fact("Median hold",x.med_hold_s!=null?x.med_hold_s+" s":"—"),
+      fact("ML score (now / 5-day)",`${laPct(x.ml)} / ${x.ew==null?"—":laPct(x.ew)}`),
+      fact("Curve shape",esc(String(x.curve_profile||"—").replace("_"," ")))].join("");
+    const conf=[["Sample × significance",x.conf_sample],["Data quality",x.conf_quality],["Repeats across days",x.conf_persistence],["Reference validation",x.conf_corroboration]]
+      .map(([t,c])=>`<span class="la2-cp">${t} <b>${laPct(c)}</b></span>`).join("");
+    $("#la-drawer-body").innerHTML=`
+      <div class="la2-dh">
+        <div><div class="la2-sub">${esc(String(account).split(":")[0])}</div>
+          <h2><a href="/trading/account?account=${encodeURIComponent(account)}" title="Open the full account page">${esc(String(account).split(":").pop())} ↗</a></h2></div>
+        <div class="la2-dscore"><b>${Math.round(x.risk||0)}</b><span class="la2-band" style="--c:${band.c}">${band.t}</span></div>
+      </div>
+      <div class="la2-dverdict">
+        <span class="la2-verdict" style="--c:${v.c}">${esc(v.t)}</span>
+        <span>${esc(x.action_max||x.action||"watchlist")}</span>
+        <span class="dim">confidence ${laPct(x.confidence)} · last trade ${esc(String(x.last_ts||"").slice(0,16))}</span>
+      </div>
+      ${gates.length?`<div class="la2-alert">Capped at Monitor — ${esc(gates.map(g=>LA_GATE[g]||g).join("; "))}.</div>`:""}
+      <h4>Evidence</h4><div class="la2-evlist">${laEvidence(x)}</div>
+      <h4>Why this score <span class="dim">points out of 100</span></h4>${comps}
+      <h4>Markout curve</h4>${laChart(x)}
+      <h4>Key facts</h4><div class="la2-facts">${facts}</div>
+      <h4>Confidence ${laPct(x.confidence)}</h4><div class="la2-cps">${conf}</div>
+      <h4>Automation tags <span class="dim">stable codes for the automation rules</span></h4>
+      <div class="la2-tags">${(x.tags||[]).map(t=>`<code class="la2-tag" title="${esc((LA.catalog[t]||{}).meaning||"")}">${esc(t)}</code>`).join("")||'<span class="dim">—</span>'}</div>
+      <h4>Actions</h4>
+      <div class="la2-actions">
+        <div><span class="la2-sub">Gentlest action to breakeven</span>${esc(x.action_min||"—")}</div>
+        <div><span class="la2-sub">Most profitable implementable action</span>${esc(x.action_max||"—")}
+          <a href="#" id="la-test-action">test ↗</a></div>
+      </div>
+      <h4>Review</h4>
+      <textarea id="la-note" rows="2" placeholder="Why — required to confirm or dismiss">${esc(laNotes[account]||"")}</textarea>
+      <div class="la2-review">
+        <button class="btn ${dec==="confirm"?"la-on-c":""}" data-d="confirm">✓ Confirm latency arbitrage</button>
+        <button class="btn ${dec==="dismiss"?"la-on-d":""}" data-d="dismiss">✗ Dismiss (false positive)</button>
+        ${dec?'<button class="btn btn-sm" data-d="clear">Clear decision</button>':""}
+        <span id="la-review-msg" class="dim"></span>
+      </div>
+      <p class="dim la2-note">Pre-spec fused score ${x.legacy_risk??"—"} · stale broker quotes ${laPct(x.stale_share)} · millisecond fills ${laPct(x.ms_share)}</p>`;
+    laChartHover($("#la-drawer-body"));
+    $("#la-test-action").onclick=e=>{e.preventDefault();laClose();afActionFor(account);};
+    $$("#la-drawer-body .la2-review button").forEach(b=>b.onclick=async()=>{
+      const d=b.dataset.d, note=$("#la-note").value.trim();
+      if(d!=="clear"&&!note){$("#la-review-msg").textContent="Add a comment first — a review must say why.";$("#la-note").focus();return;}
+      $("#la-review-msg").textContent="saving…";
+      const r=await (await fetch("/api/antifraud/latency/decide",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({account,decision:d,note})})).json();
+      if(r.error){$("#la-review-msg").textContent=r.error;return;}
+      if(d==="clear"){delete laDecisions[account];delete laNotes[account];}else{laDecisions[account]=d;laNotes[account]=note;}
+      laTiles(LA.result);laDraw();loadAudit();laOpen(account);
+      $("#la-review-msg").textContent="saved";
+    });
+    $("#la-drawer").classList.add("on");
+  }
+  function laClose(){$("#la-drawer").classList.remove("on");LA.open=null;}
+  $("#la-drawer-close").onclick=laClose;
+  $("#la-drawer").onclick=e=>{if(e.target.id==="la-drawer")laClose();};
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&LA.open)laClose();});
+
+  function laNearMisses(r){
+    const nm=r.near_misses||[];
+    $("#la-near-sum").textContent=nm.length?`${nm.length} accounts just outside the table`:"none";
+    $("#la-near").innerHTML=nm.length?`<div class="la2-tablewrap"><table class="af-table">
+      <thead><tr><th>Client</th><th class="num">Risk</th><th class="num">Points short</th><th class="num">Confidence</th>
+        <th class="num">Events · P&amp;L</th><th>Evidence</th><th>Held back by</th><th>Weakest components</th></tr></thead><tbody>`+
+      nm.map(x=>{const [server,login]=String(x.account).split(":");const band=LA_BAND[x.band]||LA_BAND.normal;
+        return `<tr><td><a href="/trading/account?account=${encodeURIComponent(x.account)}"><b class="la2-acc">${esc(login)}</b></a><span class="la2-sub">${esc(server)}</span></td>
+          <td class="num"><b class="la2-score">${Math.round(x.risk||0)}</b><span class="la2-band" style="--c:${band.c}">${band.t}</span></td>
+          <td class="num">${x.points_short>0?laNum(x.points_short,1):"—"}</td><td class="num">${laPct(x.confidence)}</td>
+          <td class="num">${x.latency_events}<span class="la2-sub">${laUsd(x.econ_usd)}</span></td>
+          <td class="la2-evcell">${laEvidence(x,3)}</td>
+          <td style="font-size:11.5px;color:#ffb020">${(x.held_back_by||[]).map(esc).join("<br>")}</td>
+          <td class="dim" style="font-size:11.5px">${(x.weakest||[]).map(esc).join(" · ")}</td></tr>`;}).join("")+
+      "</tbody></table></div>":'<p class="dim">No account has latency events in this scan.</p>';
+    if(!(r.rows||[]).length&&nm.length) $("#la-near-sec").open=true;
+  }
+  function laRootCause(r){
+    const rc=(r.root_cause||[]).filter(x=>(x.stale_tob_events||0)>0);
+    const flagged=rc.filter(x=>x.architecture_risk===true).length;
+    const top=(r.spec&&r.spec.top_replicated)||[];
+    $("#la-feed-sum").textContent=`${flagged} feed condition${flagged===1?"":"s"} flagged · ${(r.spec&&r.spec.replicated_conditions)||0} replicated moments`;
+    $("#la-rootcause").innerHTML=rc.length?`<h4>Stale broker prices by feed</h4><div class="la2-tablewrap"><table class="af-table">
+      <thead><tr><th>Feed · symbol</th><th class="num" title="Fills while the broker price sat behind the reference">Stale-price fills</th>
+        <th class="num" title="Share of those fills followed by an early client gain">Led to client gain</th><th class="num">Clients</th>
+        <th class="num">Client P&amp;L</th><th class="num" title="Median |broker − reference| at the fill">Median gap</th><th>Status</th></tr></thead><tbody>`+
+      rc.slice(0,10).map(x=>`<tr><td>${esc(x.feed)} · <b>${esc(x.canonical)}</b></td>
+        <td class="num">${x.stale_tob_events} <span class="la2-sub">${x.stale_tob_rate==null?"—":(x.stale_tob_rate*100).toFixed(1)+"%"} of ${(x.executions||0).toLocaleString()}</span></td>
+        <td class="num">${laPct(x.stale_tob_success_rate)}</td><td class="num">${x.clients}</td>
+        <td class="num">${laUsd(x.stale_tob_impact_usd)}</td><td class="num">${laNum(x.divergence_bps_p50)} bps</td>
+        <td>${x.architecture_risk===true?'<span class="la2-verdict" style="--c:#ffb020">Fix feed first</span>':'<span class="dim">Normal</span>'}</td></tr>`).join("")+
+      "</tbody></table></div>":'<p class="dim">No fills behind the reference price in this scan.</p>';
+    $("#la-replicated").innerHTML=top.length?`<h4>Replicated moments <span class="dim">several accounts profiting on the same price within 2 s</span></h4>
+      <div class="la2-tablewrap"><table class="af-table"><thead><tr><th>Time (UTC)</th><th>Symbol</th><th>Side</th><th class="num">Accounts</th><th class="num">Events</th><th class="num">P&amp;L</th></tr></thead><tbody>`+
+      top.slice(0,8).map(t=>{const [sym,dir,ts]=String(t.condition).split("|");
+        return `<tr><td>${esc(ts)}</td><td><b>${esc(sym)}</b></td><td>${dir==="1"?"Buy":"Sell"}</td><td class="num">${t.accounts}</td><td class="num">${t.events}</td><td class="num">${laUsd(t.pnl)}</td></tr>`;}).join("")+
+      "</tbody></table></div>":"";
+  }
+
+  const KPI_LABELS={detection_rate:"Detection rate",improvement_vs_baseline:"Improvement vs baseline",
+    alert_accuracy:"Alert accuracy",automation_success:"Automation success",manual_reduction:"Manual reduction"};
+  function kpiCards(k,rm,vf,rs){
+    const t=k.targets||{};
+    let cards=Object.keys(KPI_LABELS).map(key=>{
+      const v=k[key], tgt=t[key], ok=v!=null&&tgt!=null&&v>=tgt;
+      return `<div class="pcard"><b style="color:${v==null?"#55637d":(ok?"#34d399":"#ffb020")}">${v==null?"—":v+"%"}</b><br>${KPI_LABELS[key]}<br><span class="dim">${tgt!=null?("target ≥"+tgt+"%"):""}</span></div>`;
+    }).join("");
+    if(k.model_auc!=null) cards+=`<div class="pcard"><b>${k.model_precision}% / ${k.model_recall}%</b><br>Tape detector — precision / recall<br><span class="dim">AUC ${k.model_auc} · ${k.model_positives} labels, 5-fold CV</span></div>`;
+    cards+=vf&&vf.status==="verified"
+      ?`<div class="pcard"><b>${(vf.precision*100).toFixed(0)}% / ${(vf.recall*100).toFixed(0)}%</b><br>Realised walk-forward — all ${vf.active_accounts||""} active accounts<br><span class="dim">${esc(vf.explain||"")}</span></div>`
+      :`<div class="pcard"><b style="color:#55637d">—</b><br>Realised walk-forward<br><span class="dim">${esc((vf&&vf.explain)||"accumulating snapshots")}</span></div>`;
+    const ew=(rm||{}).ew, nw=(rm||{}).now;
+    if(nw&&!nw.error) cards+=`<div class="pcard"><b>${(nw.precision*100).toFixed(0)}% / ${(nw.recall*100).toFixed(0)}%</b><br>Classification (now)<br><span class="dim">AUC ${nw.auc} · lift ${nw.precision_lift||"—"}×</span></div>`;
+    if(ew&&!ew.error) cards+=`<div class="pcard"><b>${(ew.precision*100).toFixed(0)}% / ${(ew.recall*100).toFixed(0)}%</b><br>Early warning (5 days)<br><span class="dim">AUC ${ew.auc} · lift ${ew.precision_lift||"—"}×</span></div>`;
+    if(rs&&rs.rule_hits!=null) cards+=`<div class="pcard"><b>${rs.rule_hits.toLocaleString()}</b><br>Rule hits (90-day table)<br><span class="dim">${(rs.n_accounts||0).toLocaleString()} accounts observed</span></div>`;
+    return cards;
+  }
+
+  async function loadLaTrend(){
+    try{
+      const rows=(await (await fetch("/api/antifraud/latency/trend?days=30")).json()).rows||[];
+      if(!rows.length){$("#la-trend").textContent="No history yet — one row accumulates per scanned day.";return;}
+      const mx=Math.max(...rows.map(x=>(x.escalate||0)+(x.restrict_n||0)+(x.monitor||0)),1);
+      $("#la-trend").innerHTML=`<div class="la2-tablewrap"><table class="af-table"><thead><tr><th>Day</th><th class="num">Needs action</th><th class="num">Monitor</th><th class="num">Client P&amp;L on events</th><th style="width:34%">Clients flagged</th></tr></thead><tbody>`+
+        [...rows].reverse().map(x=>{const act=(x.escalate||0)+(x.restrict_n||0), mon=x.monitor||0;
+          return `<tr><td>${esc(x.day)}</td><td class="num">${act}</td><td class="num">${mon}</td><td class="num">${laUsd(x.econ_usd)}</td>
+            <td><span class="la2-stack" title="${act} needs action · ${mon} monitor"><i style="width:${100*act/mx}%;background:#ff4d6d"></i><i style="width:${100*mon/mx}%;background:#55637d"></i></span></td></tr>`;}).join("")+
+        "</tbody></table></div>";
+    }catch(e){$("#la-trend").textContent="Trend unavailable.";}
+  }
+  async function loadAudit(){
+    const r=await (await fetch("/api/antifraud/latency/audit?limit=60")).json();
+    $("#la-audit").innerHTML=(r.rows||[]).map(a=>`<tr><td class="dim">${new Date(a.ts*1000).toLocaleString()}</td><td>${esc(a.account)}</td>
+      <td>${esc(a.verdict)}</td><td class="num">${a.risk||""}</td><td class="dim">${esc(a.action||"")}</td><td>${esc(a.mode)}</td>
+      <td>${esc(a.operator)}</td><td>${esc(a.status)}${a.note?` <span class="dim" title="${esc(a.note)}">💬</span>`:""}</td></tr>`).join("");
+  }
+  async function loadLatRules(){
+    const r=await (await fetch("/api/antifraud/latency/rules")).json();
+    $("#lr-shadow").checked=!!r.shadow_mode;
+    $("#lr-complex").value=r.complex_filter||"";
+  }
+
+  async function loadLatency(refresh){
+    $("#af-latency").classList.add("la2-loading");
+    const p=new URLSearchParams({refresh:refresh?1:0,as_of:$("#la-asof").value||"",start:$("#la-start").value||""});
+    let r;
+    try{ r=await (await fetch("/api/antifraud/latency?"+p)).json(); }
+    catch(e){ $("#la-health").innerHTML=`<span class="la2-h warn">▲ Could not reach the server</span>`; $("#af-latency").classList.remove("la2-loading"); return; }
+    if(r.building){
+      $("#la-health").innerHTML=`<span class="la2-h">⟳ ${esc(r.note||"Scan building in the background")} — refreshes automatically</span>`;
+      clearTimeout(window._laPoll);window._laPoll=setTimeout(()=>loadLatency(0),15000);
+      return;
+    }
+    $("#af-latency").classList.remove("la2-loading");
+    if(r.error){$("#la-health").innerHTML=`<span class="la2-h warn">▲ ${esc(r.error)}</span>`;return;}
+    try{
+      const a=await (await fetch("/api/antifraud/latency/audit?limit=500")).json();
+      laDecisions={};laNotes={};
+      (a.rows||[]).slice().reverse().forEach(x=>{
+        if(x.status==="confirm"||x.status==="dismiss"){laDecisions[x.account]=x.status;if(x.note)laNotes[x.account]=x.note;}
+        else if(x.status==="clear"){delete laDecisions[x.account];delete laNotes[x.account];}
+      });
+    }catch(e){}
+    LA.result=r;LA.rows=r.rows||[];
+    if(LA.filter==="action"&&!laCounts(LA.rows).action) LA.filter=LA.rows.length?"all":"action";
+    laHealth(r);laTiles(r);laDraw();laNearMisses(r);laRootCause(r);
+    $("#la-kpis").innerHTML=kpiCards(r.kpis||{},r.rule_meta||{},r.verification,r.rule_stats);
+    loadLaTrend();loadAudit();loadLatRules();
+    if(LA.open) laOpen(LA.open);
+  }
+  $("#la-asof").onchange=()=>loadLatency(0);
+  $("#la-start").onchange=()=>loadLatency(0);
+  $("#la-rescan").onclick=()=>loadLatency(true);
+  $("#la-train").onclick=async()=>{
+    const r=await (await fetch("/api/antifraud/latency/train",{method:"POST"})).json();
+    $("#la-health").insertAdjacentHTML("afterbegin",`<span class="la2-h">${esc(r.error?("Retrain: "+r.error):(r.note||"Retraining in the background — rescan in a few minutes"))}</span>`);
+    $("#la-train").closest("details").open=false;
+  };
+  // Display rules apply instantly to the current scan (no rescan).
+  async function laApplyRules(){
+    $("#lr-msg").textContent="applying…";$("#lr-msg").className="la2-fmsg";
+    await fetch("/api/antifraud/latency/rules",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({shadow_mode:$("#lr-shadow").checked,complex_filter:$("#lr-complex").value.trim()})});
+    await loadLatency(0);
+    const r=LA.result||{};
+    if(r.complex_filter_error){$("#lr-msg").textContent="Filter not applied — "+r.complex_filter_error;$("#lr-msg").className="la2-fmsg warn";}
+    else if(r.complex_filter){$("#lr-msg").textContent=`Applied: showing ${LA.rows.length} of ${r.n_after_range??LA.rows.length} clients`;$("#lr-msg").className="la2-fmsg ok";}
+    else{$("#lr-msg").textContent="Filter cleared — showing every client";$("#lr-msg").className="la2-fmsg ok";}
+  }
+  $("#lr-save").onclick=laApplyRules;
+  $("#lr-complex").onkeydown=e=>{if(e.key==="Enter")laApplyRules();};
+  $("#lr-shadow").onchange=laApplyRules;
+
+  /* ============ TOXIC FLOW — P1 ENGINE B (spec s5) ============
+     Engine A asks "did the advantage fade?"; Engine B asks "did it stick?".
+     The scan is produced by the shared markout pass, so this tab never starts
+     a tape read of its own — Rescan asks Engine A to rebuild both. */
+  const TF={result:null,rows:[],filter:"action",search:"",sort:{k:"score",dir:-1},open:null,catalog:{}};
+  fetch("/api/antifraud/toxic/tags?catalog_only=1").then(r=>r.json())
+    .then(d=>{(d.catalog||[]).forEach(t=>TF.catalog[t.tag]=t.meaning);}).catch(()=>{});
+  const TF_STATE={passive_monitoring:"Passive",monitor_evidence:"Collect evidence",
+    enhanced_monitoring:"Enhanced monitoring",manual_investigation:"Manual investigation",
+    high_priority_review:"High-priority review",urgent_evidence_review:"Urgent evidence review",
+    critical_review:"Critical review"};
+  /* s5.3.1 — short labels; the full sentence is the tooltip, from the catalogue. */
+  const TF_PROF={T1:"Sharp/fast",T2:"Persistent",T3:"High rate",T4:"Material $",T5:"Profit-conc.",
+    T6:"Event",T7:"Symbol",T8:"Exec-condition",T9:"Directional",T10:"Clustered",
+    T11:"Cross-account",T12:"LP-confirmed"};
+  const TF_COMP={seven_horizon_markout:["Seven-horizon adverse markout",25],
+    toxic_trade_rate:["Toxic trade rate",15],economic_impact:["Economic impact / USD",15],
+    repetition_persistence:["Repetition / persistence",15],profit_concentration:["Profit concentration",10],
+    reference_corroboration:["Reference-market corroboration",10],lp_execution_evidence:["LP / execution evidence",10]};
+  const TF_GATE={sample:"Too few toxic trades",confidence:"Confidence below minimum",
+    market_data_condition:"Replicated across accounts — market-data condition first",
+    latency_driven:"Engine A owns this flow",conflicting_curve:"Curve conflicts across horizons",
+    total_pnl:"Account P&L below minimum"};
+  const TF_H=["100ms","200ms","300ms","500ms","1s","5s","60s"];
+  const tfNum=(v,d=2)=>v==null||!isFinite(v)?"—":Number(v).toFixed(d);
+  const tfPct=(v,d=1)=>v==null||!isFinite(v)?"—":(Number(v)*100).toFixed(d)+"%";
+  const tfUsd=v=>v==null||!isFinite(v)?"—":(Math.abs(v)>=1000?"$"+(v/1000).toFixed(1)+"k":"$"+Number(v).toFixed(0));
+
+  function tfCounts(rows){
+    const act=r=>["critical_review","urgent_evidence_review","high_priority_review"].includes(r.state);
+    return {action:rows.filter(act).length,
+            investigate:rows.filter(r=>r.state==="manual_investigation").length,
+            monitor:rows.filter(r=>["enhanced_monitoring","monitor_evidence"].includes(r.state)).length,
+            all:rows.length};
+  }
+  function tfHealth(r){
+    const bits=[];
+    const when=r.generated_at?String(r.generated_at).slice(0,19).replace("T"," "):"never";
+    bits.push(`<span class="la2-h">scan ${esc(when)} UTC</span>`);
+    bits.push(`<span class="la2-h">${(r.accounts_scored||0).toLocaleString()} accounts · ${(r.n_trades||0).toLocaleString()} tick-covered trades</span>`);
+    bits.push(`<span class="la2-h">${(r.n_toxic_trades||0).toLocaleString()} materially adverse · ${tfUsd(r.adverse_usd_total)} adverse selection</span>`);
+    const au=r.autoscan||{};
+    if(au.enabled) bits.push(`<span class="la2-h" title="Engine B refreshes with the shared markout pass">⟳ rebuilds every ${au.interval_minutes} min${au.running?" · running now":""}</span>`);
+    if(r.rules_changed) bits.push(`<span class="la2-h warn" title="${esc(r.note||"")}">▲ rules changed — rescan to apply</span>`);
+    if(r.note&&!r.rules_changed) bits.push(`<span class="la2-h">${esc(r.note)}</span>`);
+    const spec=r.spec||{},un=spec.unavailable_components||{};
+    const miss=Object.entries(un);
+    if(miss.length) bits.push(`<span class="la2-h" title="${spec.renormalised
+      ?"No data source, so the weight is redistributed across the remaining components and the score keeps its full range"
+      :"No data source, so no account can earn these points"}">${spec.renormalised?"":"▲ "}${miss.map(([k,w])=>`${(TF_COMP[k]||[k])[0]} (${w}%)`).join(", ")} ${spec.renormalised?"removed from the model":"unavailable"}</span>`);
+    $("#tf-health").innerHTML=bits.join("");
+  }
+  function tfTiles(r){
+    const c=tfCounts(TF.rows);
+    const tile=(f,label,value,hint)=>`<button class="la2-tile${TF.filter===f?" on":""}" data-f="${f}">
+      <b>${value}</b><span>${label}</span><small>${hint}</small></button>`;
+    $("#tf-tiles").innerHTML=[
+      tile("action","Risk review",c.action,"s10: review, controls only with governance"),
+      tile("investigate","Investigate",c.investigate,"strong score, confidence under 70%"),
+      tile("monitor","Monitoring",c.monitor,"evidence building"),
+      tile("all","All scored",r.accounts_scored||0,"every tick-covered account"),
+    ].join("");
+    $$("#tf-tiles .la2-tile").forEach(b=>b.onclick=()=>{TF.filter=b.dataset.f;tfTiles(TF.result||{});tfDraw();});
+  }
+  function tfVisible(){
+    const c={action:r=>["critical_review","urgent_evidence_review","high_priority_review"].includes(r.state),
+             investigate:r=>r.state==="manual_investigation",
+             monitor:r=>["enhanced_monitoring","monitor_evidence"].includes(r.state),
+             all:()=>true}[TF.filter]||(()=>true);
+    let rows=TF.rows.filter(c);
+    if(TF.search) rows=rows.filter(r=>r.account.toLowerCase().includes(TF.search.toLowerCase()));
+    const k=TF.sort.k,d=TF.sort.dir;
+    return rows.sort((a,b)=>{const x=a[k],y=b[k];
+      if(typeof x==="string"||typeof y==="string") return d*String(x??"").localeCompare(String(y??""));
+      return d*((x??-1e18)-(y??-1e18));});
+  }
+  /* The seven-horizon curve as a sparkline: horizons evenly spaced, because
+     they are decades apart in time and a linear time axis would bunch six of
+     the seven points against the left edge. */
+  function tfSpark(curve,w=88,h=22){
+    const vals=TF_H.map(k=>curve&&curve[k]!=null?curve[k]:null);
+    const ok=vals.filter(v=>v!=null);
+    if(!ok.length) return `<span class="la2-hint">no curve</span>`;
+    const lo=Math.min(0,...ok),hi=Math.max(0.01,...ok),pad=2;
+    const X=i=>pad+i*(w-2*pad)/(TF_H.length-1);
+    const Y=v=>h-pad-(v-lo)/(hi-lo)*(h-2*pad);
+    let d="",started=false;
+    vals.forEach((v,i)=>{if(v==null)return;d+=(started?"L":"M")+X(i).toFixed(1)+","+Y(v).toFixed(1);started=true;});
+    const zero=lo<0&&hi>0?`<line x1="${pad}" y1="${Y(0).toFixed(1)}" x2="${w-pad}" y2="${Y(0).toFixed(1)}" stroke="#26324a" stroke-width="1"/>`:"";
+    const last=vals[vals.length-1];
+    const col=last>0?"#ff4d6d":"#34d399";
+    return `<svg class="tf2-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">
+      ${zero}<path d="${d}" fill="none" stroke="${col}" stroke-width="1.6"/>
+      ${last!=null?`<circle cx="${X(TF_H.length-1).toFixed(1)}" cy="${Y(last).toFixed(1)}" r="2.2" fill="${col}"/>`:""}</svg>`;
+  }
+  function tfProfiles(row,max=4){
+    const codes=String(row.profiles||"").split(",").filter(Boolean);
+    const shown=codes.slice(0,max).map(c=>{
+      const tag=Object.keys(TF.catalog).find(t=>t.startsWith("TF_"+c+"_"));
+      return `<span class="la2-tag" title="${esc(TF.catalog[tag]||c)}">${esc(TF_PROF[c]||c)}</span>`;}).join("");
+    return shown+(codes.length>max?`<span class="la2-tag" title="${esc(codes.slice(max).join(', '))}">+${codes.length-max}</span>`:"")||`<span class="la2-hint">—</span>`;
+  }
+  const TF_COLS=[["account","Client",""],["score","Score","num"],["confidence","Conf","num"],
+    ["state","State",""],["curve","Curve",""],["toxic_trade_rate","Adverse rate","num"],
+    ["adverse_usd","Cost","num"],["persistence_ratio","Persistence","num"],
+    ["profiles","Behaviour",""],["action","Recommended",""]];
+  function tfDraw(){
+    $("#tf-head").innerHTML=TF_COLS.map(([k,label,cls])=>
+      `<th data-k="${k}" class="${cls}">${label}${TF.sort.k===k?(TF.sort.dir<0?" ▾":" ▴"):""}</th>`).join("");
+    $$("#tf-head th[data-k]").forEach(th=>th.onclick=()=>{
+      const k=th.dataset.k;
+      TF.sort=TF.sort.k===k?{k,dir:-TF.sort.dir}:{k,dir:-1};tfDraw();});
+    const rows=tfVisible();
+    $("#tf-rows").innerHTML=rows.length?rows.map(r=>`<tr data-a="${esc(r.account)}">
+      <td><a href="/trading/account?account=${encodeURIComponent(r.account)}" title="Open the full account page">${esc(r.account)}</a></td>
+      <td class="num"><b>${tfNum(r.score,1)}</b></td>
+      <td class="num">${tfNum(r.confidence,0)}%</td>
+      <td><span class="tf2-state s-${esc(r.state)}" title="${esc(r.state_label||"")}">${esc(TF_STATE[r.state]||r.state)}</span>
+          ${r.capped?`<span class="la2-tag" title="${esc(String(r.gates_failed||"").split(",").map(g=>TF_GATE[g]||g).join(" · "))}">capped</span>`:""}</td>
+      <td title="s5.3 ${esc(r.curve_profile||"")} · s9 ${esc(r.markout_signature||"")}">${tfSpark(r.curve)}</td>
+      <td class="num">${tfPct(r.toxic_trade_rate,0)}</td>
+      <td class="num">${tfUsd(r.adverse_usd)}</td>
+      <td class="num">${tfNum(r.persistence_ratio,2)}</td>
+      <td>${tfProfiles(r)}</td>
+      <td><span class="la2-tag" title="${esc(TF.catalog[r.action]||"")}">${esc((r.action||"").replace("TF_ACTION_","").replace(/_/g," ").toLowerCase())}</span></td>
+    </tr>`).join(""):`<tr><td colspan="${TF_COLS.length}" class="la2-empty">No accounts in this view.</td></tr>`;
+    $$("#tf-rows tr[data-a]").forEach(tr=>tr.onclick=e=>{
+      if(e.target.closest("a"))return; tfOpen(tr.dataset.a);});
+    const r=TF.result||{};
+    $("#tf-foot").innerHTML=`${rows.length} of ${TF.rows.length} listed · ${r.accounts_scored||0} scored · `
+      +`score p50 ${tfNum((r.score_distribution||{})["50%"],1)} · p90 ${tfNum((r.score_distribution||{})["90%"],1)}`;
+  }
+  /* Full markout curve for the drawer, with the s5.2 minimum drawn behind it. */
+  function tfChart(row,mins){
+    const W=430,H=170,L=46,R=14,T=14,B=28;
+    const vals=TF_H.map(k=>row.curve&&row.curve[k]!=null?row.curve[k]:null);
+    const mn=TF_H.map(k=>mins&&mins[k]!=null?mins[k]:null);
+    const all=[...vals,...mn,0].filter(v=>v!=null&&isFinite(v));
+    if(!all.length) return `<div class="la2-hint">No curve for this account.</div>`;
+    const lo=Math.min(...all),hi=Math.max(...all),span=(hi-lo)||1;
+    const X=i=>L+i*(W-L-R)/(TF_H.length-1),Y=v=>T+(hi-v)/span*(H-T-B);
+    const path=a=>{let d="",s=false;a.forEach((v,i)=>{if(v==null)return;d+=(s?"L":"M")+X(i).toFixed(1)+","+Y(v).toFixed(1);s=true;});return d;};
+    const ticks=[hi,(hi+lo)/2,lo].map(v=>`<g><line x1="${L}" y1="${Y(v).toFixed(1)}" x2="${W-R}" y2="${Y(v).toFixed(1)}" stroke="#1b2438"/>
+      <text x="${L-6}" y="${(Y(v)+3).toFixed(1)}" text-anchor="end" fill="#55637d" font-size="10">${v.toFixed(1)}</text></g>`).join("");
+    return `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Seven-horizon markout curve">
+      ${ticks}
+      ${lo<0&&hi>0?`<line x1="${L}" y1="${Y(0).toFixed(1)}" x2="${W-R}" y2="${Y(0).toFixed(1)}" stroke="#26324a" stroke-dasharray="3 3"/>`:""}
+      <path d="${path(mn)}" fill="none" stroke="#6b3a12" stroke-width="1.4" stroke-dasharray="4 3"/>
+      <path d="${path(vals)}" fill="none" stroke="#22d3ee" stroke-width="2"/>
+      ${vals.map((v,i)=>v==null?"":`<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="2.6" fill="#22d3ee"><title>${TF_H[i]}: ${v.toFixed(2)} bps</title></circle>`).join("")}
+      ${TF_H.map((k,i)=>`<text x="${X(i).toFixed(1)}" y="${H-9}" text-anchor="middle" fill="#55637d" font-size="10">${k}</text>`).join("")}
+      <text x="${L}" y="${H-1}" fill="#55637d" font-size="9.5">bps, client-positive — dashed = s5.2 minimum</text>
+    </svg>`;
+  }
+  function tfOpen(account){
+    const row=TF.rows.find(r=>r.account===account);
+    if(!row) return;
+    TF.open=account;
+    const mins=((TF.result||{}).spec||{}).markout_minimums_bps||{};
+    const applied=((TF.result||{}).spec||{}).weights_applied||{};
+    const comps=Object.entries(TF_COMP).map(([k,[label,specW]])=>{
+      const v=row["c_"+k];
+      const on=applied[k]!=null;
+      const w=on?applied[k]*100:specW;          // points actually on offer
+      const pts=v==null?0:v*w;
+      return `<div class="tf2-bar"${on?"":' style="opacity:.5"'}><span class="lab" title="${esc(label)}">${esc(label)}</span>
+        <span class="track"><span class="fill${pts>=w*0.66?" bad":pts>=w*0.33?" warn":""}" style="width:${on?Math.max(0,Math.min(100,(v||0)*100)).toFixed(0):0}%"></span></span>
+        <span class="val" title="${on?"points earned of points available":"no data source — removed from the model"}">${on?pts.toFixed(1)+"/"+w.toFixed(0):"n/a"}</span></div>`;}).join("");
+    const gates=String(row.gates_failed||"").split(",").filter(Boolean);
+    const tags=(row.tags||[]).map(t=>`<span class="la2-tag" title="${esc(TF.catalog[t]||"")}">${esc(t)}</span>`).join("");
+    $("#tf-drawer-body").innerHTML=`
+      <h3><a href="/trading/account?account=${encodeURIComponent(account)}" title="Open the full account page">${esc(account)} ↗</a></h3>
+      <div class="la2-cps">
+        <span class="la2-cp">Toxicity <b>${tfNum(row.score,1)}</b></span>
+        <span class="la2-cp">Confidence <b>${tfNum(row.confidence,0)}%</b></span>
+        <span class="la2-cp">Severity <b>${tfNum(row.severity,0)}</b></span>
+        <span class="la2-cp">Stability <b>${tfNum(row.stability,0)}</b></span>
+        <span class="la2-cp">Tier <b>${esc(row.risk_tier||"")}</b></span>
+      </div>
+      <p class="la2-hint" style="margin:8px 0">${esc(row.state_label||"")}</p>
+      ${tfChart(row,mins)}
+      <div class="la2-facts">
+        <div><label>Adverse trades</label><b>${row.toxic_trades==null?"—":row.toxic_trades.toLocaleString()} of ${row.trades==null?"—":row.trades.toLocaleString()} (${tfPct(row.toxic_trade_rate,0)})</b></div>
+        <div><label>Adverse selection</label><b>${tfUsd(row.adverse_usd)} total · ${tfUsd(row.avg_adverse_usd)} each</b></div>
+        <div><label>Persistence</label><b>${row.persistence_ratio!=null?`${tfNum(row.persistence_ratio,2)} of the early peak held to 60 s`
+          :row.late_emerging?`edge appears late — no early peak to measure from`:`no persistent edge`}</b></div>
+        <div><label>Curve slope</label><b>${tfNum(row.curve_slope_bps_per_decade,2)} bps/decade</b></div>
+        <div><label>Client P&amp;L</label><b>${tfUsd(row.realized_pnl)} · ${tfPct(row.toxic_pnl_concentration,0)} from adverse trades</b></div>
+        <div><label>Concentration</label><b>${esc(row.top_symbol||"—")} ${tfPct(row.top_symbol_share,0)} · ${row.n_symbols||0} symbols</b></div>
+        <div><label>Repeats</label><b>${row.active_days||0} days · ${tfPct(row.clustered_share,0)} clustered</b></div>
+        <div><label>Reference market</label><b>${row.ref_checked?`${tfPct(row.ref_agree_share,0)} agree (${row.ref_checked} checked)`:"not covered"}</b></div>
+        <div><label>Engine A overlap</label><b>${row.latency_events||0} latency events (${tfPct(row.latency_share,0)})</b></div>
+        <div><label>Sharp deals</label><b>${row.sharp_deals_24h||0} in a day · median hold ${tfNum(row.med_hold_s,0)}s</b></div>
+      </div>
+      <h4 class="tf2-h">Score components <span class="la2-hint">s5.4</span></h4>
+      ${comps}
+      ${gates.length?`<div class="tf2-unavail"><b>Held back.</b> ${gates.map(g=>esc(TF_GATE[g]||g)).join(" · ")}.
+        No adverse treatment is recommended automatically while a cap applies.</div>`:""}
+      <h4 class="tf2-h">Automation tags</h4>
+      <div class="la2-tags">${tags}</div>
+      <div class="la2-review">
+        <textarea id="tf-note" rows="2" placeholder="Note (required to confirm or dismiss)"></textarea>
+        <button class="btn btn-sm" data-d="confirm">Confirm toxic</button>
+        <button class="btn btn-sm" data-d="dismiss">Dismiss</button>
+        <button class="btn btn-sm" data-d="clear">Clear decision</button>
+        <span id="tf-dec-msg" class="la2-hint"></span>
+      </div>`;
+    $$("#tf-drawer-body .la2-review button").forEach(b=>b.onclick=async()=>{
+      const note=($("#tf-note").value||"").trim();
+      const res=await (await fetch("/api/antifraud/toxic/decide",{method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({account,decision:b.dataset.d,note})})).json();
+      $("#tf-dec-msg").textContent=res.error?("— "+res.error):"saved";
+      if(!res.error) loadToxicAudit();
+    });
+    $("#tf-drawer").classList.add("on");
+  }
+  function tfClose(){$("#tf-drawer").classList.remove("on");TF.open=null;}
+  $("#tf-drawer-close").onclick=tfClose;
+  $("#tf-drawer").onclick=e=>{if(e.target.id==="tf-drawer")tfClose();};
+
+  function tfSplit(r){
+    const bars=(obj,total,titles)=>Object.entries(obj||{}).sort((a,b)=>b[1]-a[1]).map(([k,v])=>
+      `<div class="tf2-bar"><span class="lab" title="${esc((titles||{})[k]||"")}">${esc(k.replace(/_/g," "))}</span>
+        <span class="track"><span class="fill" style="width:${(100*v/Math.max(total,1)).toFixed(1)}%"></span></span>
+        <span class="val">${v.toLocaleString()}</span></div>`).join("");
+    const n=r.accounts_scored||1;
+    $("#tf-split").innerHTML=`
+      <div><h4 class="tf2-h">Curve signature <span class="la2-hint">s5.3</span></h4>${bars(r.curve_profiles,n)}</div>
+      <div><h4 class="tf2-h">Markout signature <span class="la2-hint">s9</span></h4>${bars(r.signatures,n)}</div>
+      <div><h4 class="tf2-h">Suggested state <span class="la2-hint">s10</span></h4>${bars(r.states,n,TF_STATE)}</div>
+      <div><h4 class="tf2-h">Risk tier <span class="la2-hint">s9</span></h4>${bars(r.tiers,n)}</div>`;
+  }
+  function tfModel(r){
+    const spec=r.spec||{},scale=spec.score_scale||{},un=spec.unavailable_components||{};
+    const marks=scale.full_marks_at||{};
+    const applied=spec.weights_applied||{};
+    const rows=Object.entries(TF_COMP).map(([k,[label,w]])=>{
+      const on=applied[k]!=null, pct=on?(applied[k]*100):0;
+      const weight=on&&spec.renormalised&&Math.abs(pct-w)>0.05
+        ? `<span title="s5.4 weight ${w}%, redistributed because a component was removed">${pct.toFixed(1)}%</span>`
+        : `${on?pct.toFixed(0):w}%`;
+      return `<div${on?"":' style="opacity:.5"'}>${esc(label)}</div><div class="w">${on?weight:"—"}</div>
+       <div class="la2-hint">${un[k]!=null?(spec.renormalised?`removed — no data source (s5.4 weight ${w}% redistributed)`:"no data source — unavailable"):
+         (k==="seven_horizon_markout"?`full marks at ${tfNum(marks.auc_excess_bps,2)} bps above the book`:
+          k==="toxic_trade_rate"?`full marks at +${tfPct(marks.toxic_rate_excess,0)} above the book`:
+          k==="economic_impact"?`full marks at ${tfUsd(marks.adverse_usd)}`:"")}</div>`;}).join("");
+    const bench=spec.benchmark||{};
+    $("#tf-model").innerHTML=`
+      ${Object.keys(un).length?`<div class="tf2-unavail"><b>${Object.entries(un).map(([k,w])=>`${(TF_COMP[k]||[k])[0]} (${w}%)`).join(", ")}</b>
+        — no data source. ${spec.renormalised
+          ?"Removed from the model and the weight redistributed across the remaining components, so the score keeps its full 0–100 range. Restore the s5.4 table by turning renormalisation off once the feed exists."
+          :"No account can earn those points, so scores are bounded below 100 until the feed exists."}</div>`:""}
+      <div class="tf2-weights">${rows}</div>
+      <p class="la2-hint" style="margin-top:10px">
+        Calibration: ${esc(scale.mode||"fixed")}${scale.percentile?` at percentile ${scale.percentile} of ${(scale.population_accounts||0).toLocaleString()} accounts`:""}.
+        Book baseline at 60 s: ${tfNum((bench.curve_bps||{})["60s"],2)} bps, ${tfPct(bench.toxic_trade_rate,0)} of trades materially adverse.
+        A trade counts as adverse at ${Object.entries(spec.markout_minimums_bps||{}).map(([k,v])=>`${k} ≥ ${tfNum(v,2)}`).join(", ")} bps.</p>`;
+  }
+  async function loadToxicTrend(){
+    try{
+      const r=await (await fetch("/api/antifraud/toxic/trend?days=30")).json();
+      const rows=r.rows||[];
+      $("#tf-trend").innerHTML=rows.length?`<div class="la2-tablewrap"><table class="af-table">
+        <thead><tr><th>Day</th><th class="num">Scored</th><th class="num">High/critical</th><th class="num">Adverse selection</th><th class="num">Avg score</th></tr></thead>
+        <tbody>${rows.slice(-14).reverse().map(d=>`<tr><td>${esc(d.day)}</td><td class="num">${d.accounts}</td>
+          <td class="num">${d.actionable}</td><td class="num">${tfUsd(d.adverse_usd)}</td><td class="num">${tfNum(d.avg_score,1)}</td></tr>`).join("")}</tbody>
+      </table></div>`:`<div class="la2-hint">No history yet — one row is written per scan day.</div>`;
+    }catch(e){$("#tf-trend").innerHTML=`<div class="la2-hint">Trend unavailable.</div>`;}
+  }
+  async function loadToxicAudit(){
+    try{
+      const r=await (await fetch("/api/antifraud/toxic/audit?limit=60")).json();
+      $("#tf-audit").innerHTML=(r.rows||[]).map(a=>`<tr>
+        <td>${esc(new Date((a.ts||0)*1000).toISOString().slice(0,16).replace("T"," "))}</td>
+        <td>${esc(a.account||"")}</td><td>${esc(TF_STATE[a.state]||a.state||"")}</td>
+        <td class="num">${tfNum(a.score,1)}</td><td class="num">${tfNum(a.confidence,0)}</td>
+        <td>${esc(String(a.action||"").replace("TF_ACTION_","").replace(/_/g," ").toLowerCase())}</td>
+        <td>${esc(a.mode||"")}</td><td>${esc(a.operator||"")}</td><td>${esc(a.status||"")}</td></tr>`).join("")
+        ||`<tr><td colspan="9" class="la2-empty">No decisions logged yet.</td></tr>`;
+    }catch(e){}
+  }
+  /* s5.1 / s5.2 parameters the desk is most likely to calibrate. */
+  const TF_RULE_FIELDS=[
+    ["min_mo100_bps","Minimum MO100 (bps)"],["min_mo500_bps","Minimum MO500 (bps)"],
+    ["min_mo1s_bps","Minimum MO1S (bps)"],["min_mo5s_bps","Minimum MO5S (bps)"],
+    ["min_mo60s_bps","Minimum MO60S (bps)"],["min_toxic_trades","Minimum toxic trades"],
+    ["toxic_trade_rate_pct","Toxic trade rate %"],["avg_adverse_markout_usd","Average adverse markout USD"],
+    ["total_adverse_markout_usd","Total adverse markout USD"],
+    ["min_toxic_pnl_concentration_pct","Minimum toxic P&L concentration %"],
+    ["toxic_min_confidence","Minimum confidence"],["sharp_deal_count","Count of sharp deals (24h)"],
+    ["sharp_order_life_time_s","Order life time (s)"],["max_holding_time_s","Maximum holding time (s, 0 = off)"]];
+  async function loadToxicRules(){
+    try{
+      const r=await (await fetch("/api/antifraud/toxic/rules")).json();
+      $("#tf-rules").innerHTML=TF_RULE_FIELDS.map(([k,label])=>
+        `<label>${esc(label)}<input data-k="${k}" type="number" step="any" value="${r[k]??""}"></label>`).join("");
+      $("#tfr-shadow").checked=!!r.shadow_mode;
+    }catch(e){}
+  }
+  async function saveToxicRules(){
+    const body={shadow_mode:$("#tfr-shadow").checked};
+    $$("#tf-rules input[data-k]").forEach(i=>{if(i.value!=="")body[i.dataset.k]=Number(i.value);});
+    await fetch("/api/antifraud/toxic/rules",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    $("#tfr-msg").textContent="Saved — thresholds that define a toxic trade apply at the next markout pass.";
+    loadToxic(0);
+  }
+  $("#tfr-save").onclick=saveToxicRules;
+  $("#tfr-shadow").onchange=saveToxicRules;
+  $("#tf-search").oninput=e=>{TF.search=e.target.value;tfDraw();};
+  $("#tf-rescan").onclick=()=>loadToxic(true);
+
+  async function loadToxic(refresh){
+    $("#af-toxic").classList.add("la2-loading");
+    let r;
+    try{ r=await (await fetch("/api/antifraud/toxic?refresh="+(refresh?1:0))).json(); }
+    catch(e){ $("#tf-health").innerHTML=`<span class="la2-h warn">▲ Could not reach the server</span>`;
+              $("#af-toxic").classList.remove("la2-loading"); return; }
+    if(r.error){ $("#tf-health").innerHTML=`<span class="la2-h warn">▲ ${esc(r.error)}</span>`;
+                 $("#af-toxic").classList.remove("la2-loading"); return; }
+    if(r.building){
+      tfHealth(r);
+      $("#tf-health").insertAdjacentHTML("beforeend",
+        `<span class="la2-h">⟳ ${esc(r.note||"rebuilding")} — this page refreshes itself</span>`);
+      clearTimeout(window._tfPoll);window._tfPoll=setTimeout(()=>loadToxic(0),20000);
+    }
+    $("#af-toxic").classList.remove("la2-loading");
+    TF.result=r;TF.rows=r.rows||[];
+    $("#tf-mode").textContent=r.mode==="live"?"live":"shadow — logging only";
+    $("#tf-mode").title=r.mode==="live"?"Recommendations are published to the automation feed"
+      :"s13: automated actions are governed separately from classification";
+    if(TF.filter==="action"&&!tfCounts(TF.rows).action) TF.filter=TF.rows.length?"all":"action";
+    if(!r.building) tfHealth(r);
+    tfTiles(r);tfDraw();tfSplit(r);tfModel(r);
+    loadToxicTrend();loadToxicAudit();loadToxicRules();
+    if(TF.open) tfOpen(TF.open);
+  }
+
+  /* ============ EVENT IMPACT ============ */
+  const SEG_LABEL={abuse_candidate:"Abuse candidate",retain_high_value:"Retain (high value)",
+    compensate_review:"Compensate / review",monitor:"Monitor",minimal:"Minimal / not impacted"};
+  async function loadEvents(){
+    const r=await (await fetch("/api/antifraud/events")).json();
+    const sel=$("#ei-auto");
+    sel.innerHTML='<option value="">choose…</option>'+
+      (r.events||[]).map((e,i)=>`<option value="${i}">${e.symbol} ${e.start.slice(0,19)} LDN (${e.range_bps} bps/min)</option>`).join("");
+    sel.onchange=()=>{const e=(r.events||[])[+sel.value];if(!e)return;
+      $("#ei-start").value=e.start;$("#ei-end").value=e.end;
+      $("#ei-symbols").value=e.symbol;};
+    // live macro calendar (LDN times, high+medium impact), event ±15 min
+    try{
+      const c=await (await fetch("/api/antifraud/calendar")).json();
+      const evs=(c.events||[]).filter(e=>["high","medium"].includes((e.impact||"").toLowerCase()));
+      const cal=$("#ei-cal");
+      cal.innerHTML='<option value="">live macro events (LDN times)…</option>'+
+        evs.map((e,i)=>`<option value="${i}">${e.ldn.slice(0,16)} ${e.country} ${e.impact==="High"?"🔴":"🟠"} ${e.title}</option>`).join("");
+      cal.onchange=()=>{const e=evs[+cal.value];if(!e)return;
+        const t=new Date(e.ldn.replace(" ","T"));
+        const f=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}:${String(d.getSeconds()).padStart(2,"0")}`;
+        $("#ei-start").value=f(new Date(t.getTime()-2*60000));
+        $("#ei-end").value=f(new Date(t.getTime()+15*60000));
+        $("#ei-symbols").value="";};
+    }catch(e){}
+    // instant: render the LAST analysis (cached server-side) on tab open;
+    // if none, DEFAULT the fields to the last NFP session (XAUUSD).
+    try{
+      const prev=await (await fetch("/api/antifraud/event_impact")).json();
+      // don't clobber fields the user is editing; only render the cached
+      // table if we have nothing shown yet.
+      if(prev&&(prev.rows||[]).length&&!eiRows.length){
+        eiRows=prev.rows;eiNote="";eiDraw();
+        $("#ei-msg").textContent=`showing last analysis (${(prev.window||{}).start||""} → ${(prev.window||{}).end||""} UTC) — edit the window and press Analyze`;
+        eiRenderKpis(prev);
+      }
+    }catch(e){}
+    if(!$("#ei-start").value) eiLoadNfp(false);   // seed NFP only when empty
+  }
+  function eiQuery(extra){
+    return new URLSearchParams(Object.assign({
+      start:$("#ei-start").value,end:$("#ei-end").value,
+      symbols:$("#ei-symbols").value,loss_limit:$("#ei-loss").value,
+      profit_limit:$("#ei-profit").value}, extra||{}));
+  }
+  function eiRenderKpis(r){
+    const t=r.totals||{};
+    const $$=v=>"$"+Math.round(v||0).toLocaleString();
+    $("#ei-kpis").innerHTML=[
+      [r.n_impacted+(r.n_clients&&r.n_clients!==r.n_impacted?` <span class="dim" style="font-size:12px">(${r.n_clients} clients)</span>`:""),"Impacted accounts"+(r.n_linked?` · ${r.n_linked} with linked accounts`:"")],
+      [$$(t.window_pnl),"Client P&L in window"],
+      [$$(t.net_revenue_total),"Net revenue lifetime (after rebates)"],
+      [$$(t.notional_usd_total),"USD notional traded lifetime"],
+      [$$(t.rebates_total),"Rebates credited lifetime"],
+      [t.actions_in_window,"Actions in window"],
+      [(t.opens_in_window||0)+" / "+(t.closes_in_window||0)+" / "+(t.held_through||0),"Opens / closes / held-through"],
+      [t.stopped_out,"Stopped out"],
+      [$$(t.deposited_5d),"Deposited within 5d"],
+      [$$(t.withdrawn_5d),"Withdrawn within 5d"],
+      [$$(t.net_deposit_5d),"Net deposit within 5d"],
+      [t.behaviour_changed,"Behaviour changed"],
+      [t.significant_loss,"Significant loss"],[t.significant_profit,"Significant profit"],
+      [$$(t.median_mltv)+"/mo","Median MLTV (net deposits ÷ tenure)"]]
+      .map(([v,l])=>`<div class="pcard"><b>${v??"—"}</b><br>${l}</div>`).join("");
+    if(r.notes&&r.notes.some(n=>n.includes("INCOMPLETE")))
+      $("#ei-notes")&&($("#ei-notes").textContent=(r.notes||[]).join("  ·  "));
+    const ac=r.abuse_counts||{}, cl=r.classes||{};
+    const ABUSE_LABEL={desk_flag:"0 · desk flag",abusedb:"0 · desk register",high_leverage:"1a · high leverage",
+      hedge_unwind:"1b · hedge unwind",favourable_execution:"2 · favourable execution",abusive:"any abuse flag",vip_impacted:"★ VIP/High/Mid hurt, no flag"};
+    $("#ei-segments").innerHTML=Object.entries(r.segments||{})
+      .map(([s,n])=>`<span class="af-chip">${SEG_LABEL[s]||s}: <b>${n}</b></span>`).join("")
+      +(Object.keys(ac).length?`<span class="dim" style="margin:0 6px">|</span>`+Object.entries(ac)
+        .map(([k,n])=>`<span class="af-chip ${k==='abusive'?'on':''}">${ABUSE_LABEL[k]||k}: <b>${n}</b></span>`).join(""):"")
+      +(Object.keys(cl).length?`<span class="dim" style="margin:0 6px">|</span>`+["VIP","High","Mid","Low","Micro"]
+        .filter(k=>cl[k]!=null).map(k=>`<span class="af-chip">${k}: <b>${cl[k]}</b></span>`).join(""):"");
+    // reveal the Excel download tied to the CURRENT analysis params
+    const x=$("#ei-xlsx");
+    x.href="/api/antifraud/event_impact.xlsx?"+eiQuery();
+    x.style.display=(r.rows||[]).length?"":"none";
+  }
+  // The workbook is fetched by script so a refused or failed download says
+  // why in the tab instead of a blank navigation (2,700 rows x 90 columns
+  // takes a few seconds to build; the analysis itself must already be cached).
+  $("#ei-xlsx").onclick=async(ev)=>{
+    ev.preventDefault();
+    const x=$("#ei-xlsx"), label=x.textContent, msg=$("#ei-msg");
+    x.textContent="⭳ building…"; x.style.pointerEvents="none";
+    try{
+      const resp=await fetch(x.href);
+      if(!resp.ok){ msg.textContent="Excel: "+(await resp.text()); return; }
+      const blob=await resp.blob();
+      const cd=resp.headers.get("Content-Disposition")||"";
+      const m=/filename="([^"]+)"/.exec(cd);
+      const a=document.createElement("a");
+      a.href=URL.createObjectURL(blob); a.download=m?m[1]:"event_impact.xlsx";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),60000);
+      msg.textContent=`Excel ready — ${(blob.size/1048576).toFixed(1)} MB`;
+    }catch(e){ msg.textContent="Excel download failed: "+e.message; }
+    finally{ x.textContent=label; x.style.pointerEvents=""; }
+  };
+  $("#ei-run").onclick=async()=>{
+    const btn=$("#ei-run");btn.disabled=true;const label=btn.textContent;
+    $("#ei-xlsx").style.display="none";
+    const win=`${$("#ei-start").value} → ${$("#ei-end").value} (LDN) · ${$("#ei-symbols").value||"all"}`;
+    const t0=Date.now();
+    const tick=setInterval(()=>{$("#ei-msg").textContent=
+      `analyzing ${win} … ${((Date.now()-t0)/1000|0)}s (recomputes fully, ~1-2 min)`;},500);
+    try{
+      const r=await (await fetch("/api/antifraud/event_impact?"+eiQuery({refresh:1}))).json();
+      clearInterval(tick);btn.disabled=false;btn.textContent=label;
+      if(r.error){$("#ei-msg").textContent="error: "+r.error;return;}
+      $("#ei-msg").textContent=`${win} — ${r.n_impacted} accounts${r.n_clients&&r.n_clients!==r.n_impacted?` (${r.n_clients} clients)`:""} · ${r.generated_at}`;
+      eiRenderKpis(r);
+      eiRows=r.rows||[];eiNote=r.note||"nothing found";eiDraw();
+      $("#ei-notes").textContent=(r.notes||[]).join("  ·  ");
+    }catch(e){clearInterval(tick);btn.disabled=false;btn.textContent=label;
+      $("#ei-msg").textContent="analyze failed: "+e.message;}
+  };
+  async function eiLoadNfp(run, preset){
+    try{
+      const n=await (await fetch("/api/antifraud/event_impact/preset?name="+encodeURIComponent(preset||"last_nfp"))).json();
+      if(n&&n.start){
+        $("#ei-start").value=n.start;$("#ei-end").value=n.end;
+        $("#ei-symbols").value=n.symbols||"XAUUSD";
+        $("#ei-msg").textContent=n.label+(run?" — running":" — press Analyze");
+        if(run) $("#ei-run").click();
+      }
+    }catch(e){}
+  }
+  $("#ei-nfp").onclick=()=>eiLoadNfp(true,"last_nfp");
+  $("#ei-nfp-sep4").onclick=()=>eiLoadNfp(true,"nfp_2026_09_04");
+
+  /* Event-impact table: same subset-linked multi-sort as the latency table */
+  let eiRows=[], eiChain=[], eiNote="pick an event window and Analyze";
+  function eiDraw(){
+    const rows=[...eiRows];
+    if(eiChain.length) rows.sort((a,b)=>{
+      for(const {k,dir} of eiChain){
+        const av=a[k]??-Infinity, bv=b[k]??-Infinity;
+        const c=(typeof av==="number"&&typeof bv==="number")?av-bv:String(av).localeCompare(String(bv));
+        if(c) return c*dir;
+      }
+      return 0;
+    });
+    $("#ei-sortchain").textContent=eiChain.length
+      ?("sort: "+eiChain.map(c=>`${c.k}${c.dir<0?"↓":"↑"}`).join(" → ")):"";
+    const f=v=>v==null?"—":(typeof v==="number"?(Math.abs(v)>=100?v.toLocaleString():v):v);
+    const shown=rows.slice(0,1000);
+    $("#ei-rows").innerHTML=shown.map(x=>`
+      <tr><td class="dim" title="${x.is_primary?'this row is the primary':'primary of this client'}">${x.subaccounts?(x.is_primary?`<b>${x.primary_account}</b>`:(x.primary_account||"—")):"—"}</td>
+        <td><a href="/trading/account?account=${encodeURIComponent(x.account)}" title="Open account detail">${x.account}</a>${x.is_primary&&x.subaccounts?' <span class="dim" title="primary account">★</span>':''}</td>
+        <td class="num" title="${(x.linked_accounts||'').replace(/"/g,'&quot;')}${x.link_source?' · linked by '+x.link_source:''}">${x.subaccounts?`<b>${x.subaccounts}</b> <span class="dim">/ ${x.accounts_in_window||1}</span>`:'—'}</td>
+        <td><span class="af-chip ${x.segment==='abuse_candidate'?'on':''}">${SEG_LABEL[x.segment]||x.segment}</span></td>
+        <td>${x.impact}${x.stopped_out?" ⛔":""}</td>
+        <td><b>${x.client_class||"—"}</b>${x.vip_impacted?' <span title="Mid/High/VIP, no abuse flag, negative window P&amp;L">★</span>':''}</td>
+        <td class="dim" style="max-width:340px;white-space:normal;font-size:11px" title="${(x.abuse_reasons||'').replace(/"/g,'&quot;')}">${x.abuse_reasons?x.abuse_reasons.slice(0,160)+(x.abuse_reasons.length>160?"…":""):""}</td>
+        <td class="num" style="color:${(x.window_pnl||0)<0?'#ff6b81':'#34d399'}">$${f(x.window_pnl)}</td>
+        <td class="num" style="color:${(x.net_revenue||0)<0?'#ff6b81':'inherit'}">$${f(x.net_revenue)}</td>
+        <td class="num">$${f(x.notional_usd_monthly)}</td>
+        <td class="num">${x.life_rebates?'$'+f(x.life_rebates):'—'}</td>
+        <td class="num">${x.window_closes}</td>
+        <td class="num">${f(x.act_d1)}</td><td class="num">${f(x.act_d5)}</td>
+        <td class="num">${f(x.vol_d5)}</td>
+        <td class="num">$${f(x.wd_d1)}</td><td class="num">$${f(x.wd_d5)}</td>
+        <td class="num">${x.anomaly!=null?(x.anomaly*100).toFixed(0)+"%":"—"}</td>
+        <td class="dim">${x.abuse_label||""}</td></tr>`).join("")
+      ||`<tr><td colspan="19" class="dim">${eiNote}</td></tr>`;
+    if(rows.length>shown.length) $("#ei-rows").insertAdjacentHTML("beforeend",
+      `<tr><td colspan="19" class="dim">showing ${shown.length} of ${rows.length} rows — the Excel export carries every row</td></tr>`);
+  }
+  $$("#ei-head th[data-k]").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k, at=eiChain.findIndex(c=>c.k===k);
+    if(at>=0) eiChain[at].dir*=-1; else eiChain.push({k,dir:-1});
+    eiDraw();
+  });
+  $("#ei-sortreset").onclick=()=>{eiChain=[];eiDraw();};
+
+  /* ============ CATEGORY REGISTRY + DYNAMIC ML-RULE TABS ============ */
+  let REG={categories:[]}, FIELDS=[], COUNTS=null;
+  /* click any count -> the rule's own tab when Use ML is ticked (latency has
+     its bespoke tab), else Behavioural Profiling. */
+  window.gotoRule=(key)=>{
+    const cat=REG.categories.find(c=>c.key===key)||{};
+    const af=cat.use_ml?(key==="latency_arbitrage"?"latency":"rule-"+key):"profiling";
+    const btn=document.querySelector(`.af-tab[data-af="${af}"]`)
+      ||document.querySelector('.af-tab[data-af="profiling"]');
+    if(btn) btn.click();
+  };
+  function countChip(key){
+    if(COUNTS&&COUNTS.building)
+      return `<span class="dim" style="font-size:11px">counts building… (auto-refreshes)</span>`;
+    const c=COUNTS&&COUNTS.categories&&COUNTS.categories[key];
+    if(!c) return `<span class="dim" style="font-size:11px">counts…</span>`;
+    const chip=(color,title,label,v,pct)=>`<span class="reg-count" data-key="${key}"
+      style="font-size:11px;color:${color};cursor:pointer;text-decoration:underline dotted" title="${title} — click to open the ${REG.categories.find(x=>x.key===key)?.use_ml?'rule tab':'Behavioural Profiling tab'}">${label}: <b>${v==null?'—':v.toLocaleString()}</b>${pct!=null?` (${pct}%)`:''}</span>`;
+    return chip("#34d399",`accounts satisfying the definition NOW (hindsight), of ${COUNTS.n_accounts.toLocaleString()} observed · ${c.hits_active.toLocaleString()} of them active ${COUNTS.active_day||'today'}`,"hindsight",c.hits,c.pct)
+      +chip("#ffb020","classification model over its tuned threshold — the ML view of who fits this category NOW","ML",c.ml_hits,c.ml_pct)
+      +chip("#22d3ee","early-warning model: predicted to satisfy the rule over the NEXT 5 days with equity rising","EW 5d",c.ew_hits,c.ew_pct);
+  }
+  function regCard(c,i){
+    return `<div class="card" style="margin-bottom:10px;border:1px solid ${c.use_ml?'rgba(255,176,32,.4)':'#1b2438'}">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <input value="${c.label}" data-i="${i}" data-f="label" style="width:180px;font-weight:bold">
+        <span class="dim" style="font-size:11px">key: ${c.key}</span>
+        <label style="font-size:12px">order <input value="${c.order}" data-i="${i}" data-f="order" style="width:44px"></label>
+        <label style="font-size:12px"><input type="checkbox" ${c.active?"checked":""} data-i="${i}" data-f="active"> Active</label>
+        <label style="font-size:12px"><input type="checkbox" ${c.use_ml?"checked":""} data-i="${i}" data-f="use_ml"> Use ML (own tab + model)</label>
+        ${countChip(c.key)}
+      </div>
+      <textarea data-i="${i}" data-f="definition" rows="2" class="reg-def" style="width:100%;margin-top:8px;font-family:JetBrains Mono,monospace;font-size:12px">${c.definition||""}</textarea>
+      <input value="${c.description||""}" data-i="${i}" data-f="description" style="width:100%;margin-top:4px;font-size:11px" placeholder="description">
+    </div>`;
+  }
+  /* autocomplete over the field universe on every definition box */
+  function attachAutocomplete(){
+    const box=$("#reg-suggest");
+    $$(".reg-def").forEach(ta=>{
+      ta.oninput=()=>{
+        const upto=ta.value.slice(0,ta.selectionStart);
+        const m=upto.match(/[A-Za-z_][A-Za-z0-9_]*$/);
+        if(!m||m[0].length<2){box.style.display="none";return;}
+        const tok=m[0].toLowerCase();
+        const hits=FIELDS.filter(f=>f.field.toLowerCase().includes(tok)).slice(0,12);
+        if(!hits.length){box.style.display="none";return;}
+        const r=ta.getBoundingClientRect();
+        box.style.left=(r.left+window.scrollX)+"px";
+        box.style.top=(r.bottom+window.scrollY)+"px";
+        box.style.display="block";
+        box.innerHTML=hits.map(f=>`<div class="reg-sug" data-v="${f.field}" style="padding:4px 10px;cursor:pointer" title="${f.doc.replace(/"/g,'&quot;')}">${f.field}</div>`).join("");
+        $$(".reg-sug").forEach(d=>d.onclick=()=>{
+          const pos=ta.selectionStart, before=ta.value.slice(0,pos).replace(/[A-Za-z_][A-Za-z0-9_]*$/,d.dataset.v);
+          ta.value=before+ta.value.slice(pos);
+          REG.categories[+ta.dataset.i].definition=ta.value;
+          box.style.display="none";ta.focus();
+        });
+      };
+      ta.onkeydown=(e)=>{
+        if(e.key==="Tab"&&box.style.display==="block"){
+          e.preventDefault();box.querySelector(".reg-sug")?.click();
+        } else if(e.key==="Escape"){box.style.display="none";}
+      };
+      ta.onblur=()=>setTimeout(()=>box.style.display="none",250);
+    });
+  }
+  function drawFields(filter){
+    const f=(filter||"").toLowerCase();
+    $("#reg-fields").innerHTML=FIELDS
+      .filter(x=>!f||x.field.toLowerCase().includes(f)||x.doc.toLowerCase().includes(f))
+      .slice(0,400)
+      .map(x=>`<tr><td style="font-family:JetBrains Mono,monospace">${x.field}</td><td class="dim">${x.doc}</td></tr>`).join("");
+  }
+  function regDraw(){
+    $("#reg-source").textContent=`(source: ${REG.source||"defaults"})`;
+    $("#reg-cards").innerHTML=REG.categories.map((c,i)=>regCard(c,i)).join("");
+    $$("#reg-cards [data-f]").forEach(el=>el.onchange=()=>{
+      const c=REG.categories[+el.dataset.i], f=el.dataset.f;
+      c[f]=el.type==="checkbox"?el.checked:(f==="order"?+el.value:el.value);
+    });
+    attachAutocomplete();
+    buildDynamicTabs();
+    $$(".reg-count").forEach(s=>s.onclick=()=>gotoRule(s.dataset.key));
+  }
+  let countsTimer=null;
+  async function loadCounts(){
+    try{
+      COUNTS=await (await fetch("/api/antifraud/registry/counts")).json();
+      regDraw();
+      if(COUNTS&&COUNTS.building){          // server builds in background
+        clearTimeout(countsTimer);
+        countsTimer=setTimeout(loadCounts,15000);
+      }
+    }catch(e){
+      clearTimeout(countsTimer);
+      countsTimer=setTimeout(loadCounts,20000);
+    }
+  }
+  async function loadRegistry(){
+    const r=await (await fetch("/api/antifraud/registry?fields=1")).json();
+    if(r.categories){REG=r;FIELDS=r.fields||[];regDraw();drawFields("");}
+    loadCounts();
+  }
+  $("#reg-field-filter").oninput=e=>drawFields(e.target.value);
+  $("#reg-add").onclick=()=>{
+    const key=prompt("category key (letters/underscores):","my_category");
+    if(!key)return;
+    REG.categories.push({key:key.replace(/\W/g,"_"),label:key,order:99,
+      active:true,use_ml:false,definition:"",description:""});
+    regDraw();
+  };
+  async function regPost(url){
+    $("#reg-msg").textContent="saving…";
+    const r=await (await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({categories:REG.categories})})).json();
+    if(r.categories){REG=r;regDraw();$("#reg-msg").textContent="saved ("+r.source+")";}
+    else $("#reg-msg").textContent=r.error||"error";
+  }
+  $("#reg-save").onclick=()=>regPost("/api/antifraud/registry");
+  $("#reg-save-admin").onclick=()=>regPost("/api/antifraud/registry?as_admin=1");
+  $("#reg-restore").onclick=async()=>{
+    const r=await (await fetch("/api/antifraud/registry/restore",{method:"POST"})).json();
+    if(r.categories){REG=r;regDraw();$("#reg-msg").textContent="restored to "+r.source;}
+  };
+
+  /* dynamic tabs: one per ACTIVE use_ml rule, built on the LATENCY TAB
+     TEMPLATE — KPI strip with BOTH models side by side (classification
+     rule-now + 5D early warning), as-of/range controls defaulting to the
+     last 24 live hours, chain-sortable columns, deselectable overrides. */
+  const RSTATE={};
+  function modelCard(title,m,accent){
+    if(!m||m.error) return `<div class="pcard" style="border-color:${accent}"><b style="color:#55637d">—</b><br>${title}<br><span class="dim">${m&&m.error?m.error:"not trained yet"}</span></div>`;
+    return `<div class="pcard" style="border-color:${accent}">
+      <b style="color:${accent}">${(m.precision*100).toFixed(0)}% / ${(m.recall*100).toFixed(0)}%</b><br>${title} — precision / recall @thr ${m.threshold}<br>
+      <span class="dim">AUC ${m.auc} · PR-AUC ${m.pr_auc??"—"} · base ${((m.base_rate||0)*100).toFixed(1)}% → lift ${m.precision_lift||"—"}× · ${m.positives} positives</span></div>`;
+  }
+  function ruleDraw(key){
+    const st=RSTATE[key];if(!st)return;
+    const rows=[...st.rows];
+    if(st.chain.length) rows.sort((a,b)=>{
+      for(const {k,dir} of st.chain){
+        const av=a[k]??-Infinity,bv=b[k]??-Infinity;
+        const c=(typeof av==="number"&&typeof bv==="number")?av-bv:String(av).localeCompare(String(bv));
+        if(c) return c*dir;
+      }
+      return 0;
+    });
+    $("#rule-sortchain-"+key).textContent=st.chain.length
+      ?("sort: "+st.chain.map(c=>`${c.k}${c.dir<0?"↓":"↑"}`).join(" → ")):"";
+    const pct=v=>v==null?"—":(v*100).toFixed(0)+"%";
+    $("#rule-rows-"+key).innerHTML=rows.length?rows.map(x=>{
+      const dec=laDecisions[x.account];
+      return `<tr class="${dec?("la-"+dec):""}">
+        <td><a href="/trading/account?account=${encodeURIComponent(x.account)}" title="Open account detail">${x.account}</a></td>
+        <td class="num"><b>${x.risk}</b> ${bar(x.risk)}</td>
+        <td>${x.rule_hit?'<span class="af-chip on">✓ rule</span>':'<span class="dim">—</span>'}</td>
+        <td class="num" style="${(x.ml_now||0)>=.5?'color:#ffb020':''}">${pct(x.ml_now)}</td>
+        <td class="num" style="${(x.ml||0)>=.5?'color:#22d3ee':''}">${pct(x.ml)}</td>
+        <td class="num" style="color:${(x.avg_daily_cost||0)>0?'#f87171':'#8b9ab4'}">${x.avg_daily_cost!=null?"$"+x.avg_daily_cost.toLocaleString():"—"}</td>
+        <td class="num">${x.obs_trades??"—"}</td>
+        <td class="num">${pct(x.event_share)}</td>
+        <td class="num">${x.event_trades??"—"}</td>
+        <td class="num">$${(x.event_pnl||0).toLocaleString()}</td>
+        <td class="dim">${(x.last_ts||"").slice(0,16)}</td>
+        <td><span class="af-chip ${x.verdict==='escalate'?'on':''}">${x.verdict}</span></td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-sm rule-dec ${dec==='confirm'?'la-on-c':''}" title="Confirm: true positive. Click again to deselect." data-acc="${x.account}" data-d="confirm">✓${dec==='confirm'?' confirmed':''}</button>
+          <button class="btn btn-sm rule-dec ${dec==='dismiss'?'la-on-d':''}" title="Dismiss: false positive. Click again to deselect." data-acc="${x.account}" data-d="dismiss">✗${dec==='dismiss'?' dismissed':''}</button></td></tr>`;
+    }).join(""):`<tr><td colspan="13" class="dim">no accounts over threshold active in the selected range</td></tr>`;
+    $$("#rule-rows-"+key+" .rule-dec").forEach(b=>b.onclick=async()=>{
+      const d=laDecisions[b.dataset.acc]===b.dataset.d?"clear":b.dataset.d;
+      let note="";
+      if(d!=="clear"){
+        note=(window.prompt(`Comment (REQUIRED) — why ${d} ${b.dataset.acc}? [${key}]`,"")||"").trim();
+        if(!note){alert("Override not permitted without a comment.");return;}
+        note=`[${key}] `+note;
+      }
+      b.textContent="…";
+      const r=await (await fetch("/api/antifraud/latency/decide",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({account:b.dataset.acc,decision:d,note})})).json();
+      if(r.error){alert(r.error);ruleDraw(key);return;}
+      if(d==="clear") delete laDecisions[b.dataset.acc];
+      else laDecisions[b.dataset.acc]=d;
+      ruleDraw(key);
+    });
+  }
+  function buildDynamicTabs(){
+    const latBtn=document.querySelector('.af-tab[data-af="latency"]');
+    const latActive=REG.categories.find(c=>c.key==="latency_arbitrage");
+    if(latBtn) latBtn.style.display=(!latActive||latActive.active)?"":"none";
+    const wanted=REG.categories.filter(c=>c.active&&c.use_ml&&c.key!=="latency_arbitrage")
+      .sort((a,b)=>a.order-b.order);
+    // IDEMPOTENT: if the active-rule set is unchanged, do NOTHING -- a
+    // background counts poll must never tear down the tab the user has open
+    // (that was the 'tabs close after a few seconds' bug).
+    const sig=wanted.map(c=>c.key+":"+c.label).join("|");
+    if(sig===buildDynamicTabs._sig) return;
+    buildDynamicTabs._sig=sig;
+    $("#af-dynamic-tabs").innerHTML="";
+    $$(".af-rule-dyn").forEach(el=>el.remove());
+    wanted.forEach(c=>{
+        RSTATE[c.key]=RSTATE[c.key]||{rows:[],chain:[]};
+        const b=document.createElement("button");
+        b.className="af-tab af-rule-dyn";b.dataset.af="rule-"+c.key;
+        b.innerHTML=`<span class="glyph">✦</span><span class="t"><b>${c.label}</b><small>ML rule · dedicated models</small></span>`;
+        $("#af-dynamic-tabs").appendChild(b);
+        const s=document.createElement("section");
+        s.className="af-panel af-rule-dyn";s.id="af-rule-"+c.key;
+        s.innerHTML=`
+          <div class="card" style="margin-bottom:14px">
+            <h3>${c.label} — model quality <span class="dim" style="font-weight:400">classification (rule now) · early warning (rule holds next 5d + equity rises)</span></h3>
+            <div id="rule-kpis-${c.key}" class="pcard-row" style="display:flex;flex-wrap:wrap">loading&hellip;</div>
+          </div>
+          <div class="toolbar" style="gap:12px;flex-wrap:wrap;align-items:flex-end">
+            <button class="btn" onclick="ruleScan('${c.key}',1)">Rescan</button>
+            <button class="btn" onclick="ruleTrain('${c.key}')">Retrain ML</button>
+            <div><label>As-of day (blank = today)</label>
+              <input id="rule-asof-${c.key}" type="date" style="width:150px" onchange="ruleScan('${c.key}',0)"></div>
+            <div><label>Range start (blank = last 24 live hours)</label>
+              <input id="rule-start-${c.key}" type="date" style="width:150px" onchange="ruleScan('${c.key}',0)"></div>
+            <button class="btn" onclick="RSTATE['${c.key}'].chain=[];ruleDraw('${c.key}')">Reset sort</button>
+            <span class="dim" id="rule-meta-${c.key}"></span>
+            <span class="dim" id="rule-sortchain-${c.key}"></span>
+          </div>
+          <div class="card"><div style="max-height:440px;overflow:auto">
+          <table class="af-table"><thead id="rule-head-${c.key}"><tr>
+            <th data-k="account" title="database:login — click to open the full account detail page">Account</th>
+            <th data-k="risk" class="num" title="Composite 0-100: 40% rule-hit + 30% ML-now + 30% EW; drives the verdict tiers (monitor ≥35, restrict ≥55, escalate ≥75)">Risk</th>
+            <th data-k="rule_hit" title="Does the account satisfy the rule definition RIGHT NOW over its 90-day feature window (hindsight, not a model)">Rule now</th>
+            <th data-k="ml_now" class="num" title="Classification model: probability the account fits this category at its NEXT ACTIVE day, judged WITHOUT the rule's own fields (generalisation, not echo). Trained on the sequential active-day panel, cutoff yesterday.">ML now</th>
+            <th data-k="ml" class="num" title="Early-warning model (conditional): GIVEN the rule fires at the next active day, probability the account is PROFITABLE over the following 5 days. The action trigger: flagged AND expected to keep extracting.">EW 5d</th>
+            <th data-k="avg_daily_cost" class="num" title="EMPIRICAL, not a model: the account's realized P&L per ACTIVE day over the 90-day window. Client profit = the book's cost, so this is the measured $ you can expect to pay per day while this account keeps hitting the rule.">Avg Daily Hit $ Cost</th>
+            <th data-k="obs_trades" class="num" title="Closed trades in the 90-day observation window">Obs trades</th>
+            <th data-k="event_share" class="num" title="Share of entries within ±10 min of a calendar event (macro prints + synchronized-volatility minutes)">Event%</th>
+            <th data-k="event_trades" class="num" title="Number of entries within ±10 min of a calendar event">Event trades</th>
+            <th data-k="event_pnl" class="num" title="Net client P&L ($) on event-window entries">Event $</th>
+            <th data-k="last_ts" title="The account's most recent trade — the date-range picker filters on this">Last trade</th>
+            <th data-k="verdict" title="Tier from Risk: monitor ≥35 · restrict ≥55 · escalate ≥75">Verdict</th>
+            <th title="Confirm/dismiss with a REQUIRED comment; click the active button again to deselect">Override</th></tr></thead>
+          <tbody id="rule-rows-${c.key}"><tr><td colspan="13" class="dim">loading…</td></tr></tbody>
+          </table></div></div>`;
+        document.querySelector(".af-content").appendChild(s);
+        $$("#rule-head-"+c.key+" th[data-k]").forEach(th=>th.onclick=()=>{
+          const st=RSTATE[c.key], k=th.dataset.k, at=st.chain.findIndex(x=>x.k===k);
+          if(at>=0) st.chain[at].dir*=-1; else st.chain.push({k,dir:-1});
+          ruleDraw(c.key);
+        });
+        b.onclick=()=>{
+          $$(".af-tab").forEach(x=>x.classList.remove("on"));
+          $$(".af-panel").forEach(x=>x.classList.remove("on"));
+          b.classList.add("on");s.classList.add("on");
+          ruleScan(c.key,0);
+        };
+      });
+  }
+  window.ruleScan=async(key,refresh)=>{
+    const el=$("#rule-rows-"+key);if(!el)return;
+    $("#rule-meta-"+key).textContent="scanning…";
+    const p=new URLSearchParams({refresh:refresh?1:0,
+      as_of:$("#rule-asof-"+key)?.value||"",start:$("#rule-start-"+key)?.value||""});
+    const r=await (await fetch(`/api/antifraud/rule/${key}?`+p)).json();
+    if(r.building){
+      $("#rule-meta-"+key).textContent=(r.note||"scan building")+" — auto-refreshes";
+      // the stat strip must render in EVERY state, placeholders included
+      if(!$("#rule-kpis-"+key).innerHTML||$("#rule-kpis-"+key).textContent.includes("loading"))
+        $("#rule-kpis-"+key).innerHTML=`<div class="pcard"><b>…</b><br>rule hits (90d obs table)<br><span class="dim">building — auto-refreshes</span></div>`;
+      clearTimeout(window["_rp_"+key]);window["_rp_"+key]=setTimeout(()=>ruleScan(key,0),15000);
+      return;
+    }
+    const m=r.meta||{};
+    const ew=m.ew||((m.auc!=null)?m:null), now=m.now||null;
+    const vf=r.verification;
+    $("#rule-kpis-"+key).innerHTML=
+      modelCard("Classification — rule now",now,"#ffb020")
+      +modelCard("Early warning — profitable next 5d GIVEN flagged",ew,"#22d3ee")
+      +(vf&&vf.status==="verified"
+        ?`<div class="pcard" style="border-color:#34d399"><b style="color:#34d399">${(vf.precision*100).toFixed(0)}% / ${(vf.recall*100).toFixed(0)}%</b><br>REALISED walk-forward P / R<br><span class="dim">${vf.explain||""}</span></div>`
+        :`<div class="pcard"><b style="color:#55637d">—</b><br>Realised walk-forward<br><span class="dim">${(vf&&vf.explain)||"accumulating snapshots — first verification on the next trading day"}</span></div>`)
+      +`<div class="pcard"><b>${r.rule_hits??"—"}</b><br>rule hits (90d obs table)<br><span class="dim">${r.n_accounts??"—"} accounts observed</span></div>`;
+    $("#rule-meta-"+key).textContent=r.error?r.error:
+      `showing ${(r.rows||[]).length} accounts active ${r.range_start||""} → ${r.range_end||"now"} · generated ${r.generated_at||""}${r.from_disk?" (cached — Rescan for fresh)":""}${m.join_error?" · JOIN ERROR: "+m.join_error:""}`;
+    RSTATE[key]=RSTATE[key]||{rows:[],chain:[]};
+    RSTATE[key].rows=r.rows||[];
+    ruleDraw(key);
+  };
+  window.ruleTrain=async(key)=>{
+    const r=await (await fetch(`/api/antifraud/rule/${key}/train`,{method:"POST"})).json();
+    $("#rule-meta-"+key).textContent=r.error?("train: "+r.error)
+      :(r.note||"training started in the background — press Rescan in a few minutes");
+  };
+  /* ---- BETA: one engine per page -------------------------------------
+     The beta promotes Latency and Toxic to top-level sections, so the page
+     opens straight onto the requested pane instead of Rules & Coverage, and
+     the registry/rules bootstrap is skipped -- neither is on screen. */
+  /* ---- BETA: one engine per page -------------------------------------
+     The beta promotes Latency and Toxic to top-level sections, so the page
+     opens straight onto the requested pane instead of Rules & Coverage.
+     The registry/rules bootstrap still runs: the engine panes read RULES and
+     REG for thresholds and category labels, and skipping it left their tables
+     unrendered. It is two cached calls -- cheap enough to keep parity. */
+  loadRegistry();loadRules();
+  const AF_ONLY = {{ (af_only or '') | tojson }};
+  if (AF_ONLY) {
+    $$(".af-panel").forEach(x => x.classList.remove("on"));
+    const pane = $("#af-" + AF_ONLY);
+    if (pane) pane.classList.add("on");
+    if (AF_ONLY === "latency") loadLatency();
+    if (AF_ONLY === "toxic") loadToxic();
+  }
+})();
+</script>
+{% endblock %}

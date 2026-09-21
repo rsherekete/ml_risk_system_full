@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block title %}Executive - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Executive</h1>
+  <p>Both books on one page &mdash; what the business made, what the models would add, and what needs a decision.</p>
+</div>
+
+{% if stale_trading or stale_quant %}
+<div class="alert alert-info">
+  <b>Model settings have changed since these results were produced.</b>
+  They remain correct for the configuration that made them.
+  {% if user.is_admin %}Retrain from the Model Performance tab to apply the new one.{% endif %}
+</div>
+{% endif %}
+
+{% if report.books %}
+{# ---- headline, per book ---- #}
+<div class="grid cols-2" style="margin-bottom:14px">
+  {% for book in report.books %}
+  <div class="panel">
+    <div class="panel-head">
+      <h2>{{ book.name }} book</h2>
+      <span class="live-stamp" style="margin-left:auto">
+        {{ book.first_day }} &rarr; {{ book.last_day }} &middot; {{ book.days }} days
+      </span>
+    </div>
+
+    <div class="grid cols-2" style="gap:12px;margin-top:10px">
+      <div class="stat">
+        <span class="label"><span class="def" data-def="{{ define('firm_pnl') }}">Realised, flat book</span></span>
+        <span class="value {{ 'pos' if book.flat_pnl >= 0 else 'neg' }}">
+          ${{ '{:,.0f}'.format(book.flat_pnl) }}</span>
+        <span class="delta dim">{{ '{:,}'.format(book.accounts) }} accounts</span>
+      </div>
+      <div class="stat">
+        <span class="label">Model would add</span>
+        {% if book.model_uplift is not none %}
+          <span class="value {{ 'pos' if book.model_uplift >= 0 else 'neg' }}">
+            {{ '{:+,.0f}'.format(book.model_uplift) }}</span>
+          <span class="delta {{ 'pos' if book.drawdown_change and book.drawdown_change > 0 else 'dim' }}">
+            drawdown {{ '{:+,.0f}'.format(book.drawdown_change) if book.drawdown_change else '--' }}
+          </span>
+        {% else %}
+          <span class="value dim">--</span><span class="delta dim">not trained</span>
+        {% endif %}
+      </div>
+      <div class="stat">
+        <span class="label">Last 30 days</span>
+        <span class="value {{ 'pos' if book.last_30 >= 0 else 'neg' }}" style="font-size:20px">
+          ${{ '{:,.0f}'.format(book.last_30) }}</span>
+        {% if book.momentum is not none %}
+          <span class="delta {{ 'pos' if book.momentum >= 0 else 'neg' }}">
+            {{ '{:+,.0f}'.format(book.momentum) }} vs prior 30</span>
+        {% endif %}
+      </div>
+      <div class="stat">
+        <span class="label"><span class="def" data-def="{{ define('drawdown') }}">Max drawdown</span></span>
+        <span class="value neg" style="font-size:20px">${{ '{:,.0f}'.format(book.flat_drawdown) }}</span>
+        <span class="delta dim">{{ '{:.0%}'.format(book.losing_day_share) }} of days lost money</span>
+      </div>
+    </div>
+
+    <div id="curve-{{ book.view }}" class="chart" style="height:190px;margin-top:12px"></div>
+
+    <table style="margin-top:10px">
+      <tbody>
+        <tr><td>Best / worst day</td>
+            <td class="num pos">${{ '{:,.0f}'.format(book.best_day) }}</td>
+            <td class="num neg">${{ '{:,.0f}'.format(book.worst_day) }}</td></tr>
+        <tr><td>Daily average / volatility</td>
+            <td class="num">${{ '{:,.0f}'.format(book.daily_mean) }}</td>
+            <td class="num dim">${{ '{:,.0f}'.format(book.daily_vol) }}</td></tr>
+        <tr><td>Sharpe &mdash; flat vs model</td>
+            <td class="num">{{ '%.2f'|format(book.sharpe_flat) if book.sharpe_flat else '--' }}</td>
+            <td class="num {{ 'pos' if book.sharpe_model and book.sharpe_flat and book.sharpe_model > book.sharpe_flat else '' }}">
+              {{ '%.2f'|format(book.sharpe_model) if book.sharpe_model else '--' }}</td></tr>
+        <tr><td>Model discrimination
+              (<span class="def" data-def="{{ define('roc_auc') }}">AUC</span>)</td>
+            <td class="num" colspan="2"><b>{{ '%.4f'|format(book.roc_auc) if book.roc_auc else '--' }}</b></td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top:10px">
+      <a class="btn btn-sm" href="/{{ book.view }}/overview">Open {{ book.name }}</a>
+      <a class="btn btn-sm" href="/{{ book.view }}/risk">Risk</a>
+      <a class="btn btn-sm" href="/{{ book.view }}/exposure">Exposure</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{# ---- live position ---- #}
+<div class="panel" style="margin-bottom:14px">
+  <div class="panel-head">
+    <h2>Right now</h2>
+    <div class="live-controls" data-live="exec"></div>
+  </div>
+  <p class="hint">Open exposure across every server, read from the brokers' own position tables.</p>
+  <div class="grid cols-4" id="live-cards">
+    <div class="stat"><span class="label">Net exposure</span>
+      <span class="value" id="ex-net">--</span><span class="delta dim">direction-weighted, USD</span></div>
+    <div class="stat"><span class="label">Gross exposure</span>
+      <span class="value dim" id="ex-gross">--</span><span class="delta dim">both sides, USD</span></div>
+    <div class="stat"><span class="label">Instruments</span>
+      <span class="value" id="ex-symbols">--</span><span class="delta dim">with open positions</span></div>
+    <div class="stat"><span class="label">Limit breaches</span>
+      <span class="value" id="ex-alerts">--</span><span class="delta dim">net and concentration</span></div>
+  </div>
+  <div id="exec-exposure" class="chart" style="height:230px;margin-top:12px"></div>
+</div>
+
+<div class="grid cols-2">
+  {# ---- concentration ---- #}
+  {% if report.concentration %}
+  <div class="panel">
+    <h2>How fragile is the earnings base</h2>
+    <p class="hint">
+      <span class="def" data-def="{{ define('herfindahl') }}">Concentration</span> matters as much
+      as the total. Earning from ten clients is a different business from earning from ten thousand,
+      at identical P&amp;L.
+    </p>
+    <div class="grid cols-2" style="gap:12px;margin-bottom:12px">
+      <div class="stat">
+        <span class="label">Top 10 accounts</span>
+        <span class="value {{ 'neg' if report.concentration.top10_share > 0.4 else '' }}">
+          {{ '{:.1%}'.format(report.concentration.top10_share) }}</span>
+        <span class="delta dim">of all account profit</span>
+      </div>
+      <div class="stat">
+        <span class="label">Top 100 accounts</span>
+        <span class="value">{{ '{:.1%}'.format(report.concentration.top100_share) }}</span>
+        <span class="delta dim">of {{ '{:,}'.format(report.concentration.contributors) }} profitable</span>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Largest contributors</th><th class="num">Firm P&amp;L</th><th></th></tr></thead>
+      <tbody>
+      {% for row in report.concentration.top_accounts %}
+        <tr><td style="font-family:var(--mono);font-size:11px">{{ row.account_key }}</td>
+          <td class="num pos">${{ '{:,.0f}'.format(row.firm_pnl) }}</td>
+          <td class="num"><a class="btn btn-sm" href="/trading/account?account={{ row.account_key }}">Inspect</a></td></tr>
+      {% endfor %}
+      {% for row in report.concentration.worst_accounts %}
+        <tr><td style="font-family:var(--mono);font-size:11px">{{ row.account_key }}</td>
+          <td class="num neg">${{ '{:,.0f}'.format(row.firm_pnl) }}</td>
+          <td class="num"><a class="btn btn-sm" href="/trading/account?account={{ row.account_key }}">Inspect</a></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {# ---- what needs a decision ---- #}
+  <div class="panel">
+    <h2>Needs a decision</h2>
+    <p class="hint">Open items, most consequential first.</p>
+    <table>
+      <tbody>
+        {% if findings is not none and findings|length %}
+        <tr>
+          <td><span class="tag tag-toxic">surveillance</span></td>
+          <td>{{ findings|length }} open findings,
+            {{ (findings.severity == 'critical')|sum if findings|length else 0 }} critical</td>
+          <td class="num"><a class="btn btn-sm" href="/trading/surveillance">Review</a></td>
+        </tr>
+        {% endif %}
+        <tr>
+          <td><span class="tag tag-arb">validation</span></td>
+          <td>Models are not yet tested on a held-out period. Direction is established;
+              magnitude is provisional.</td>
+          <td class="num"><a class="btn btn-sm" href="/quant/research">Detail</a></td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-arb">economics</span></td>
+          <td>A-book figures assume hedged flow earns no markup and costs no slippage.
+              Real numbers move in both directions.</td>
+          <td class="num"><a class="btn btn-sm" href="/trading/performance">Settings</a></td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-neutral">execution</span></td>
+          <td>Copy trader is in paper mode. No live order has been sent.</td>
+          <td class="num"><a class="btn btn-sm" href="/quant/copytrader">Open</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="panel"><div class="empty"><strong>No trained models yet</strong>
+  Train from either book's Model Performance tab.</div></div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if report.books %}
+<script>
+const money = v => {
+  const n = Number(v || 0), a = Math.abs(n);
+  if (a >= 1e9) return '$' + (n/1e9).toFixed(2) + 'B';
+  if (a >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
+  if (a >= 1e3) return '$' + (n/1e3).toFixed(0) + 'k';
+  return '$' + n.toFixed(0);
+};
+
+{% for book in report.books %}
+(function () {
+  const points = {{ book.curve|tojson }};
+  zfxChart(document.getElementById('curve-{{ book.view }}'), {
+    backgroundColor: 'transparent',
+    grid: { left: 58, right: 16, top: 12, bottom: 22 },
+    tooltip: Object.assign({ trigger: 'axis', valueFormatter: money }, zfxTheme.tooltip),
+    xAxis: Object.assign({ type: 'category', data: points.map(p => p[0]),
+      boundaryGap: false, axisLabel: { show: false } }, zfxTheme.axis),
+    yAxis: Object.assign({ type: 'value',
+      axisLabel: { formatter: money, color: '#55637d', fontSize: 10,
+                   fontFamily: 'JetBrains Mono' } }, zfxTheme.axis),
+    series: [{ type: 'line', data: points.map(p => p[1]), smooth: true, symbol: 'none',
+      lineStyle: { width: 2, color: '#22d3ee' }, itemStyle: { color: '#22d3ee' },
+      areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,
+        [{offset:0,color:'rgba(34,211,238,.2)'},{offset:1,color:'rgba(34,211,238,0)'}]) } }]
+  });
+})();
+{% endfor %}
+
+async function loadExecLive() {
+  const data = await (await fetch('/api/exposure/live')).json();
+  document.getElementById('ex-net').textContent = money(data.total_net);
+  document.getElementById('ex-net').className =
+    'value ' + ((data.total_net || 0) >= 0 ? 'pos' : 'neg');
+  document.getElementById('ex-gross').textContent = money(data.total_gross);
+  document.getElementById('ex-symbols').textContent = (data.rows || []).length;
+  const alerts = data.alerts || [];
+  document.getElementById('ex-alerts').textContent = alerts.length;
+  document.getElementById('ex-alerts').className = 'value ' +
+    (alerts.some(a => a.severity === 'critical') ? 'neg' : alerts.length ? 'warn' : 'pos');
+
+  const rows = (data.rows || []).slice(0, 12);
+  if (!rows.length) return;
+  zfxChart(document.getElementById('exec-exposure'), {
+    backgroundColor: 'transparent',
+    grid: { left: 10, right: 26, top: 10, bottom: 8, containLabel: true },
+    tooltip: Object.assign({ trigger: 'axis', axisPointer: { type: 'shadow' },
+      valueFormatter: money }, zfxTheme.tooltip),
+    xAxis: Object.assign({ type: 'value',
+      axisLabel: { formatter: money, color: '#55637d', fontSize: 10,
+                   fontFamily: 'JetBrains Mono' } }, zfxTheme.axis),
+    yAxis: Object.assign({ type: 'category',
+      data: rows.map(r => r.canonical_symbol).reverse(),
+      axisLabel: { color: '#8b9ab4', fontSize: 10 } }, zfxTheme.axis),
+    series: [{ type: 'bar', barWidth: '62%',
+      data: rows.map(r => ({ value: r.net_notional,
+        itemStyle: { color: (r.net_notional || 0) >= 0 ? '#2ee6a8' : '#ff4d6d',
+                     borderRadius: [0,4,4,0] } })).reverse() }]
+  });
+}
+zfxLive.register('exec', loadExecLive, 30000);
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Surveillance - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Surveillance</h1>
+  <p>Accounts worth investigating, each with the measurement that triggered it.</p>
+</div>
+
+{% include "_controls.html" %}
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>How to read this</h2>
+  <p class="hint" style="margin:0">
+    Separate from routing on purpose. Routing asks whether an account is worth hedging;
+    this asks whether it warrants a phone call &mdash; an arbitrageur and a skilled client
+    may both deserve an A-book, but only one deserves investigation.
+    Every flag states its measurement, the threshold crossed, and the number of trades
+    behind it, because a surveillance alert is an accusation and should be judged rather
+    than trusted. Nothing is flagged on fewer than 50 closed trades.
+  </p>
+</div>
+
+{% if findings is defined and findings is not none and findings|length %}
+{% set critical = findings[findings.severity == 'critical'] %}
+<div class="grid cols-4" style="margin-bottom:14px">
+  <div class="panel stat">
+    <span class="label">Open findings</span>
+    <span class="value">{{ findings|length }}</span>
+    <span class="delta dim">across {{ findings.account_key.nunique() }} accounts</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Critical</span>
+    <span class="value {{ 'neg' if critical|length else 'pos' }}">{{ critical|length }}</span>
+    <span class="delta dim">arbitrage or toxic flow</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Most common</span>
+    <span class="value" style="font-size:17px">
+      {{ findings.code.mode()[0].replace('_',' ')|title if findings|length }}</span>
+    <span class="delta dim">dominant pattern</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Evidence base</span>
+    <span class="value" style="font-size:19px">{{ '{:,}'.format(findings.trades.sum()) }}</span>
+    <span class="delta dim">trades behind these findings</span>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Findings</h2>
+  <p class="hint">Most severe first, then by strength of the measurement.</p>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Severity</th><th>Account</th><th>Pattern</th>
+        <th>Evidence</th><th class="num">Trades</th><th></th></tr></thead>
+      <tbody>
+      {% for row in findings.itertuples() %}
+        <tr>
+          <td><span class="tag {{ 'tag-toxic' if row.severity == 'critical'
+                                 else 'tag-arb' if row.severity == 'warning' else 'tag-neutral' }}">
+            {{ row.severity }}</span></td>
+          <td><a href="/trading/account?account={{ row.account_key }}"
+                 style="font-family:var(--mono);font-size:11px">{{ row.account_key }}</a></td>
+          <td><b>{{ row.what }}</b>
+            <div class="dim" style="font-size:11px;max-width:340px;margin-top:3px">{{ row.why }}</div></td>
+          <td style="font-size:12px;color:var(--ink-dim);max-width:320px">
+            {{ row.evidence }}
+            <div style="margin-top:5px;color:var(--accent);font-size:11px">{{ row.action }}</div></td>
+          <td class="num">{{ '{:,}'.format(row.trades) }}</td>
+          <td class="num"><a class="btn btn-sm" href="/trading/account?account={{ row.account_key }}">Inspect</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% elif has_data %}
+<div class="panel"><div class="empty">
+  <strong>No findings</strong>
+  No account crossed a detection threshold on the current data. Thresholds are set to be
+  defensible rather than generous &mdash; an earlier, looser arbitrage rule flagged 137,000
+  account-days, which is noise dressed as a finding.
+</div></div>
+{% endif %}
+{% endblock %}

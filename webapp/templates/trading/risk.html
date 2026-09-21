@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% block title %}Live Risk - ZFX Trading{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Risk Monitor</h1>
+  <p>Settled risk for a chosen day, and the live event stream &mdash; kept apart by provenance.</p>
+</div>
+{% include "_controls.html" %}
+{% include "_risk_body.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const IS_ADMIN = {{ 'true' if user.is_admin else 'false' }};
+
+function renderStatus(status) {
+  const body = document.getElementById('status-body');
+  const reachable = status.reachable || {};
+  const coverage = status.coverage || {};
+
+  if (!reachable.ok) {
+    // The usual cause is not a broken consumer -- it is that these hostnames
+    // only resolve on the corporate network. Say so, with the evidence.
+    const rows = ['broker', 'schema_registry'].map(key => {
+      const r = reachable[key] || {};
+      const state = r.tcp ? '<span class="pos">reachable</span>'
+                  : r.dns ? '<span class="warn">DNS ok, port closed</span>'
+                          : '<span class="neg">DNS fails</span>';
+      return `<tr><td>${key.replace('_',' ')}</td>
+              <td style="font-family:var(--mono);font-size:11px">${r.host}:${r.port}</td>
+              <td>${state}</td>
+              <td class="dim" style="font-size:11px">${r.error || ''}</td></tr>`;
+    }).join('');
+    body.className = '';
+    body.innerHTML = `
+      <div class="alert alert-error" style="text-align:left">
+        <b>Not connected to the event stream.</b> ${reachable.hint || ''}
+      </div>
+      <table style="margin-top:6px"><thead><tr><th>Endpoint</th><th>Host</th>
+        <th>State</th><th>Detail</th></tr></thead><tbody>${rows}</tbody></table>
+      <p class="hint" style="margin-top:12px;text-align:left">
+        Nothing on this page is estimated or simulated while disconnected &mdash; live risk
+        is shown only when it is genuinely live. Historical analysis on the other tabs is
+        unaffected; it reads the warehouse, not the stream.
+      </p>
+      <div style="margin-top:12px;text-align:left">
+        <button onclick="checkStatus()">Re-check</button>
+        ${IS_ADMIN ? '<button class="btn-primary" onclick="startStream()">Connect consumer</button>' : ''}
+      </div>`;
+    return false;
+  }
+
+  const topics = (status.topics || []).map(t => `
+    <tr><td style="font-family:var(--mono);font-size:11px">${t.topic}</td>
+      <td><span class="tag ${t.status === 'streaming' ? 'tag-edge' : 'tag-arb'}">${t.status}</span></td>
+      <td class="num">${t.consumed.toLocaleString()}</td>
+      <td class="dim">${t.message || ''}</td></tr>`).join('');
+
+  // Report the span the store ACTUALLY holds. Broker retention may be shorter
+  // than the window we want, and a partial history must not read as complete.
+  const spanNote = coverage.complete
+    ? `<span class="pos">${coverage.span_days} days retained</span>`
+    : `<span class="warn">only ${coverage.span_days} of ${coverage.requested_days} days retained</span>`;
+
+  document.getElementById('status-body').className = '';
+  document.getElementById('status-body').innerHTML = `
+    <div style="text-align:left">
+      <div class="grid cols-4" style="margin-bottom:12px">
+        <div class="stat"><span class="label">Events stored</span>
+          <span class="value" style="font-size:20px">${(coverage.events||0).toLocaleString()}</span></div>
+        <div class="stat"><span class="label">Window</span>
+          <span class="value" style="font-size:20px">${spanNote}</span></div>
+        <div class="stat"><span class="label">Accounts seen</span>
+          <span class="value" style="font-size:20px">${(coverage.logins||0).toLocaleString()}</span></div>
+        <div class="stat"><span class="label">Symbols</span>
+          <span class="value" style="font-size:20px">${(coverage.symbols||0).toLocaleString()}</span></div>
+      </div>
+      <table><thead><tr><th>Topic</th><th>State</th><th class="num">Consumed</th><th>Detail</th></tr></thead>
+        <tbody>${topics}</tbody></table>
+    </div>`;
+  return (coverage.events || 0) > 0;
+}
+
+async function checkStatus() {
+  const status = await (await fetch('/api/live/status')).json();
+  if (renderStatus(status)) loadActivity();
+}
+async function startStream() {
+  await fetch('/api/live/start', { method: 'POST' });
+  setTimeout(checkStatus, 2500);
+}
+
+async function loadActivity() {
+  const data = await (await fetch('/api/live/activity?hours=168')).json();
+  if (!data.buckets || !data.buckets.length) return;
+  document.getElementById('live-charts').style.display = '';
+  document.getElementById('live-table').style.display = '';
+
+  zfxChart(document.getElementById('activity'), {
+    backgroundColor: 'transparent', grid: zfxTheme.grid,
+    legend: { data: ['Events', 'Accounts'], top: 0, right: 0,
+              textStyle: { color: '#8b9ab4', fontSize: 11 }, icon: 'roundRect' },
+    tooltip: Object.assign({ trigger: 'axis' }, zfxTheme.tooltip),
+    xAxis: Object.assign({ type: 'category',
+      data: data.buckets.map(b => b.bucket.slice(5, 16).replace('T', ' ')) }, zfxTheme.axis),
+    yAxis: [Object.assign({ type: 'value' }, zfxTheme.axis),
+            Object.assign({ type: 'value' }, zfxTheme.axis)],
+    series: [
+      { name: 'Events', type: 'bar', data: data.buckets.map(b => b.events),
+        itemStyle: { color: 'rgba(34,211,238,.55)', borderRadius: [3,3,0,0] } },
+      { name: 'Accounts', type: 'line', yAxisIndex: 1, smooth: true, symbol: 'none',
+        data: data.buckets.map(b => b.accounts), lineStyle: { width: 2, color: '#2ee6a8' } }
+    ]
+  });
+
+  const rows = data.exposure || [];
+  zfxChart(document.getElementById('exposure'), {
+    backgroundColor: 'transparent',
+    grid: { left: 8, right: 22, top: 12, bottom: 8, containLabel: true },
+    tooltip: Object.assign({ trigger: 'axis', axisPointer: { type: 'shadow' } }, zfxTheme.tooltip),
+    xAxis: Object.assign({ type: 'value' }, zfxTheme.axis),
+    yAxis: Object.assign({ type: 'category', data: rows.map(r => r.symbol).reverse(),
+      axisLabel: { color: '#8b9ab4', fontSize: 10 } }, zfxTheme.axis),
+    series: [{ type: 'bar', barWidth: '58%', data: rows.map(r => r.volume).reverse(),
+      itemStyle: { color: '#22d3ee', borderRadius: [0,4,4,0] } }]
+  });
+
+  document.getElementById('exposure-rows').innerHTML = rows.map(r => `
+    <tr><td>${r.symbol}</td><td class="num">${r.events.toLocaleString()}</td>
+      <td class="num">${r.accounts.toLocaleString()}</td>
+      <td class="num">${r.volume.toFixed(2)}</td>
+      <td class="num ${r.profit < 0 ? 'pos' : 'neg'}">${r.profit.toLocaleString(undefined,{maximumFractionDigits:0})}</td></tr>`).join('');
+}
+
+// ---- symbol VaR + chips ---------------------------------------------------
+let hiddenSymbols = new Set();
+
+async function loadSymbolVar() {
+  const data = await (await fetch('/api/live/symbol_var')).json();
+  const rows = data.rows || [];
+  if (!rows.length) return;
+  document.getElementById('live-table').style.display = '';
+
+  document.getElementById('symbol-chips').innerHTML = rows.map(r =>
+    `<span class="chip chip-sm ${hiddenSymbols.has(r.symbol) ? '' : 'on'}"
+           onclick="toggleSymbol('${r.symbol}')">${r.symbol}</span>`).join('');
+
+  const money = v => '$' + Number(v).toLocaleString(undefined, {maximumFractionDigits: 0});
+  document.getElementById('exposure-rows').innerHTML = rows.map(r => `
+    <tr style="${hiddenSymbols.has(r.symbol) ? 'opacity:.35' : ''}">
+      <td>${r.symbol}</td>
+      <td class="num">${r.events.toLocaleString()}</td>
+      <td class="num">${r.accounts.toLocaleString()}</td>
+      <td class="num">${r.volume.toFixed(2)}</td>
+      <td class="num ${r.firm_pnl >= 0 ? 'pos' : 'neg'}">${money(r.firm_pnl)}</td>
+      <td class="num neg">${money(r.var_1d)}</td>
+      <td class="num neg">${money(r.var_5d)}</td>
+      <td class="num neg">${money(r.var_20d)}</td>
+    </tr>`).join('');
+
+  const shown = rows.filter(r => !hiddenSymbols.has(r.symbol));
+  zfxChart(document.getElementById('exposure'), {
+    backgroundColor: 'transparent',
+    grid: { left: 8, right: 26, top: 30, bottom: 8, containLabel: true },
+    legend: { data: ['VaR 1d', 'VaR 5d', 'VaR 20d'], top: 0, right: 0,
+              textStyle: { color: '#8b9ab4', fontSize: 11 }, icon: 'roundRect' },
+    tooltip: Object.assign({ trigger: 'axis', axisPointer: { type: 'shadow' },
+      valueFormatter: money }, zfxTheme.tooltip),
+    xAxis: Object.assign({ type: 'value' }, zfxTheme.axis),
+    yAxis: Object.assign({ type: 'category', data: shown.map(r => r.symbol).reverse(),
+      axisLabel: { color: '#8b9ab4', fontSize: 10 } }, zfxTheme.axis),
+    series: [
+      { name: 'VaR 1d', type: 'bar', data: shown.map(r => r.var_1d).reverse(),
+        itemStyle: { color: '#22d3ee' } },
+      { name: 'VaR 5d', type: 'bar', data: shown.map(r => r.var_5d).reverse(),
+        itemStyle: { color: '#7c8cff' } },
+      { name: 'VaR 20d', type: 'bar', data: shown.map(r => r.var_20d).reverse(),
+        itemStyle: { color: '#ff4d6d' } }
+    ]
+  });
+}
+function toggleSymbol(symbol) {
+  hiddenSymbols.has(symbol) ? hiddenSymbols.delete(symbol) : hiddenSymbols.add(symbol);
+  loadSymbolVar();
+}
+
+// ---- OHLC -----------------------------------------------------------------
+async function loadOhlc() {
+  const select = document.getElementById('ohlc-sym');
+  const symbol = select.value;
+  const minutes = document.getElementById('ohlc-tf').value;
+  const hours = document.getElementById('ohlc-window').value;
+  const data = await (await fetch(
+    `/api/live/ohlc?symbol=${encodeURIComponent(symbol || '')}&minutes=${minutes}&hours=${hours}`)).json();
+
+  if (!select.options.length && data.symbols && data.symbols.length) {
+    select.innerHTML = data.symbols.map(s => `<option value="${s}">${s}</option>`).join('');
+    return loadOhlc();
+  }
+  if (!data.bars || !data.bars.length) return;
+  document.getElementById('ohlc-panel').style.display = '';
+  document.getElementById('ohlc-symbol').textContent = data.symbol;
+
+  zfxChart(document.getElementById('ohlc'), {
+    backgroundColor: 'transparent',
+    grid: { left: 70, right: 24, top: 20, bottom: 50 },
+    tooltip: Object.assign({ trigger: 'axis', axisPointer: { type: 'cross' } }, zfxTheme.tooltip),
+    dataZoom: [{ type: 'inside' },
+               { type: 'slider', height: 18, bottom: 10, borderColor: '#26324a',
+                 fillerColor: 'rgba(34,211,238,.12)', handleStyle: { color: '#22d3ee' },
+                 textStyle: { color: '#55637d', fontSize: 10 } }],
+    xAxis: Object.assign({ type: 'category',
+      data: data.bars.map(b => b.time.slice(5, 16).replace('T', ' ')) }, zfxTheme.axis),
+    yAxis: Object.assign({ type: 'value', scale: true }, zfxTheme.axis),
+    series: [{
+      type: 'candlestick',
+      // ECharts candlestick order is [open, close, low, high].
+      data: data.bars.map(b => [b.open, b.close, b.low, b.high]),
+      itemStyle: { color: '#2ee6a8', color0: '#ff4d6d',
+                   borderColor: '#2ee6a8', borderColor0: '#ff4d6d' }
+    }]
+  });
+}
+
+// ---- open positions -------------------------------------------------------
+async function loadPositions() {
+  const data = await (await fetch('/api/live/positions')).json();
+  const chip = document.getElementById('positions-source');
+  chip.textContent = data.source === 'mysql' ? 'broker tables' : 'stream-derived';
+  chip.title = data.source === 'mysql'
+    ? 'Read from each server position table -- the complete book.'
+    : 'Inferred from the event stream; only sees positions opened inside retention.';
+  const rows = data.rows || [];
+  const money = v => Number(v || 0).toLocaleString(undefined, {maximumFractionDigits: 0});
+  document.getElementById('positions-rows').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td>${r.database || r.server || ''}</td>
+      <td>${r.canonical || r.symbol || ''}</td>
+      <td class="num">${(r.accounts || 0).toLocaleString()}</td>
+      <td class="num">${(r.positions || 0).toLocaleString()}</td>
+      <td class="num">${(r.gross_lots ?? Math.abs(r.net_volume || 0)).toFixed(2)}</td>
+      <td class="num ${(r.net_lots || 0) >= 0 ? 'pos' : 'neg'}">${(r.net_lots ?? r.net_volume ?? 0).toFixed(2)}</td>
+      <td class="num ${(r.floating || 0) >= 0 ? 'pos' : 'neg'}">${money(r.floating)}</td>
+    </tr>`).join('')
+    : '<tr><td colspan="7" class="empty">No open positions found.</td></tr>';
+}
+
+function stampRefresh() {
+  const el = document.getElementById('refreshed');
+  if (el) el.textContent = 'live refreshed ' + new Date().toLocaleTimeString();
+}
+
+// Registered with the shared live registry rather than raw setInterval: it
+// owns the refresh button, the auto-update toggle (remembered per panel), the
+// timestamp, and pausing while the tab is hidden -- previously five servers
+// were being polled for a window nobody was looking at.
+zfxLive.register('risk', async () => {
+  const status = await (await fetch('/api/live/status')).json();
+  if (renderStatus(status)) await loadActivity();
+  await loadSymbolVar();
+}, 15000);
+
+zfxLive.register('positions', async () => {
+  await loadPositions();
+}, 60000);
+
+loadOhlc();
+</script>
+
+{% if timeline is defined and timeline is not none and timeline|length %}
+<script>
+// Cumulative P&L against rolling volatility and rolling VaR on one plot: the
+// question is never "was it profitable" alone, but whether the profit came
+// calmly or violently, and that only reads when the three share an axis.
+const tDays = {{ timeline.day.dt.strftime('%Y-%m-%d').tolist()|tojson }};
+zfxChart(document.getElementById('risk-timeline'), {
+  backgroundColor: 'transparent',
+  grid: { left: 62, right: 60, top: 26, bottom: 34 },
+  legend: { data: ['Cumulative P&L', 'Rolling vol (30d)', 'Rolling VaR 95%'],
+            top: 0, right: 0, textStyle: { color: '#8b9ab4', fontSize: 11 }, icon: 'roundRect' },
+  tooltip: Object.assign({ trigger: 'axis',
+    valueFormatter: v => v === null ? '--' : '$' + Number(v).toLocaleString(undefined,{maximumFractionDigits:0})
+  }, zfxTheme.tooltip),
+  xAxis: Object.assign({ type: 'category', data: tDays, boundaryGap: false }, zfxTheme.axis),
+  yAxis: [
+    Object.assign({ type: 'value', axisLabel: { formatter: v => '$' + (v/1e6).toFixed(1) + 'M',
+      color: '#55637d', fontSize: 10, fontFamily: 'JetBrains Mono' } }, zfxTheme.axis),
+    Object.assign({ type: 'value', splitLine: { show: false },
+      axisLabel: { formatter: v => '$' + (v/1e3).toFixed(0) + 'k',
+      color: '#55637d', fontSize: 10, fontFamily: 'JetBrains Mono' } }, zfxTheme.axis)
+  ],
+  series: [
+    { name: 'Cumulative P&L', type: 'line', smooth: true, symbol: 'none',
+      data: {{ timeline.cumulative.round(0).tolist()|tojson }},
+      lineStyle: { width: 2.5, color: '#22d3ee' }, itemStyle: { color: '#22d3ee' },
+      areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,
+        [{offset:0,color:'rgba(34,211,238,.18)'},{offset:1,color:'rgba(34,211,238,0)'}]) } },
+    { name: 'Rolling vol (30d)', type: 'line', yAxisIndex: 1, smooth: true, symbol: 'none',
+      data: {{ timeline.rolling_vol.round(0).where(timeline.rolling_vol.notna(), None).tolist()|tojson }},
+      lineStyle: { width: 1.8, color: '#ffb020' }, itemStyle: { color: '#ffb020' } },
+    { name: 'Rolling VaR 95%', type: 'line', yAxisIndex: 1, smooth: true, symbol: 'none',
+      data: {{ timeline.rolling_var95.round(0).where(timeline.rolling_var95.notna(), None).tolist()|tojson }},
+      lineStyle: { width: 1.8, color: '#ff4d6d', type: 'dashed' }, itemStyle: { color: '#ff4d6d' } }
+  ]
+});
+</script>
+{% endif %}
+{% endblock %}

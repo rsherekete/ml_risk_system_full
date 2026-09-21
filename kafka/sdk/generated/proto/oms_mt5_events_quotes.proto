@@ -1,0 +1,32 @@
+syntax = "proto3";
+package Zeal.OMS.MT5.Events.Contract.Quotes;
+
+import "google/protobuf/timestamp.proto";
+
+option java_package = "com.zeal.oms.mt5.events.contract.quotes";
+option cc_enable_arenas = true;
+
+message Quote {
+  google.protobuf.Timestamp timestamp = 1;
+  string symbol = 2;
+
+  oneof Event {
+    Tick quoteCreated = 10;
+  }
+}
+message Tick {
+  string symbol = 1;
+  string feedName = 2;
+  string bank = 3;
+  google.protobuf.Timestamp datetime = 4;
+  double bid = 5;
+  double ask = 6;
+  double last = 7;
+  uint64 volume = 8;
+  uint64 volume_ext = 9;
+  TickFlags flags = 10;
+}
+message TickFlags {
+  bool flagTickBuy = 1;
+  bool flagTickSell = 2;
+}

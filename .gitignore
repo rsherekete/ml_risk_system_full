@@ -1,0 +1,70 @@
+# ---- credentials: never leave this machine
+server.yaml
+vantage.yaml
+vantage_reference.yaml
+icmarkets_reference.yaml
+*_reference.yaml
+server.yaml.bak-*
+kafka/clusters.yaml
+kafka/config.yaml
+docs/replication/_servers_local.yaml
+webapp/artifacts/agent_key.txt
+webapp/artifacts/agent_workspace.txt
+tunnel_url.txt
+.github_token
+*.pem
+*.key
+
+# ---- client data (trades, cash movements, per-client analysis output)
+*.csv
+*.parquet
+*.duckdb
+*.duckdb.wal
+*.sqlite
+*.sqlite-journal
+*.db
+*.db-journal
+*.xlsx
+*.zip
+webapp/artifacts/event_impact_last.json
+webapp/artifacts/lifetime_trading.parquet
+webapp/artifacts/live_stream_backup_*.duckdb
+docs/event_impact_labels.csv
+docs/Event_Impact_Replication.zip
+
+*.bak
+*.tmp
+webapp/artifacts/live_stream.duckdb.tmp/
+webapp/artifacts/ad/
+# the feature manifest is small and has no client data; the corpus and the
+# 90-day records next to it travel as GitHub release assets
+# (tools/github_data_assets.py), never as commits.
+!webapp/artifacts/ad/model_features.csv
+
+# ---- environments, caches, logs, editor state
+.venv/
+.venv315/
+.launch-venv/
+.cache/
+.claude/
+.streamlit/
+.vscode/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*.log
+# `*.log` does NOT match `*.log.err`, and the uvicorn stderr files run to tens
+# of megabytes each -- they were the bulk of an accidental 800 MB upload.
+*.err
+*.log.err
+scratch_uvicorn_*.log
+beta_uvicorn*.log
+webapp/artifacts/_server_*.log
+
+# SQLite side-car files: `*.db` is ignored above but its WAL and shared-memory
+# companions are separate extensions and were being tracked.
+*.db-shm
+*.db-wal
+
+# Local snapshots taken before a sync -- a copy of the tree, never pushed.
+_backup_before_github_sync_*/

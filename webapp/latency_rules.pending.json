@@ -1,0 +1,67 @@
+{
+  "window_days": 7,
+  "horizons_seconds": [
+    0.1,
+    0.2,
+    0.3,
+    0.5,
+    1,
+    5,
+    60
+  ],
+  "flag_markout_bps": {
+    "0.1": 0.75,
+    "0.2": 1.0,
+    "0.3": 1.25,
+    "0.5": 1.5,
+    "1": 1.5,
+    "5": 2.0
+  },
+  "early_horizons_seconds": [
+    0.1,
+    0.2,
+    0.3,
+    0.5
+  ],
+  "fallback_early_horizons_seconds": [
+    1,
+    5
+  ],
+  "quote_throttle_ms": 200,
+  "quote_age_tolerance_ms": 100,
+  "min_decay_pct": 50.0,
+  "directional_markout_bps": 3.0,
+  "neutral_band_bps": 0.5,
+  "max_hold_seconds": 120,
+  "min_trade_profit_usd": 1.0,
+  "min_flagged_trades": 5,
+  "illiquid_spread_ratio": 1.5,
+  "independent_check": true,
+  "tiers": {
+    "escalate": 75,
+    "restrict": 55,
+    "monitor": 35
+  },
+  "complex_filter": "risk >= 20",
+  "actions": {
+    "escalate": {
+      "treatment": "SOR: pin to B-book off + feed delay",
+      "delay_ms": 250,
+      "requote_bps": 1.0,
+      "review": true
+    },
+    "restrict": {
+      "treatment": "SOR: feed delay on quotes",
+      "delay_ms": 120,
+      "requote_bps": 0.5,
+      "review": false
+    },
+    "monitor": {
+      "treatment": "watchlist only",
+      "delay_ms": 0,
+      "requote_bps": 0.0,
+      "review": false
+    }
+  },
+  "shadow_mode": true
+}

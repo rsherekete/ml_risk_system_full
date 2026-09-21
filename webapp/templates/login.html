@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Sign in - ZFX Risk Intelligence{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="brand" style="margin-bottom:20px">
+      <div class="brand-mark">Z</div>
+      <div>ZFX<small>Risk Intelligence</small></div>
+    </div>
+    <h1>Sign in</h1>
+    <p class="sub">Client routing, trade-level execution and live risk.</p>
+
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+    {% if notice %}<div class="alert alert-ok">{{ notice }}</div>{% endif %}
+
+    <form method="post" action="/login" onsubmit="signingIn(this)">
+      <div class="field">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" autocomplete="username" autofocus required>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+      </div>
+      <button id="signin" class="btn-primary" type="submit" style="width:100%">Sign in</button>
+    </form>
+    <script>
+    // The first page after sign-in builds a dashboard, so there can be a pause
+    // before anything changes. Without feedback that reads as a dead button --
+    // which is exactly how it was reported.
+    function signingIn(form) {
+      const button = document.getElementById('signin');
+      button.textContent = 'Signing in…';
+      button.style.opacity = '.65';
+      button.disabled = true;
+      // Re-enable if the browser restores this page from cache on Back.
+      window.addEventListener('pageshow', () => {
+        button.textContent = 'Sign in';
+        button.style.opacity = '';
+        button.disabled = false;
+      });
+      return true;
+    }
+    </script>
+
+    <p style="margin:18px 0 0;font-size:13px;color:var(--ink-dim)">
+      No account? <a href="/register">Request access</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

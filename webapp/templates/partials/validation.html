@@ -1,0 +1,296 @@
+﻿<div class="page-head">
+  <h1>Validation</h1>
+  <p>Evidence that the numbers on every other screen can be believed.</p>
+</div>
+
+{% if not report.available %}
+<div class="panel">
+  {% if report.building %}
+  <p class="empty">Building the validation report in the background &mdash; the Quant artifact is
+    18M rows and the full check takes about two minutes. Refresh this page shortly.</p>
+  {% else %}
+  <p class="empty">No trained model yet. Train one, then this page fills in.</p>
+  {% endif %}
+</div>
+{% else %}
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>What this page is for</h2>
+  <p class="hint" style="margin:0">
+    Every other screen reports what the model <em>earned</em>. This one asks whether that report
+    is true. Three failures would each make the headline wrong without making it look wrong: the
+    P&amp;L could be double-counted by the exposure-day expansion (every screen would still agree
+    with every other, because they read the same artefact); the model could be scored against the
+    wrong target; or the result could hold only in an early regime. Each is checked below.
+    Nothing here retrains &mdash; these are walk-forward scores, each produced by a model fitted
+    only on days strictly before the day it scores.
+  </p>
+</div>
+
+<!-- 0. COVERAGE -->
+{% set cov = report.coverage %}
+<div class="panel" style="margin-bottom:14px">
+  <h2>0. Is every live server included?</h2>
+  <p class="hint">
+    The desk runs <b>six</b> live real-money servers. Five are in the MySQL instance behind
+    <code>ld4-dbproxy</code>; the sixth, <code>mt5_dubai_live01</code>, is not &mdash; the proxy
+    exposes 31 databases and none of them is dubai. Its data is replicated into BigQuery instead
+    (<code>operational_data_store.dubai_traze_&hellip;</code>). Until it is backfilled, every P&amp;L
+    total, exposure figure and model on this site <b>excludes one whole live server</b>.
+  </p>
+  {% if cov.error %}
+    <p class="empty neg">Coverage check failed: {{ cov.error }}</p>
+  {% else %}
+  {% if cov.missing %}
+  <p class="hint neg" style="margin-bottom:8px"><b>
+    {{ cov.present }} of {{ cov.expected }} live servers present.
+    Missing: {{ cov.missing|join(', ') }} &mdash; firm P&amp;L is understated by that server's
+    entire contribution.</b></p>
+  {% elif cov.incomplete %}
+  <p class="hint neg" style="margin-bottom:8px"><b>
+    All {{ cov.expected }} servers present, but {{ cov.incomplete|join(', ') }}
+    {{ 'has' if cov.incomplete|length == 1 else 'have' }} missing months &mdash; an interrupted
+    backfill. Every figure covering those dates is understated until it is completed.</b></p>
+  {% else %}
+  <p class="hint pos" style="margin-bottom:8px"><b>All {{ cov.expected }} live servers present
+    and complete, with no missing months.</b></p>
+  {% endif %}
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Server</th><th>Source</th><th class="num">Months</th>
+        <th class="num">Rows</th><th>Range</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for s in cov.servers %}
+        <tr>
+          <td><b>{{ s.server }}</b></td>
+          <td class="dim">{{ s.source }}</td>
+          <td class="num dim">{{ s.files }}</td>
+          <td class="num">{{ '{:,}'.format(s.rows) }}</td>
+          <td class="dim">{{ (s.first ~ ' .. ' ~ s.last) if s.present else '--' }}</td>
+          <td>{% if not s.present %}<span class="neg">NOT INCLUDED</span>
+              {% elif s.gaps %}<span class="neg">{{ s.gap_count }} MONTHS MISSING</span>
+                <span class="dim">({{ s.gaps[:4]|join(', ') }}{{ '&hellip;' if s.gap_count > 4 }})</span>
+              {% else %}<span class="pos">complete</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<!-- 1. RECONCILIATION -->
+<div class="panel" style="margin-bottom:14px">
+  <div class="panel-head">
+    <h2>1. Is the P&amp;L real?</h2>
+    <form method="post" action="/{{ view }}/validation/reconcile" style="margin:0">
+      <button class="btn" {% if report.reconciling %}disabled{% endif %}>
+        {% if report.reconciling %}Scanning warehouse&hellip;{% else %}Recompute{% endif %}
+      </button>
+    </form>
+  </div>
+  <p class="hint">
+    The artefact's total P&amp;L against the warehouse's own <code>sum(net_profit)</code> over the
+    same date range &mdash; an independent path to the same quantity. Costs a full scan of ~140M
+    trades, so it is cached rather than recomputed per page load.
+  </p>
+
+  {% set rec = report.reconciliation %}
+  {% if not rec %}
+    <p class="empty">Not yet computed. Press Recompute &mdash; it runs in the background.</p>
+  {% elif rec.error %}
+    <p class="empty neg">Failed: {{ rec.error }}</p>
+  {% else %}
+    {% set matched = rec.relative_gap < 0.01 %}
+    <div class="stat-row" style="margin-bottom:10px">
+      <div class="stat"><div class="stat-label">Artefact</div>
+        <div class="stat-value">{{ '${:,.0f}'.format(rec.artefact_pnl) }}</div></div>
+      <div class="stat"><div class="stat-label">Warehouse</div>
+        <div class="stat-value">{{ '${:,.0f}'.format(rec.warehouse_pnl) }}</div></div>
+      <div class="stat"><div class="stat-label">Difference</div>
+        <div class="stat-value {{ 'pos' if matched else 'neg' }}">{{ '${:,.0f}'.format(rec.gap) }}</div></div>
+      <div class="stat"><div class="stat-label">Relative</div>
+        <div class="stat-value {{ 'pos' if matched else 'neg' }}">{{ '{:.4%}'.format(rec.relative_gap) }}</div></div>
+    </div>
+    <p class="hint" style="margin:0">
+      {% if matched %}
+        <b class="pos">MATCH.</b> {{ '{:,}'.format(rec.trades) }} closed trades over
+        {{ rec.start }} to {{ rec.end }} reconcile to within
+        {{ '{:.4%}'.format(rec.relative_gap) }}. The exposure-day expansion books realised P&amp;L
+        on the closing day only, as intended &mdash; it is not double-counting.
+      {% else %}
+        <b class="neg">MISMATCH.</b> The artefact and the warehouse disagree by
+        {{ '{:.2%}'.format(rec.relative_gap) }}. Headline figures should not be relied on until
+        this is explained.
+      {% endif %}
+      {% if rec.stale %}
+        <br><b class="neg">Stale:</b> computed against a previous model. Recompute it.
+      {% endif %}
+    </p>
+  {% endif %}
+</div>
+
+<!-- 2. AUC ON THE REAL TARGET -->
+<div class="panel" style="margin-bottom:14px">
+  <h2>2. Is the model scored on the right target?</h2>
+  <p class="hint">
+    The target here is <b>{{ report.target_note }}</b>.
+    {% if report.target.has_sigma %}
+      Scoring this model against <em>same-day</em> P&amp;L instead returns roughly 0.43, which
+      looks like an inverted model and is really a measurement error &mdash; the model predicts
+      forward P&amp;L, so a contemporaneous label measures nothing. The label below is the stored
+      target.
+    {% else %}
+      This is not circular: the score was produced by a model fitted only on earlier days, and the
+      P&amp;L is what happened afterwards.
+    {% endif %}
+  </p>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Window</th><th class="num">Days</th><th class="num">Rows</th>
+        <th class="num">Scored</th><th class="num">Base rate</th><th class="num">ROC AUC</th></tr></thead>
+      <tbody>
+      {% for w in report.windows %}
+        <tr>
+          <td><b>{{ w.title }}</b></td>
+          <td class="num dim">{{ '{:,}'.format(w.days) }}</td>
+          <td class="num dim">{{ '{:,}'.format(w.rows) }}</td>
+          <td class="num dim">{{ '{:,}'.format(w.scored) }}</td>
+          <td class="num">{{ '{:.1%}'.format(w.base_rate) if w.base_rate == w.base_rate else '--' }}</td>
+          <td class="num {{ 'pos' if w.auc == w.auc and w.auc > 0.55 else ('neg' if w.auc == w.auc and w.auc < 0.5 else '') }}">
+            {{ '{:.4f}'.format(w.auc) if w.auc == w.auc else '--' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 3. REGIME -->
+<div class="panel" style="margin-bottom:14px">
+  <h2>3. Does it still work now?</h2>
+  <p class="hint">
+    A hedge fraction <b>dominates</b> only if it earns more <em>and</em> draws down less than a
+    flat B-book. Where nothing dominates, the model is buying stability with profit &mdash; a
+    legitimate trade, but not a free one, and the table says so rather than quoting the window
+    that flatters it.
+  </p>
+  {% for d in report.dominance %}
+  <div style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+      <b>{{ d.title }}</b>
+      <span class="hint">flat {{ '${:,.0f}'.format(d.flat_profit) }} &middot; DD
+        {{ '${:,.0f}'.format(d.flat_drawdown) }} &middot;
+        {% if d.winners %}<b class="pos">dominates at {{ d.winners|join(', ') }}</b>
+        {% else %}<b class="neg">no dominating fraction</b>{% endif %}</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Hedge</th><th class="num">Profit</th><th class="num">vs flat</th>
+          <th class="num">Max DD</th><th class="num">vs flat</th><th class="num">Sharpe</th>
+          <th>Verdict</th></tr></thead>
+        <tbody>
+        {% for r in d.ladder %}
+          <tr>
+            <td>{{ '{:.0%}'.format(r.fraction) }}</td>
+            <td class="num">{{ '${:,.0f}'.format(r.profit) }}</td>
+            <td class="num {{ 'pos' if r.profit_delta >= 0 else 'neg' }}">{{ '{:+,.0f}'.format(r.profit_delta) }}</td>
+            <td class="num">{{ '${:,.0f}'.format(r.drawdown) }}</td>
+            <td class="num {{ 'pos' if r.drawdown_delta >= 0 else 'neg' }}">{{ '{:+,.0f}'.format(r.drawdown_delta) }}</td>
+            <td class="num">{{ '{:.2f}'.format(r.sharpe) }}</td>
+            <td>{% if r.dominates %}<span class="pos">beats both</span>
+                {% else %}<span class="dim">trade-off</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- 3b. ROUTING POLICY -->
+<div class="panel" style="margin-bottom:14px">
+  <h2>3b. Which routing policy actually pays?</h2>
+  <p class="hint">
+    Same model, same scores &mdash; only the selection rule differs. Almost every client cohort
+    loses to the broker, so <b>every hedge costs expected profit</b>: hedging is insurance, not
+    alpha. A wide quota spends that premium on marginal cases and buys little; only genuinely
+    confident calls pay for themselves. Ranking by expected <em>dollars</em> instead of
+    probability was tested and is far worse &mdash; the largest accounts are the firm's biggest
+    profit source, so weighting by size hedges precisely the wrong ones.
+  </p>
+  {% for w in report.policies %}
+  <div style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+      <b>{{ w.title }}</b>
+      <span class="hint">flat {{ '${:,.0f}'.format(w.flat_profit) }} &middot; DD
+        {{ '${:,.0f}'.format(w.flat_drawdown) }}</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Policy</th><th class="num">Profit</th><th class="num">vs flat</th>
+          <th class="num">Max DD</th><th class="num">vs flat</th>
+          <th class="num">Hedges/day</th><th>Verdict</th></tr></thead>
+        <tbody>
+        {% for r in w.rows %}
+          <tr>
+            <td>{{ r.name }}</td>
+            <td class="num">{{ '${:,.0f}'.format(r.profit) }}</td>
+            <td class="num {{ 'pos' if r.profit_delta >= 0 else 'neg' }}">{{ '{:+,.0f}'.format(r.profit_delta) }}</td>
+            <td class="num">{{ '${:,.0f}'.format(r.drawdown) }}</td>
+            <td class="num {{ 'pos' if r.drawdown_delta >= 0 else 'neg' }}">{{ '{:+,.0f}'.format(r.drawdown_delta) }}</td>
+            <td class="num dim">{{ '{:,.0f}'.format(r.hedged_per_day) if r.hedged_per_day == r.hedged_per_day else '--' }}</td>
+            <td>{% if r.dominates %}<span class="pos">beats both</span>
+                {% else %}<span class="dim">trade-off</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+  <p class="hint" style="margin:0">
+    <b>Live setting:</b> hedging only scores at or above
+    {{ '{:.2f}'.format(report.threshold_live) }} probability
+    (quota fallback {{ '{:.0%}'.format(report.hedge_fraction) }}).
+    Both apply at view time to cached scores, so changing them needs no retrain.
+    One caution: these thresholds were chosen by looking at these same windows, so treat the
+    exact figure as fitted. What is not fitted is the direction &mdash; fewer, more confident
+    hedges beat a wide quota in every window tested.
+  </p>
+</div>
+
+<!-- 4. TARGET SANITY -->
+<div class="panel">
+  <h2>4. Is the target itself well-formed?</h2>
+  <p class="hint">
+    The target divides forward P&amp;L by the account's own volatility, so an account with a
+    near-zero volatility produces an enormous value that is arithmetic, not a real move. Those are
+    counted and excluded from the AUC above rather than being averaged in.
+  </p>
+  <div class="stat-row">
+    <div class="stat"><div class="stat-label">Rows</div>
+      <div class="stat-value">{{ '{:,}'.format(report.target.rows) }}</div></div>
+    <div class="stat"><div class="stat-label">Not scoreable</div>
+      <div class="stat-value">{{ '{:,}'.format(report.target.non_finite) }}</div></div>
+    {% if report.target.has_sigma %}
+    <div class="stat"><div class="stat-label">|&sigma;| &gt; 100</div>
+      <div class="stat-value {{ 'neg' if report.target.extreme > 1000 else '' }}">{{ '{:,}'.format(report.target.extreme) }}</div></div>
+    <div class="stat"><div class="stat-label">Median</div>
+      <div class="stat-value">{{ '{:.4f}'.format(report.target.median) }}</div></div>
+    <div class="stat"><div class="stat-label">0.1 &ndash; 99.9 pct</div>
+      <div class="stat-value">{{ '{:.1f}'.format(report.target.p01) }} &hellip; {{ '{:.1f}'.format(report.target.p99) }}</div></div>
+    {% endif %}
+  </div>
+  {% if report.target.has_sigma and report.target.extreme %}
+  <p class="hint" style="margin:6px 0 0">
+    {{ '{:,}'.format(report.target.extreme) }} rows exceed 100&sigma; and
+    {{ '{:,}'.format(report.target.non_finite) }} are non-finite &mdash;
+    {{ '{:.3%}'.format((report.target.extreme + report.target.non_finite) / report.target.rows) }}
+    of the sample. They are excluded from the AUC above rather than averaged in.
+  </p>
+  {% endif %}
+</div>
+
+{% endif %}

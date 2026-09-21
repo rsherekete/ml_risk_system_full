@@ -1,0 +1,11 @@
+# grpcio-tools first and let it pull the protobuf it was built against.
+grpcio-tools >= 1.83
+protobuf >= 7.36
+
+confluent-kafka >= 2.15
+PyYAML >= 6.0
+requests >= 2.32
+
+# frame.ipynb
+ipykernel >= 7.0
+pandas >= 2.2

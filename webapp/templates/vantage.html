@@ -1,0 +1,767 @@
+{% extends "base.html" %}
+{% block title %}Vantage Copy Trader - ZFX{% endblock %}
+
+{% block content %}
+{#
+  One strategy's full section: identical layout for Mirror (S1) and Fade (S2),
+  rendered from report.strategies[key]. Server-renders the first paint; poll()
+  keeps every id live thereafter.
+#}
+{% macro tape_strip(key, tape) %}
+<div style="margin:0 0 10px;padding:8px 10px;border:1px solid rgba(128,128,128,.28);border-radius:6px">
+  <div class="stat-label" style="margin-bottom:4px">15-minute tape bias
+    <span class="dim">{% if key == 's1' %}&mdash; gate: no new mirror entry against an active bias; open positions run to their mirror exit{% else %}&mdash; traded on the most confident half, one position per symbol, flipped when the bias flips, closed when the hold lapses{% endif %}</span></div>
+  <div id="{{ key }}-tape">
+  {% for b in tape or [] %}
+    {% set bb = b.gate_bias if (key == 's1' and b.gate_bias) else b %}
+    <div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;padding:3px 0;border-top:1px solid rgba(128,128,128,.12)">
+      <b style="min-width:70px">{{ b.symbol }}</b>
+      <span class="dim">{{ bb.horizon or bb.hold_minutes or 15 }}m {{ 'gate' if key == 's1' else 'trade' }}</span>
+      {% if bb.refused %}<span class="dim">not used &mdash; {{ bb.refused }}</span>
+      {% elif bb.active %}<span class="{{ 'pos' if bb.direction > 0 else 'neg' }}"><b>{{ '&#9650; UP' if bb.direction > 0 else '&#9660; DOWN' }}</b> active</span>
+      {% elif bb.p_up is not none %}<span class="dim">{{ '&#9650; up' if bb.lean > 0 else '&#9660; down' }} {{ 'warming (buffer filling)' if bb.warming else ('TAPE NOT LIVE (feed quiet or dead) — no trade' if bb.tape_live is false else 'weak (inactive)') }}</span>
+      {% else %}<span class="dim">{{ 'warming (buffer filling)' if bb.warming else 'no evaluation yet' }}</span>{% endif %}
+      {% if bb.p_up is not none %}<span>p(up) <b>{{ '{:.2f}'.format(bb.p_up) }}</b></span>
+      <span>confidence <b>{{ '{:.2f}'.format(bb.confidence) }}</b> <span class="dim">/ threshold {{ '{:.2f}'.format(bb.threshold or 0) }}</span></span>{% endif %}
+      <span class="dim">start {{ bb.since or '--' }} UTC</span>
+      <span class="dim">end {{ bb.until or '--' }}{{ ' UTC' if bb.until else '' }}</span>
+      <span class="dim">opens/15m {{ b.events_15m or 0 }}</span>
+      <span class="dim">model {{ bb.model_trained_at or '--' }} &middot; OOS {{ '{:.0%}'.format(bb.oos_acc) if bb.oos_acc else '--' }} / top-half {{ '{:.0%}'.format(bb.oos_top50_acc) if bb.oos_top50_acc else '--' }}</span>
+      {% if key == 's2' and b.replay and b.replay.trades %}
+      <span class="dim">replay (OOS, one at a time): {{ '{:.0f}'.format(b.replay.per_day) }}/day &middot; {{ '{:+.1f}'.format(b.replay.bps_per_trade_net) }} bps/trade net &middot; hit {{ '{:.0%}'.format(b.replay.hit) }} &middot; worst run {{ '{:.0f}'.format(b.replay.maxdd_bps) }} bps{% if b.replay_money %} &rarr; at {{ b.replay_money.lots }} lots: {{ '{:+,.0f}'.format(b.replay_money.per_trade) }}/trade, {{ '{:+,.0f}'.format(b.replay_money.per_day) }}/day upper bound, worst run {{ '{:,.0f}'.format(b.replay_money.worst_run) }}{% endif %}</span>
+      {% endif %}
+      {% if bb.parity %}<span class="dim">parity live=train {{ 'OK' if bb.parity.ok else 'FAILED' }} ({{ bb.parity.rows }} rows)</span>{% endif %}
+      {% for p in b.positions or [] %}
+        <span class="{{ 'pos' if p.direction > 0 else 'neg' }}">position {{ 'BUY' if p.direction > 0 else 'SELL' }} {{ '{:.2f}'.format(p.lots or 0) }} @ {{ p.open_price }} P&amp;L {{ '{:+,.2f}'.format(p.profit or 0) }} until {{ p.until or '--' }}</span>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="dim">No tape models deployed yet.</div>
+  {% endfor %}
+  </div>
+</div>
+{% endmacro %}
+
+{% macro strat_block(key, title, magic, sub, s, tape=None) %}
+<div class="panel strat-panel" id="{{ key }}-panel" style="margin-bottom:14px">
+  <div class="panel-head">
+    <h2>{{ title }}
+      <span class="dim" style="font-size:.62em;font-weight:400">magic {{ magic }}</span>
+      <span class="pill {{ 'pill-on' if s.enabled else 'pill-off' }}" id="{{ key }}-state">
+        {{ 'DEPLOYED' if s.enabled else 'OFF' }}</span></h2>
+    <button class="btn btn-sm" id="{{ key }}-toggle"
+            onclick="vpost('/vantage/strategy/toggle', {which:'{{ key }}', on:'{{ 0 if s.enabled else 1 }}'})">
+      {{ 'Disable' if s.enabled else 'Enable' }}</button>
+  </div>
+  <p class="hint" style="margin:0 0 10px">{{ sub }}</p>
+  {{ tape_strip(key, tape) }}
+
+  <!-- headline realized / accuracy / client comparison -->
+  <div class="stat-row">
+    <div class="stat"><div class="stat-label">Realized {{ '(' ~ s.perf.window_days ~ 'd)' if s.perf.window_days else '(30d)' }}</div>
+      <div class="stat-value {{ 'pos' if s.perf.realized_usd >= 0 else 'neg' }}" id="{{ key }}-realized">
+        {{ '${:,.2f}'.format(s.perf.realized_usd) }}</div></div>
+    <div class="stat"><div class="stat-label">Floating</div>
+      <div class="stat-value {{ 'pos' if s.floating >= 0 else 'neg' }}" id="{{ key }}-floating">
+        {{ '${:,.2f}'.format(s.floating) }}</div></div>
+    <div class="stat"><div class="stat-label">Win rate</div>
+      <div class="stat-value" id="{{ key }}-winrate">{{ '{:.1%}'.format(s.perf.win_rate) }}</div></div>
+    <div class="stat"><div class="stat-label">Closed</div>
+      <div class="stat-value" id="{{ key }}-closed-n">{{ s.perf.closed }}</div></div>
+    <div class="stat"><div class="stat-label">Profit factor</div>
+      <div class="stat-value" id="{{ key }}-pf">{{ '{:.2f}'.format(s.perf.profit_factor) }}</div></div>
+    <div class="stat"><div class="stat-label">Max DD (realized)</div>
+      <div class="stat-value neg" id="{{ key }}-dd">{{ '${:,.0f}'.format(s.perf.max_dd_usd) }}</div></div>
+    <div class="stat"><div class="stat-label">Open now</div>
+      <div class="stat-value" id="{{ key }}-npos">{{ s.positions|length }}</div></div>
+  </div>
+
+  <!-- accuracy vs model + edge vs client -->
+  <div class="stat-row" style="margin-top:6px;border-top:1px solid rgba(128,128,128,.18);padding-top:8px">
+    <div class="stat"><div class="stat-label">Model accuracy (hit rate)</div>
+      <div class="stat-value" id="{{ key }}-hit">{{ '{:.1%}'.format(s.perf.hit_rate) if s.perf.closed else '--' }}</div></div>
+    <div class="stat"><div class="stat-label">Expected (honest, matched closes)</div>
+      <div class="stat-value dim" id="{{ key }}-expected">{{ '${:,.2f}'.format(s.perf.expected_usd) }}</div></div>
+    <div class="stat"><div class="stat-label">Client @ our size</div>
+      <div class="stat-value {{ 'pos' if s.perf.client_equiv_usd >= 0 else 'neg' }}" id="{{ key }}-client">
+        {{ '${:,.2f}'.format(s.perf.client_equiv_usd) }}</div></div>
+    <div class="stat"><div class="stat-label">Our edge vs client
+      <span class="dim">(real closes: {{ s.perf.client_matched or 0 }})</span></div>
+      <div class="stat-value {{ 'pos' if s.perf.edge_vs_client_usd >= 0 else 'neg' }}" id="{{ key }}-edge">
+        {{ '${:,.2f}'.format(s.perf.edge_vs_client_usd) }}</div></div>
+    <div class="stat"><div class="stat-label">Cost paid (swap+comm)</div>
+      <div class="stat-value dim" id="{{ key }}-cost">{{ '${:,.2f}'.format(s.perf.cost_usd) }}</div></div>
+  </div>
+
+  <div class="grid cols-2" style="margin-top:12px">
+    <!-- OPEN POSITIONS -->
+    <div>
+      <h3 class="sub-h">Open positions</h3>
+      <div class="table-scroll" style="max-height:240px">
+        <table>
+          <thead><tr><th>Symbol</th><th>Side</th><th class="num">Lots</th>
+            <th class="num">Entry</th><th class="num">Exp $</th><th class="num">P&amp;L</th></tr></thead>
+          <tbody id="{{ key }}-positions">
+          {% for p in s.positions %}
+            <tr><td>{{ p.symbol }}</td>
+              <td class="{{ 'pos' if p.direction > 0 else 'neg' }}">{{ 'BUY' if p.direction > 0 else 'SELL' }}</td>
+              <td class="num">{{ '{:.2f}'.format(p.lots) }}</td>
+              <td class="num dim">{{ p.open_price }}</td>
+              <td class="num dim">{{ '{:,.2f}'.format(p.expected_usd or 0) }}</td>
+              <td class="num {{ 'pos' if (p.profit or 0) >= 0 else 'neg' }}">{{ '{:,.2f}'.format(p.profit or 0) }}</td></tr>
+          {% else %}
+            <tr><td colspan="6" class="empty">No open positions.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <!-- CLOSED TRADES: our P&L vs client-equivalent, per trade -->
+    <div>
+      <h3 class="sub-h">Closed trades &mdash; our P&amp;L vs client at our size</h3>
+      <div class="table-scroll" style="max-height:240px">
+        <table>
+          <thead><tr><th>Closed</th><th>Symbol</th><th>Side</th>
+            <th class="num">Our P&amp;L</th><th class="num">Client=</th>
+            <th class="num">Exp $</th><th class="num">Cost</th></tr></thead>
+          <tbody id="{{ key }}-closed">
+          {% for r in s.perf.recent %}
+            <tr><td class="dim">{{ r.close_time | timestamp }}</td>
+              <td>{{ r.symbol }}</td>
+              <td class="{{ 'pos' if r.direction > 0 else 'neg' }}">{{ 'BUY' if r.direction > 0 else 'SELL' }}</td>
+              <td class="num {{ 'pos' if r.net >= 0 else 'neg' }}">{{ '{:,.2f}'.format(r.net) }}</td>
+              <td class="num {{ 'pos' if r.client_equiv >= 0 else 'neg' }}">{{ '{:,.2f}'.format(r.client_equiv) }}</td>
+              <td class="num dim">{{ '{:,.2f}'.format(r.expected) }}</td>
+              <td class="num dim">{{ '{:,.2f}'.format(r.cost) }}</td></tr>
+          {% else %}
+            <tr><td colspan="7" class="empty">No closed trades in the window yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid cols-2" style="margin-top:12px">
+    <!-- WHERE MONEY IS MADE / LOST -->
+    <div>
+      <h3 class="sub-h">Where money is made / lost (by symbol)</h3>
+      <div class="table-scroll" style="max-height:180px">
+        <table>
+          <thead><tr><th>Symbol</th><th class="num">Trades</th>
+            <th class="num">Win%</th><th class="num">Net P&amp;L</th></tr></thead>
+          <tbody id="{{ key }}-symbols">
+          {% for b in s.perf.by_symbol %}
+            <tr><td>{{ b.symbol }}</td>
+              <td class="num dim">{{ b.count }}</td>
+              <td class="num dim">{{ '{:.0%}'.format(b.wins / b.count if b.count else 0) }}</td>
+              <td class="num {{ 'pos' if b.net >= 0 else 'neg' }}">{{ '{:,.2f}'.format(b.net) }}</td></tr>
+          {% else %}
+            <tr><td colspan="4" class="empty">No closed trades yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <!-- ACCURACY / EDGE EXPLAINER -->
+    <div>
+      <h3 class="sub-h">Accuracy &amp; edge</h3>
+      <ul class="explain">
+        <li><b>Model accuracy</b> is the share of closed trades whose realized
+          sign matched the model's expectation &mdash; the strategy doing what it
+          predicted.</li>
+        <li><b>Expected (honest)</b> is the model's pre-trade dollar forecast
+          with the lot-calibration multiplier divided back out &mdash; a number
+          realized P&amp;L can fairly be held against.</li>
+        <li><b>Client @ our size</b> is the client's own realized P&amp;L on each
+          mirrored trade, scaled to our lots (copy = same sign, invert/fade =
+          opposite) &mdash; the zero-cost, zero-slippage perfect-mirror ceiling.
+          Uses the client's real close event where recorded.</li>
+        <li><b>Our edge vs client</b> = our realized &minus; client-at-our-size,
+          computed ONLY on trades joined to the client's real close (count
+          shown). Negative = execution drag (late exits, slippage, early
+          capacity closes); positive = our entries/exits beat pure mirroring.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+<div class="page-head">
+  <h1>Vantage Copy Trader <span class="pill">admin only</span></h1>
+  <p>The quant model driving one external MT5 account &mdash; every client trade judged on its
+     own merit, copied, inverted or faded, sized to the risk contract. Two strategies run off the
+     same engine and account; toggle either independently.</p>
+</div>
+
+{% if not has_model %}
+<div class="panel" style="margin-bottom:14px;border-left:3px solid #ff4d6d">
+  <h2 class="neg">No trained model</h2>
+  <p class="hint" style="margin:0">The engine scores each trade with the saved quant booster
+    (<code>artifacts/quant_model.txt</code>). Train the Quant model first &mdash; without it
+    nothing can be scored and the engine will refuse to start.</p>
+</div>
+{% endif %}
+
+<!-- ENGINE -->
+<div class="panel" style="margin-bottom:14px">
+  <div class="panel-head">
+    <h2>Engine</h2>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="v-start" onclick="vpost('/vantage/start')"
+              {{ 'disabled' if engine.running }}>Start</button>
+      <button class="btn" id="v-stop" onclick="vpost('/vantage/stop')"
+              {{ 'disabled' if not engine.running }}>Stop</button>
+      <button class="btn" id="v-kill" style="border-color:#ff4d6d"
+              onclick="vpost('/vantage/kill', {engage: '{{ '0' if engine.kill_switch else '1' }}'})">
+        {{ 'Release kill switch' if engine.kill_switch else 'KILL SWITCH' }}</button>
+    </div>
+  </div>
+  <div class="stat-row">
+    <div class="stat"><div class="stat-label">Status</div>
+      <div class="stat-value {{ 'pos' if engine.running else 'dim' }}" id="v-status">
+        {{ 'RUNNING' if engine.running else 'stopped' }}</div></div>
+    <div class="stat"><div class="stat-label">Mode</div>
+      <div class="stat-value {{ 'neg' if config.mode == 'live' else '' }}">{{ config.mode }}</div></div>
+    <div class="stat"><div class="stat-label">Scored</div>
+      <div class="stat-value" id="v-scored">{{ engine.scored }}</div></div>
+    <div class="stat"><div class="stat-label">Acted on</div>
+      <div class="stat-value" id="v-acted">{{ engine.acted }}</div></div>
+    <div class="stat"><div class="stat-label">Filled</div>
+      <div class="stat-value pos" id="v-filled">{{ engine.filled }}</div></div>
+    <div class="stat"><div class="stat-label">Blocked</div>
+      <div class="stat-value" id="v-blocked">{{ engine.blocked }}</div></div>
+    <div class="stat"><div class="stat-label">Stale skipped</div>
+      <div class="stat-value dim" id="v-stale">{{ engine.stale_skipped }}</div></div>
+  </div>
+  {% if engine.last_error %}<p class="hint neg" style="margin:8px 0 0">{{ engine.last_error }}</p>{% endif %}
+</div>
+
+<!-- ACCOUNT + RISK -->
+<div class="grid cols-2" style="margin-bottom:14px">
+  <div class="panel">
+    <h2>Account</h2>
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Balance</div>
+        <div class="stat-value" id="v-balance">
+          {{ '${:,.2f}'.format(report.snapshot.balance) if report.snapshot.available else '--' }}</div></div>
+      <div class="stat"><div class="stat-label">Equity</div>
+        <div class="stat-value" id="v-equity">
+          {{ '${:,.2f}'.format(report.snapshot.equity) if report.snapshot.available else '--' }}</div></div>
+      <div class="stat"><div class="stat-label">Floating P&amp;L</div>
+        <div class="stat-value" id="v-floating">
+          {{ '${:,.2f}'.format(report.actual_floating_usd) if report.actual_floating_usd is not none else '--' }}</div></div>
+      <div class="stat"><div class="stat-label">Open positions</div>
+        <div class="stat-value" id="v-npos">{{ report.positions|length }}</div></div>
+    </div>
+    {% if not report.snapshot.available %}
+    <p class="hint neg" style="margin:8px 0 0">MT5 not connected: {{ report.snapshot.error }}
+      {% if config.mode != 'live' %}<br>(paper mode does not require a connection){% endif %}</p>
+    {% endif %}
+  </div>
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Risk contract</h2>
+      <div class="strat-flags">
+        <span class="flag {{ 'flag-on' if report.strategies.s1.enabled else 'flag-off' }}" id="rc-s1">
+          Mirror {{ 'ON' if report.strategies.s1.enabled else 'off' }}</span>
+        <span class="flag {{ 'flag-on' if report.strategies.s2.enabled else 'flag-off' }}" id="rc-s2">
+          Tape {{ 'ON' if report.strategies.s2.enabled else 'off' }}</span>
+      </div>
+    </div>
+    <p class="hint" style="margin:0 0 8px">
+      Lots scale so the deployed logic's own drawdown stays inside
+      {{ '{:.0%}'.format(config.risk_budget_fraction) }} of balance; total notional is capped at
+      {{ '{:.0f}'.format(config.leverage) }}&times; equity. The replay below describes the
+      <b>Mirror</b> book; the <b>Fade</b> book reports its own realized stats in its section.
+    </p>
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Risk budget</div>
+        <div class="stat-value" id="v-budget">{{ '${:,.2f}'.format(report.risk_budget_usd) }}</div></div>
+      <div class="stat"><div class="stat-label">Scale k</div>
+        <div class="stat-value" id="v-k">
+          {{ '{:.6f}'.format(engine.scale_factor) if engine.scale_factor else '--' }}</div></div>
+      <div class="stat"><div class="stat-label">Live drawdown</div>
+        <div class="stat-value" id="v-livedd">{{ '${:,.2f}'.format(report.current_drawdown_usd) }}</div></div>
+      <div class="stat"><div class="stat-label">Expected max DD</div>
+        <div class="stat-value" id="v-expdd">{{ '${:,.2f}'.format(report.expected.max_dd_usd) }}</div></div>
+      <div class="stat"><div class="stat-label">Expected daily P&amp;L</div>
+        <div class="stat-value pos" id="v-expdaily">{{ '${:,.2f}'.format(report.expected.daily_usd) }}
+          <span class="dim" style="font-size:.7em">&plusmn;{{ '${:,.0f}'.format(report.expected.daily_std_usd) }}</span></div></div>
+    </div>
+    {% if report.replay %}
+    <div style="margin-top:10px;border-top:1px solid rgba(128,128,128,.25);padding-top:8px">
+      <div class="stat-row">
+        <div class="stat"><div class="stat-label">Replay: trades</div>
+          <div class="stat-value">{{ '{:,}'.format(report.replay.trades or 0) }}</div></div>
+        <div class="stat"><div class="stat-label">Replay: win rate</div>
+          <div class="stat-value">{{ '{:.1%}'.format(report.replay.win_rate or 0) }}</div></div>
+        <div class="stat"><div class="stat-label">Replay: total P&amp;L</div>
+          <div class="stat-value pos">{{ '${:,.0f}'.format(report.replay.total or 0) }}</div></div>
+        <div class="stat"><div class="stat-label">Replay: max DD</div>
+          <div class="stat-value">{{ '${:,.0f}'.format(report.replay.drawdown or 0) }}
+            <span class="dim" style="font-size:.7em">of {{ '${:,.0f}'.format(report.replay.dd_target or 0) }}</span></div></div>
+        <div class="stat"><div class="stat-label">Calibration m</div>
+          <div class="stat-value">{{ '{:.0f}'.format(report.replay.calibration or 1) }}&times;</div></div>
+      </div>
+    </div>
+    {% else %}
+    <p class="hint" style="margin:8px 0 0">
+      From the backtest of this exact routing over {{ report.expected.backtest_days }} days,
+      scaled by k. <b style="color:#ffb454">Treat expected daily as an upper bound, not a
+      promise.</b> Live drawdown exceeding the budget is the number to watch.
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- SIGNAL STREAM (unified across strategies) -->
+<div class="panel" style="margin-bottom:14px">
+  <div class="panel-head">
+    <h2>Signal stream <span class="dim" style="font-size:.62em;font-weight:400">all strategies</span></h2>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span class="flag" id="v-feed-mysql" title="Toggle the MySQL poll feed (~2.5s)"
+            style="cursor:pointer">MySQL</span>
+      <span class="flag" id="v-feed-kafka" title="Toggle the Kafka events feed"
+            style="cursor:pointer">Kafka</span>
+      <span class="hint" id="v-lag">lag &mdash;</span>
+      <span class="hint" id="v-health">checking&hellip;</span>
+      <button class="btn btn-sm" onclick="vpost('/vantage/stream/start')">Restart consumer</button>
+    </div>
+  </div>
+  <p class="hint">
+    The newest client trades, each scored the moment it arrives. <b>Mirror</b> shows the copy/invert
+    decision; <b>Fade</b> shows Strategy 2's 15-minute view of the same trade. Anything older than
+    {{ config.max_signal_age_minutes|int }} minutes is marked
+    <span style="color:#ffb454">stale</span> and never traded.
+  </p>
+  <div class="table-scroll" style="max-height:300px">
+    <table>
+      <thead><tr><th>Seen</th><th>Traded</th><th>Account</th><th>Symbol</th>
+        <th>Side</th><th class="num">Lots</th><th class="num">Entry</th><th class="num">Score</th>
+        <th>Mirror</th><th class="num">Target entry</th><th class="num">s2</th><th>Fade</th></tr></thead>
+      <tbody id="v-stream">
+        <tr><td colspan="12" class="empty">Waiting for first poll&hellip;</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- STRATEGY SECTIONS: identical layout, S1 then S2 -->
+{{ strat_block('s1', 'Strategy 1 — Mirror', '909090',
+   'Copies high-conviction client trades and inverts the doomed ones; exits mirror the client.
+    The path-aware study measured every stop $16.8–18.3M worse than following them out.',
+   report.strategies.s1, report.tape) }}
+
+{{ strat_block('s2', 'Strategy 2 — Tape-15 (replaces Fade-15)', '909091',
+   'Reads the tape through the trade model: the stance-weighted flow of the last 5–120 minutes gives
+    P(up) over the next 15 minutes per instrument (gold OOS: 71% every minute, 81% on the traded half).
+    Trades the most confident half at ' ~ '{:.2f}'.format(config.tape_lots_per_5k) ~ ' lot per £5k of equity, one position per symbol, closes the
+    old side and opens the new when the bias flips, and lets the hold lapse otherwise.',
+   report.strategies.s2, report.tape) }}
+
+<!-- COMBINED ORDER LOG -->
+<div class="panel" style="margin-bottom:14px">
+  <h2>Order log <span class="dim" style="font-size:.62em;font-weight:400">both strategies</span></h2>
+  <div class="table-scroll" style="max-height:260px">
+    <table>
+      <thead><tr><th>When</th><th>Stance</th><th>Symbol</th><th>Side</th><th class="num">Lots</th>
+        <th class="num">Client @</th><th class="num">Our fill</th>
+        <th class="num">Exp $</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody id="v-orders">
+      {% for o in report.orders %}
+        <tr><td class="dim">{{ o.created | timestamp }}</td>
+          <td class="{{ 'pos' if o.stance == 'copy' else ('warn' if o.stance == 'fade15' else 'neg') }}">{{ o.stance }}</td>
+          <td>{{ o.symbol }}</td>
+          <td class="{{ 'pos' if (o.our_direction or 0) > 0 else 'neg' }}">{{ ('BUY' if (o.our_direction or 0) > 0 else 'SELL') if o.our_direction is not none else '--' }}</td>
+          <td class="num">{{ '{:.2f}'.format(o.our_lots or 0) }}</td>
+          <td class="num">{{ ('{:,.5g}'.format(o.client_price)) if o.client_price else '--' }}</td>
+          <td class="num">{{ ('{:,.5g}'.format(o.fill_price)) if o.fill_price else '--' }}</td>
+          <td class="num">{{ '{:,.2f}'.format(o.expected_usd or 0) }}</td>
+          <td class="{{ 'pos' if o.status == 'filled' else 'neg' }}">{{ o.status }}</td>
+          <td class="dim" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">{{ o.detail or '' }}</td></tr>
+      {% else %}
+        <tr><td colspan="10" class="empty">No orders yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CLOSE PRICES FOR QUALIFYING TRADES -->
+<div class="panel" style="margin-bottom:14px">
+  <h2>Qualifying trades &mdash; close prices
+    <span class="dim" style="font-size:.62em;font-weight:400">copy / invert, entry &rarr; close</span></h2>
+  <div class="table-scroll" style="max-height:240px">
+    <table>
+      <thead><tr><th>Closed</th><th>Stance</th><th>Symbol</th><th>Side</th>
+        <th class="num">Lots</th><th class="num">Client @</th>
+        <th class="num">Our entry</th><th class="num">Our close</th>
+        <th class="num">Move</th></tr></thead>
+      <tbody id="v-closed">
+      {% for o in report.closed_prices %}
+        <tr><td class="dim">{{ o.created | timestamp }}</td>
+          <td class="{{ 'pos' if o.stance == 'copy' else 'neg' }}">{{ o.stance }}</td>
+          <td>{{ o.symbol }}</td>
+          <td class="{{ 'pos' if (o.our_direction or 0) > 0 else 'neg' }}">{{ 'BUY' if (o.our_direction or 0) > 0 else 'SELL' }}</td>
+          <td class="num">{{ '{:.2f}'.format(o.our_lots or 0) }}</td>
+          <td class="num">{{ ('{:,.5g}'.format(o.client_price)) if o.client_price else '--' }}</td>
+          <td class="num">{{ ('{:,.5g}'.format(o.fill_price)) if o.fill_price else '--' }}</td>
+          <td class="num">{{ ('{:,.5g}'.format(o.close_price)) if o.close_price else '--' }}</td>
+          <td class="num {{ 'pos' if o.close_price and o.fill_price and ((o.close_price - o.fill_price) * (o.our_direction or 0)) > 0 else 'neg' }}">
+            {{ '{:+,.5g}'.format((o.close_price - o.fill_price) * (o.our_direction or 0)) if (o.close_price and o.fill_price) else '--' }}</td></tr>
+      {% else %}
+        <tr><td colspan="9" class="empty">No qualifying trades closed yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CONFIG -->
+<div class="panel">
+  <h2>Configuration</h2>
+  <p class="hint">
+    Credentials live in <code>{{ config_path }}</code>{% if not config_exists %}
+    <b class="neg"> (not created yet)</b>{% endif %}. The password is never shown back &mdash;
+    leave it blank to keep the stored one.
+  </p>
+  <form method="post" action="/vantage/config" class="grid cols-4" style="gap:10px">
+    <label>Account number<input name="login" inputmode="numeric" autocomplete="off" placeholder="{{ config.login or '12345678' }}"></label>
+    <label>Password<input name="password" type="password" autocomplete="new-password"
+      placeholder="{{ 'saved -- blank keeps it' if config.password else 'required' }}"></label>
+    <label>Server<input name="server" value="{{ config.server }}"></label>
+    <label>Terminal path (optional)<input name="terminal_path" value="{{ config.terminal_path }}"></label>
+    <label>Mode
+      <select name="mode">
+        <option value="paper" {{ 'selected' if config.mode != 'live' }}>paper (no orders sent)</option>
+        <option value="live" {{ 'selected' if config.mode == 'live' }}>LIVE (sends orders)</option>
+      </select></label>
+    <label>Risk budget (of balance)<input name="risk_budget_fraction" value="{{ config.risk_budget_fraction }}"></label>
+    <label>Copy quantile<input name="copy_quantile" value="{{ config.copy_quantile }}"></label>
+    <label>Invert quantile<input name="invert_quantile" value="{{ config.invert_quantile }}"></label>
+    <label>Max signal age (min)<input name="max_signal_age_minutes" value="{{ config.max_signal_age_minutes }}"></label>
+    <label>Leverage (1:N)<input name="leverage" value="{{ config.leverage }}"></label>
+    <label>Max lots / trade<input name="max_lots_per_trade" value="{{ config.max_lots_per_trade }}"></label>
+    <label>Max open positions<input name="max_open_positions" value="{{ config.max_open_positions }}"></label>
+    <label>Stop multiple (0 = off)<input name="stop_multiple" value="{{ config.stop_multiple }}"></label>
+    <label>Target multiple (0 = off)<input name="target_multiple" value="{{ config.target_multiple }}"></label>
+    <div style="grid-column:1/-1"><button class="btn">Save configuration</button></div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .strat-panel .sub-h{font-size:12px;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--ink-dim);margin:0 0 6px}
+  .pill-on{background:rgba(46,230,168,.16);color:#2ee6a8;border:1px solid rgba(46,230,168,.4)}
+  .pill-off{background:rgba(128,128,128,.14);color:var(--ink-dim);border:1px solid rgba(128,128,128,.3)}
+  .strat-flags{display:flex;gap:6px}
+  .flag{font-size:11px;padding:2px 8px;border-radius:999px}
+  .flag-on{background:rgba(46,230,168,.16);color:#2ee6a8}
+  .flag-off{background:rgba(128,128,128,.14);color:var(--ink-dim)}
+  td.warn,.warn{color:#ffb454}
+  .explain{margin:0;padding-left:18px;font-size:12.5px;color:var(--ink-dim);line-height:1.5}
+  .explain li{margin-bottom:6px}
+  .explain b{color:var(--ink)}
+</style>
+<script>
+async function vpost(url, fields) {
+  try {
+    await fetch(url, {method: 'POST', body: new URLSearchParams(fields || {}),
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
+  } catch (err) { /* the poller reports whatever actually happened */ }
+  setTimeout(poll, 400);
+}
+
+const usd = v => '$' + Number(v || 0).toLocaleString(undefined,
+  {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const usd0 = v => '$' + Math.round(Number(v || 0)).toLocaleString();
+const pct = v => (100 * Number(v || 0)).toFixed(1) + '%';
+const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+const setSigned = (id, v, fmt) => {
+  const el = document.getElementById(id); if (!el) return;
+  el.textContent = (fmt || usd)(v);
+  el.classList.toggle('pos', Number(v || 0) >= 0);
+  el.classList.toggle('neg', Number(v || 0) < 0);
+};
+const localTime = epoch => epoch ? new Date(epoch * 1000).toLocaleTimeString('en-GB',
+  {hour12: false}) : '--';
+
+function renderStrategy(key, s) {
+  if (!s) return;
+  const p = s.perf || {};
+  setSigned(`${key}-realized`, p.realized_usd);
+  setSigned(`${key}-floating`, s.floating);
+  set(`${key}-winrate`, pct(p.win_rate));
+  set(`${key}-closed-n`, p.closed || 0);
+  set(`${key}-pf`, Number(p.profit_factor || 0).toFixed(2));
+  set(`${key}-dd`, usd0(p.max_dd_usd));
+  set(`${key}-npos`, (s.positions || []).length);
+  set(`${key}-hit`, p.closed ? pct(p.hit_rate) : '--');
+  set(`${key}-expected`, usd(p.expected_usd));
+  setSigned(`${key}-client`, p.client_equiv_usd);
+  setSigned(`${key}-edge`, p.edge_vs_client_usd);
+  set(`${key}-cost`, usd(p.cost_usd));
+
+  // enabled state chip + toggle button
+  const state = document.getElementById(`${key}-state`);
+  if (state) {
+    state.textContent = s.enabled ? 'DEPLOYED' : 'OFF';
+    state.className = 'pill ' + (s.enabled ? 'pill-on' : 'pill-off');
+  }
+  const btn = document.getElementById(`${key}-toggle`);
+  if (btn) {
+    btn.textContent = s.enabled ? 'Disable' : 'Enable';
+    btn.setAttribute('onclick',
+      `vpost('/vantage/strategy/toggle', {which:'${key}', on:'${s.enabled ? '0' : '1'}'})`);
+  }
+  const flag = document.getElementById('rc-' + key);
+  if (flag) {
+    flag.textContent = (key === 's1' ? 'Mirror ' : 'Tape ') + (s.enabled ? 'ON' : 'off');
+    flag.className = 'flag ' + (s.enabled ? 'flag-on' : 'flag-off');
+  }
+
+  // open positions
+  const pos = document.getElementById(`${key}-positions`);
+  if (pos) {
+    const rows = s.positions || [];
+    pos.innerHTML = rows.length ? rows.map(p => `
+      <tr><td>${p.symbol}</td>
+        <td class="${p.direction > 0 ? 'pos' : 'neg'}">${p.direction > 0 ? 'BUY' : 'SELL'}</td>
+        <td class="num">${(p.lots ?? 0).toFixed(2)}</td>
+        <td class="num dim">${p.open_price}</td>
+        <td class="num dim">${(p.expected_usd || 0).toFixed(2)}</td>
+        <td class="num ${(p.profit || 0) >= 0 ? 'pos' : 'neg'}">${(p.profit || 0).toFixed(2)}</td></tr>`).join('')
+      : '<tr><td colspan="6" class="empty">No open positions.</td></tr>';
+  }
+  // closed trades
+  const cl = document.getElementById(`${key}-closed`);
+  if (cl) {
+    const rows = p.recent || [];
+    cl.innerHTML = rows.length ? rows.map(r => `
+      <tr><td class="dim">${localTime(r.close_time)}</td>
+        <td>${r.symbol}</td>
+        <td class="${r.direction > 0 ? 'pos' : 'neg'}">${r.direction > 0 ? 'BUY' : 'SELL'}</td>
+        <td class="num ${r.net >= 0 ? 'pos' : 'neg'}">${r.net.toFixed(2)}</td>
+        <td class="num ${r.client_equiv >= 0 ? 'pos' : 'neg'}">${r.client_equiv.toFixed(2)}</td>
+        <td class="num dim">${r.expected.toFixed(2)}</td>
+        <td class="num dim">${r.cost.toFixed(2)}</td></tr>`).join('')
+      : '<tr><td colspan="7" class="empty">No closed trades in the window yet.</td></tr>';
+  }
+  // symbol breakdown
+  const sy = document.getElementById(`${key}-symbols`);
+  if (sy) {
+    const rows = p.by_symbol || [];
+    sy.innerHTML = rows.length ? rows.map(b => `
+      <tr><td>${b.symbol}</td>
+        <td class="num dim">${b.count}</td>
+        <td class="num dim">${b.count ? Math.round(100 * b.wins / b.count) : 0}%</td>
+        <td class="num ${b.net >= 0 ? 'pos' : 'neg'}">${b.net.toFixed(2)}</td></tr>`).join('')
+      : '<tr><td colspan="4" class="empty">No closed trades yet.</td></tr>';
+  }
+}
+
+function renderTape(key, tape) {
+  const box = document.getElementById(`${key}-tape`);
+  if (!box) return;
+  const rows = tape || [];
+  if (!rows.length) { box.innerHTML = '<div class="dim">No tape models deployed yet.</div>'; return; }
+  const f2 = x => (x == null ? '--' : Number(x).toFixed(2));
+  const pct = x => (x ? Math.round(100 * x) + '%' : '--');
+  box.innerHTML = rows.map(b0 => {
+    const b = (key === 's1' && b0.gate_bias)
+      ? {...b0, ...b0.gate_bias, symbol: b0.symbol, positions: b0.positions, events_15m: b0.events_15m} : b0;
+    const horizon = `<span class="dim">${b.horizon || b.hold_minutes || 15}m ${key === 's1' ? 'gate' : 'trade'}</span>`;
+    let state;
+    if (b.refused) state = `<span class="dim">not used &mdash; ${b.refused}</span>`;
+    else if (b.active) state = `<span class="${b.direction > 0 ? 'pos' : 'neg'}"><b>${b.direction > 0 ? '&#9650; UP' : '&#9660; DOWN'}</b> active</span>`;
+    else if (b.p_up != null) state = `<span class="dim">${b.lean > 0 ? '&#9650; up' : '&#9660; down'} ${b.warming ? 'warming (buffer filling, no trade yet)' : (b.tape_live === false ? 'TAPE NOT LIVE (feed quiet or dead) &mdash; no trade' : 'weak (no trade)')}</span>`;
+    else state = `<span class="dim">${b.warming ? 'warming (buffer filling)' : 'no evaluation yet'}</span>`;
+    const nums = b.p_up != null
+      ? `<span>p(up) <b>${f2(b.p_up)}</b></span><span>confidence <b>${f2(b.confidence)}</b> <span class="dim">/ threshold ${f2(b.threshold)}</span></span>` : '';
+    const rp = b0.replay, rm = b0.replay_money;
+    const replay = (key === 's2' && rp && rp.trades)
+      ? `<span class="dim">replay (OOS, one at a time): ${Math.round(rp.per_day)}/day &middot; ${rp.bps_per_trade_net >= 0 ? '+' : ''}${rp.bps_per_trade_net.toFixed(1)} bps/trade net &middot; hit ${pct(rp.hit)} &middot; worst run ${Math.round(rp.maxdd_bps)} bps`
+        + (rm ? ` &rarr; at ${rm.lots} lots: ${rm.per_trade >= 0 ? '+' : ''}${Math.round(rm.per_trade).toLocaleString()}/trade, ${rm.per_day >= 0 ? '+' : ''}${Math.round(rm.per_day).toLocaleString()}/day upper bound, worst run ${Math.round(rm.worst_run).toLocaleString()}` : '') + '</span>'
+      : '';
+    const parity = b.parity ? `<span class="dim">parity live=train ${b.parity.ok ? 'OK' : 'FAILED'} (${b.parity.rows} rows)</span>` : '';
+    const pos = (b.positions || []).map(p =>
+      `<span class="${p.direction > 0 ? 'pos' : 'neg'}">position ${p.direction > 0 ? 'BUY' : 'SELL'} ${f2(p.lots)} @ ${p.open_price} P&amp;L ${(p.profit || 0) >= 0 ? '+' : ''}${f2(p.profit)} until ${p.until || '--'}</span>`).join('');
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;padding:3px 0;border-top:1px solid rgba(128,128,128,.12)">
+      <b style="min-width:70px">${b.symbol}</b>${horizon}${state}${nums}
+      <span class="dim">start ${b.since || '--'} UTC</span>
+      <span class="dim">end ${b.until ? b.until + ' UTC' : '--'}</span>
+      <span class="dim">opens/15m ${b.events_15m || 0}</span>
+      <span class="dim">model ${b.model_trained_at || '--'} &middot; OOS ${pct(b.oos_acc)} / top-half ${pct(b.oos_top50_acc)}</span>${replay}${parity}${pos}</div>`;
+  }).join('');
+}
+
+async function poll() {
+  let data;
+  try { data = await (await fetch('/api/vantage/status')).json(); } catch (err) { return; }
+  if (!data || data.error) return;
+  const e = data.engine, r = data.report;
+
+  set('v-status', e.running ? 'RUNNING' : 'stopped');
+  set('v-scored', e.scored); set('v-acted', e.acted); set('v-filled', e.filled);
+  set('v-blocked', e.blocked); set('v-stale', e.stale_skipped);
+  set('v-k', e.scale_factor ? e.scale_factor.toFixed(6) : '--');
+  const startBtn = document.getElementById('v-start');
+  const stopBtn = document.getElementById('v-stop');
+  const killBtn = document.getElementById('v-kill');
+  if (startBtn) startBtn.disabled = e.running;
+  if (stopBtn) stopBtn.disabled = !e.running;
+  if (killBtn) {
+    killBtn.textContent = e.kill_switch ? 'Release kill switch' : 'KILL SWITCH';
+    killBtn.setAttribute('onclick',
+      `vpost('/vantage/kill', {engage: '${e.kill_switch ? '0' : '1'}'})`);
+  }
+
+  if (r.snapshot && r.snapshot.available) {
+    set('v-balance', usd(r.snapshot.balance)); set('v-equity', usd(r.snapshot.equity));
+    setSigned('v-floating', r.snapshot.profit);
+  }
+  set('v-budget', usd(r.risk_budget_usd)); set('v-livedd', usd(r.current_drawdown_usd));
+  set('v-npos', (r.positions || []).length);
+  if (r.expected) {
+    set('v-expdd', usd(r.expected.max_dd_usd));
+    const daily = document.getElementById('v-expdaily');
+    if (daily) daily.innerHTML = usd(r.expected.daily_usd)
+      + ` <span class="dim" style="font-size:.7em">&plusmn;$${Math.round(r.expected.daily_std_usd).toLocaleString()}</span>`;
+  }
+
+  // feed chips (click to toggle) + end-to-end lag of the newest signal
+  if (data.feed) {
+    for (const [id, key, label] of [['v-feed-mysql','mysql','MySQL'],
+                                    ['v-feed-kafka','kafka','Kafka']]) {
+      const el = document.getElementById(id);
+      if (el) {
+        const on = data.feed[key];
+        el.className = 'flag ' + (on ? 'flag-on' : 'flag-off');
+        el.textContent = label + (on ? ' ON' : ' off');
+        el.style.cursor = 'pointer';
+        el.onclick = () => vpost('/vantage/feed/toggle',
+                                 {source: key, on: on ? '0' : '1'});
+      }
+    }
+  }
+  const lagEl = document.getElementById('v-lag');
+  if (lagEl) {
+    // FEED LAG is the health number: client trade -> our ingest, on the
+    // newest signal. Wall-clock age of that trade is market quietness, not
+    // pipeline speed -- headlining it read "lag 105s" against a 4s pipeline.
+    const rows = data.signals || [];
+    if (rows.length && rows[0].traded) {
+      const ageS = Math.max(0, (Date.now() - new Date(rows[0].traded).getTime()) / 1000);
+      const ing = rows[0].seen
+        ? Math.max(0, (new Date(rows[0].seen) - new Date(rows[0].traded)) / 1000) : null;
+      const ageTxt = ageS < 90 ? ageS.toFixed(0) + 's' : (ageS / 60).toFixed(1) + 'm';
+      lagEl.textContent = (ing != null ? 'feed lag ' + ing.toFixed(1) + 's' : 'feed lag —')
+        + ' | last trade ' + ageTxt + ' ago';
+      lagEl.style.color = ing == null ? '#ffb454'
+        : (ing < 15 ? '#2ee6a8' : (ing < 60 ? '#ffb454' : '#ff4d6d'));
+    } else { lagEl.textContent = 'feed lag —'; }
+  }
+
+  const health = document.getElementById('v-health');
+  if (health && r.stream) {
+    if (!r.stream.available) {
+      health.textContent = 'STREAM DOWN: ' + (r.stream.reason || 'unknown');
+      health.style.color = '#ff4d6d';
+    } else {
+      const q = r.stream.quote_age_seconds, t = r.stream.trade_age_seconds;
+      const live = q != null && q < 180;
+      health.textContent = (live ? 'LIVE' : 'quiet')
+        + ' | ' + (r.stream.quotes_last_minute || 0).toLocaleString() + ' quotes/min'
+        + ' | last client trade ' + (t != null ? Math.round(t / 60) + 'm ago' : 'never');
+      health.style.color = live ? '#2ee6a8' : '#ffb454';
+    }
+  }
+
+  // unified signal stream: mirror + fade decision on each trade
+  const stream = document.getElementById('v-stream');
+  if (stream) {
+    const rows = data.signals || [];
+    const local = iso => iso
+      ? new Date(iso).toLocaleTimeString('en-GB', {hour12: false}) : '--';
+    const mirror = d => d === 'copy' ? '<b class="pos">COPY</b>'
+      : d === 'invert' ? '<b class="neg">INVERT</b>'
+      : d === 'stale' ? '<span style="color:#ffb454">stale</span>'
+      : '<span class="dim">no action</span>';
+    const fade = d => d === 'fade' ? '<b class="warn">FADE</b>'
+      : d === 'hold' ? '<span class="dim">hold</span>'
+      : '<span class="dim">--</span>';
+    stream.innerHTML = rows.length ? rows.map(s => `
+      <tr>
+        <td class="dim">${local(s.seen)}</td>
+        <td class="dim">${local(s.traded)}</td>
+        <td class="dim">${s.account}</td>
+        <td>${s.symbol}</td>
+        <td class="${s.side === 'BUY' ? 'pos' : 'neg'}">${s.side}</td>
+        <td class="num">${(s.lots ?? 0).toFixed(2)}</td>
+        <td class="num">${s.client_price != null ? (+s.client_price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 5}) : '--'}</td>
+        <td class="num">${s.score != null ? s.score.toFixed(4) : '--'}</td>
+        <td>${mirror(s.decision)}</td>
+        <td class="num ${s.entry_mode === 'limit' ? 'warn' : 'dim'}">${s.target_entry != null
+          ? (s.entry_mode === 'limit'
+             ? (+s.target_entry).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 5}) + ' ⏳'
+             : (+s.target_entry).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 5}) + ' now')
+          : '--'}</td>
+        <td class="num dim">${s.s2_score != null ? s.s2_score.toFixed(3) : '--'}</td>
+        <td>${fade(s.s2_decision)}</td>
+      </tr>`).join('')
+      : '<tr><td colspan="12" class="empty">No trades in the stream yet.</td></tr>';
+  }
+
+  if (r.strategies) {
+    renderStrategy('s1', r.strategies.s1);
+    renderStrategy('s2', r.strategies.s2);
+    renderTape('s1', r.tape);
+    renderTape('s2', r.tape);
+  }
+
+  // price formatter: up to 5 significant figures, '--' when absent
+  const px = v => (v == null || v === 0 || isNaN(v)) ? '--'
+    : (+v).toLocaleString(undefined, {maximumSignificantDigits: 6});
+
+  const orders = document.getElementById('v-orders');
+  if (orders && r.orders) {
+    orders.innerHTML = r.orders.length ? r.orders.map(o => `
+      <tr><td class="dim">${new Date((o.created || 0) * 1000).toLocaleTimeString()}</td>
+        <td class="${o.stance === 'copy' ? 'pos' : (o.stance === 'fade15' ? 'warn' : 'neg')}">${o.stance}</td>
+        <td>${o.symbol}</td>
+        <td class="${(o.our_direction || 0) > 0 ? 'pos' : 'neg'}">${o.our_direction == null ? '--' : (o.our_direction > 0 ? 'BUY' : 'SELL')}</td>
+        <td class="num">${(o.our_lots || 0).toFixed(2)}</td>
+        <td class="num">${px(o.client_price)}</td>
+        <td class="num">${px(o.fill_price)}</td>
+        <td class="num">${(o.expected_usd || 0).toFixed(2)}</td>
+        <td class="${o.status === 'filled' ? 'pos' : 'neg'}">${o.status}</td>
+        <td class="dim" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${o.detail || ''}</td></tr>`).join('')
+      : '<tr><td colspan="10" class="empty">No orders yet.</td></tr>';
+  }
+
+  const closed = document.getElementById('v-closed');
+  if (closed && r.closed_prices) {
+    closed.innerHTML = r.closed_prices.length ? r.closed_prices.map(o => {
+      const dir = o.our_direction || 0;
+      const move = (o.close_price && o.fill_price) ? (o.close_price - o.fill_price) * dir : null;
+      return `
+      <tr><td class="dim">${new Date((o.created || 0) * 1000).toLocaleTimeString()}</td>
+        <td class="${o.stance === 'copy' ? 'pos' : 'neg'}">${o.stance}</td>
+        <td>${o.symbol}</td>
+        <td class="${dir > 0 ? 'pos' : 'neg'}">${dir > 0 ? 'BUY' : 'SELL'}</td>
+        <td class="num">${(o.our_lots || 0).toFixed(2)}</td>
+        <td class="num">${px(o.client_price)}</td>
+        <td class="num">${px(o.fill_price)}</td>
+        <td class="num">${px(o.close_price)}</td>
+        <td class="num ${move == null ? 'dim' : (move > 0 ? 'pos' : 'neg')}">${move == null ? '--' : (move > 0 ? '+' : '') + px(move)}</td></tr>`;
+    }).join('')
+      : '<tr><td colspan="9" class="empty">No qualifying trades closed yet.</td></tr>';
+  }
+}
+setInterval(poll, 5000);
+poll();
+</script>
+{% endblock %}

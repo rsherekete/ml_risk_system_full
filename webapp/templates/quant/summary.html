@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Summary - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Summary</h1>
+  <p>Four questions: what did the book make, what is the model worth, where is the risk, what needs attention.</p>
+</div>
+
+{% include "_controls.html" %}
+
+{% if summary_report %}
+{% set s = summary_report %}
+<div class="grid cols-4" style="margin-bottom:14px">
+  <div class="panel stat">
+    <span class="label"><span class="def" data-def="{{ define('firm_pnl') }}">Firm P&amp;L</span> &mdash; {{ s.days }} days</span>
+    <span class="value {{ 'pos' if s.total_firm_pnl >= 0 else 'neg' }}">
+      ${{ '{:,.0f}'.format(s.total_firm_pnl) }}</span>
+    <span class="delta dim">{{ '{:,}'.format(s.accounts) }} accounts</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Last 30 days</span>
+    <span class="value {{ 'pos' if s.last_30 >= 0 else 'neg' }}">${{ '{:,.0f}'.format(s.last_30) }}</span>
+    {% if s.trend is not none %}
+      <span class="delta {{ 'pos' if s.trend >= 0 else 'neg' }}">
+        {{ '{:+,.0f}'.format(s.trend) }} vs the prior 30</span>
+    {% else %}<span class="delta dim">no prior period</span>{% endif %}
+  </div>
+  <div class="panel stat">
+    <span class="label">Model uplift</span>
+    {% if s.model_uplift is not none %}
+      <span class="value {{ 'pos' if s.model_uplift >= 0 else 'neg' }}">
+        {{ '{:+,.0f}'.format(s.model_uplift) }}</span>
+      <span class="delta {{ 'pos' if s.drawdown_reduction and s.drawdown_reduction > 0 else 'dim' }}">
+        drawdown {{ '{:+,.0f}'.format(s.drawdown_reduction) if s.drawdown_reduction else '--' }}</span>
+    {% else %}
+      <span class="value dim">--</span><span class="delta dim">train a model first</span>
+    {% endif %}
+  </div>
+  <div class="panel stat">
+    <span class="label"><span class="def" data-def="{{ define('drawdown') }}">Max drawdown</span></span>
+    <span class="value neg">${{ '{:,.0f}'.format(s.max_drawdown) }}</span>
+    <span class="delta dim">{{ s.losing_days }} losing days of {{ s.days }}</span>
+  </div>
+</div>
+
+<div class="grid cols-2" style="margin-bottom:14px">
+  <div class="panel">
+    <h2>What the model is worth</h2>
+    <p class="hint">Walk-forward, out-of-sample, against B-booking every account.</p>
+    <table>
+      <tbody>
+        <tr><td>Discrimination
+          (<span class="def" data-def="{{ define('roc_auc') }}">ROC AUC</span>)</td>
+          <td class="num"><b>{{ '%.4f'|format(s.roc_auc) if s.roc_auc else '--' }}</b></td></tr>
+        <tr><td>Profit uplift at the current policy</td>
+          <td class="num {{ 'pos' if s.model_uplift and s.model_uplift > 0 else 'neg' }}">
+            {{ '{:+,.0f}'.format(s.model_uplift) if s.model_uplift is not none else '--' }}</td></tr>
+        <tr><td>Drawdown change</td>
+          <td class="num {{ 'pos' if s.drawdown_reduction and s.drawdown_reduction > 0 else 'neg' }}">
+            {{ '{:+,.0f}'.format(s.drawdown_reduction) if s.drawdown_reduction is not none else '--' }}</td></tr>
+        <tr><td>Best / worst single day</td>
+          <td class="num">${{ '{:,.0f}'.format(s.best_day) }} / ${{ '{:,.0f}'.format(s.worst_day) }}</td></tr>
+      </tbody>
+    </table>
+    <div class="alert alert-info" style="margin-top:12px;font-size:12px">
+      <b>Not yet validated on a held-out period.</b> These figures come from the same
+      history against which many configurations were compared, so some of the margin
+      may be selection. Treat the direction as established and the magnitude as provisional.
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Where the profit comes from</h2>
+    <p class="hint">
+      <span class="def" data-def="{{ define('herfindahl') }}">Concentration</span> matters
+      as much as the total: earning from ten clients is a different business from earning
+      from ten thousand.
+    </p>
+    <div class="stat" style="margin-bottom:12px">
+      <span class="label">Top 10 accounts</span>
+      <span class="value {{ 'neg' if s.top10_account_share > 0.4 else '' }}">
+        {{ '{:.1%}'.format(s.top10_account_share) }}</span>
+      <span class="delta dim">of all account-level profit</span>
+    </div>
+    <table>
+      <thead><tr><th>Account</th><th class="num">Firm P&amp;L</th><th></th></tr></thead>
+      <tbody>
+      {% for row in s.top_accounts %}
+        <tr>
+          <td style="font-family:var(--mono);font-size:11px">{{ row.account_key }}</td>
+          <td class="num {{ 'pos' if row.firm_pnl >= 0 else 'neg' }}">
+            ${{ '{:,.0f}'.format(row.firm_pnl) }}</td>
+          <td class="num"><a class="btn btn-sm" href="/trading/account?account={{ row.account_key }}">Inspect</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Where to look next</h2>
+  <div class="grid cols-3" style="gap:12px">
+    <a class="btn" href="/{{ view }}/abook" style="text-align:center;padding:16px">
+      <b>A-Book Manifest</b><br><span class="dim" style="font-size:12px">today's routing decisions</span></a>
+    <a class="btn" href="/{{ view }}/exposure" style="text-align:center;padding:16px">
+      <b>Exposure</b><br><span class="dim" style="font-size:12px">what the book is carrying now</span></a>
+    <a class="btn" href="/{{ view }}/risk" style="text-align:center;padding:16px">
+      <b>Risk Monitor</b><br><span class="dim" style="font-size:12px">VaR, concentration, live stream</span></a>
+  </div>
+</div>
+{% else %}
+<div class="panel"><div class="empty"><strong>No model artefact yet</strong>
+  Train a model from <a href="/{{ view }}/performance">Model Performance</a>.</div></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,9 @@
+pandas >= 2.2
+SQLAlchemy >= 2.0
+PyMySQL >= 1.1
+PyYAML >= 6.0
+matplotlib >= 3.8
+scikit-learn >= 1.5
+streamlit >= 1.40
+altair >= 5.0
+jupyterlab >= 4.0

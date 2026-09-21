@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}A-Book Manifest - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>A-Book Manifest</h1>
+  <p>Accounts to hedge on the selected day, ordered by impact on profitability.</p>
+</div>
+
+{% include "_controls.html" %}
+
+{% if has_data %}
+<form method="get" class="toolbar">
+  <div>
+    <label for="day">Trading day</label>
+    <select id="day" name="day" onchange="this.form.submit()">
+      {% for d in days %}<option value="{{ d }}" {{ 'selected' if d == selected_day }}>{{ d }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="hedge">Hedge fraction</label>
+    <select id="hedge" name="hedge" onchange="this.form.submit()">
+      {% for value in [0.01, 0.02, 0.05, 0.10, 0.20] %}
+        <option value="{{ value }}" {{ 'selected' if config.hedge_fraction == value }}>{{ '{:.0%}'.format(value) }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="threshold">Or probability &ge;</label>
+    <select id="threshold" name="threshold" onchange="this.form.submit()">
+      <option value="0" {{ 'selected' if not config.probability_threshold }}>Use fraction</option>
+      {% for value in [0.6, 0.7, 0.8, 0.9] %}
+        <option value="{{ value }}" {{ 'selected' if config.probability_threshold == value }}>{{ value }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div style="flex:1"></div>
+  <a class="btn btn-primary" href="/trading/abook.csv?day={{ selected_day }}&hedge={{ config.hedge_fraction }}&threshold={{ config.probability_threshold }}">
+    Download manifest (CSV)
+  </a>
+</form>
+<p class="hint" style="margin:-8px 0 16px">
+  These controls re-slice cached model scores. They never trigger a refit.
+</p>
+
+{% if manifest is defined and manifest is not none and manifest|length %}
+<div class="grid cols-4" style="margin-bottom:14px">
+  <div class="panel stat">
+    <span class="label">Accounts to A-book</span>
+    <span class="value">{{ manifest|length }}</span>
+    <span class="delta dim">of {{ '{:,}'.format(population) }} routable</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Firm P&amp;L &mdash; flat B-book</span>
+    <span class="value {{ 'pos' if outcome and outcome.flat_firm_pnl >= 0 else 'neg' }}">
+      ${{ '{:,.0f}'.format(outcome.flat_firm_pnl) if outcome else 0 }}</span>
+    <span class="delta dim">{{ '{:,}'.format(outcome.active_accounts) if outcome else 0 }} accounts actually traded</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Firm P&amp;L &mdash; following this list</span>
+    <span class="value {{ 'pos' if outcome and outcome.delta >= 0 else 'neg' }}">
+      ${{ '{:,.0f}'.format(outcome.model_firm_pnl) if outcome else 0 }}</span>
+    <span class="delta {{ 'pos' if outcome and outcome.delta >= 0 else 'neg' }}">
+      {{ '{:+,.0f}'.format(outcome.delta) if outcome else 0 }} vs B-booking everything</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Hedge economics</span>
+    <span class="value pos" style="font-size:19px">${{ '{:,.0f}'.format(outcome.avoided_losses) if outcome else 0 }}</span>
+    <span class="delta dim">payouts avoided &middot; forfeited
+      ${{ '{:,.0f}'.format(outcome.forfeited_profit|abs) if outcome else 0 }}</span>
+  </div>
+</div>
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>How this list was formed</h2>
+  <p class="hint" style="margin:0">
+    A routing decision is made <b>before</b> the session, when nobody knows who will trade.
+    So the candidate set is every account with data on or before {{ selected_day }}, reduced to
+    its most recent observation and carried forward &mdash; <b>{{ '{:,}'.format(population) }}</b>
+    accounts, excluding those dormant more than 30 days.
+    {% if outcome %} Of them, <b>{{ '{:,}'.format(outcome.active_accounts) }}</b> actually traded
+    that day and <b>{{ outcome.hedged_active }}</b> of the hedged names were among them &mdash; a
+    hedge on an account that stays flat neither costs nor earns anything.{% endif %}
+  </p>
+</div>
+
+<div class="panel">
+  <h2>Hedge list &mdash; {{ selected_day }}</h2>
+  <p class="hint">
+    Ranked by expected dollar impact, not raw probability: a confident call on a
+    tiny account is worth nothing, so the consequential names come first.
+  </p>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:34px">#</th><th>Account</th><th>Category</th>
+          <th class="num">Confidence</th><th class="num">Exposure</th>
+          <th class="num">Expected impact</th><th class="num">Evidence</th>
+          <th>Justification</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in manifest.itertuples() %}
+        <tr>
+          <td class="dim">{{ loop.index }}</td>
+          <td><b style="font-family:var(--mono);font-size:12px">{{ row.account_key }}</b></td>
+          <td><span class="tag {{ row.css }}">{{ row.category.replace('_',' ') }}</span></td>
+          <td class="num">{{ '{:.1%}'.format(row.score) }}</td>
+          <td class="num">{{ '${:,.0f}'.format(row.gross_notional) if row.gross_notional == row.gross_notional else '--' }}</td>
+          <td class="num"><b>{{ '${:,.0f}'.format(row.expected_impact) }}</b></td>
+          <td class="num {{ 'warn' if row.days_stale > 5 else 'dim' }}" title="Days since this account last traded">
+            {{ 'today' if row.days_stale == 0 else '{}d ago'.format(row.days_stale) }}</td>
+          <td style="font-size:12px;color:var(--ink-dim);max-width:400px">{{ row.reason }}</td>
+          <td class="num"><a class="btn btn-sm" href="/trading/account?account={{ row.account_key }}">Inspect</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:14px">
+  <h2>Operational note</h2>
+  <p class="hint" style="margin:0">
+    This list is the decision for <b>{{ selected_day }}</b> only &mdash; routing is re-evaluated
+    each day from that day's features. Automating the switch would mean feeding this
+    manifest to the bridge as a per-account book assignment; the CSV carries the account
+    key, direction of the call and its confidence so a bridge job can consume it directly.
+  </p>
+</div>
+{% else %}
+<div class="panel"><div class="empty"><strong>No accounts selected</strong>
+  No account-day on {{ selected_day }} met the current threshold.</div></div>
+{% endif %}
+{% endif %}
+{% endblock %}

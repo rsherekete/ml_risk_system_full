@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Cash Flow - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Cash Flow</h1>
+  <p>Deposits, withdrawals and transfers &mdash; overall, by region, and by account.</p>
+</div>
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>Why this matters beyond accounting</h2>
+  <p class="hint" style="margin:0">
+    Cash movement is the strongest fraud signal in the dataset and is invisible to any
+    model reading only trades. Money in, a token trade, money out leaves no trading
+    footprint at all. <b>Internal transfers are separated from external funding</b>: counting
+    them as deposits double-counts firm-wide inflow, because the matching withdrawal from
+    the other account is also recorded.
+  </p>
+</div>
+
+<form class="toolbar" onsubmit="return false">
+  <div>
+    <label for="cf-days">Window</label>
+    <select id="cf-days" onchange="loadCash()">
+      <option value="30">30 days</option>
+      <option value="90">90 days</option>
+      <option value="180" selected>180 days</option>
+      <option value="365">1 year</option>
+      <option value="730">2 years</option>
+    </select>
+  </div>
+  <div>
+    <label for="cf-dim">Break down by</label>
+    <select id="cf-dim" onchange="loadCash()">
+      <option value="region" selected>Region</option>
+      <option value="country">Country</option>
+      <option value="group">Account group</option>
+    </select>
+  </div>
+  <div style="flex:1"></div>
+  <div class="live-controls" data-live="cashflow"></div>
+</form>
+
+<div class="grid cols-4" style="margin-bottom:14px">
+  <div class="panel stat"><span class="label">Deposits</span>
+    <span class="value pos" id="cf-deposits">--</span>
+    <span class="delta dim" id="cf-deposit-count">--</span></div>
+  <div class="panel stat"><span class="label">Withdrawals</span>
+    <span class="value neg" id="cf-withdrawals">--</span>
+    <span class="delta dim" id="cf-withdrawal-count">--</span></div>
+  <div class="panel stat"><span class="label">Net external funding</span>
+    <span class="value" id="cf-net">--</span>
+    <span class="delta dim">deposits less withdrawals</span></div>
+  <div class="panel stat"><span class="label">Internal transfers</span>
+    <span class="value dim" id="cf-internal">--</span>
+    <span class="delta dim" id="cf-internal-count">excluded from net</span></div>
+</div>
+
+<div class="grid cols-2" style="margin-bottom:14px">
+  <div class="panel">
+    <h2>Funding by <span id="cf-dim-label">region</span></h2>
+    <p class="hint">
+      Withdrawal ratio is what came out over what went in. A region persistently near
+      1.0 is recycling the same money rather than funding new risk.
+    </p>
+    <div id="cf-chart" class="chart"></div>
+  </div>
+  <div class="panel">
+    <h2>Detail</h2>
+    <div class="table-scroll" style="max-height:340px">
+      <table>
+        <thead><tr><th id="cf-dim-head">Region</th>
+          <th class="num"><span class="def" data-def="{{ define('accounts') }}">Accounts</span></th>
+          <th class="num">Deposits</th><th class="num">Withdrawals</th>
+          <th class="num">Net</th><th class="num">Withdrawal ratio</th></tr></thead>
+        <tbody id="cf-rows"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Compliance flags</h2>
+  <p class="hint">
+    Cash-behaviour patterns worth a review, each with the measurement behind it.
+    Accounts funded under $1,000 are excluded entirely &mdash; a small account withdrawing
+    everything is noise, not a finding.
+  </p>
+  <div class="table-scroll" style="max-height:400px">
+    <table>
+      <thead><tr><th>Severity</th><th>Account</th><th>Pattern</th>
+        <th>Evidence</th><th></th></tr></thead>
+      <tbody id="cf-flags"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const money = v => {
+  const n = Number(v || 0), a = Math.abs(n);
+  if (a >= 1e9) return '$' + (n/1e9).toFixed(2) + 'B';
+  if (a >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
+  if (a >= 1e3) return '$' + (n/1e3).toFixed(0) + 'k';
+  return '$' + n.toFixed(0);
+};
+
+async function loadCash() {
+  const days = document.getElementById('cf-days').value;
+  const dimension = document.getElementById('cf-dim').value;
+  document.getElementById('cf-dim-label').textContent = dimension;
+  document.getElementById('cf-dim-head').textContent =
+    dimension.charAt(0).toUpperCase() + dimension.slice(1);
+
+  const data = await (await fetch(`/api/cashflow?days=${days}&dimension=${dimension}`)).json();
+  const s = data.summary || {};
+  if (!Object.keys(s).length) {
+    document.getElementById('cf-flags').innerHTML =
+      `<tr><td colspan="5" class="empty">${(data.errors || []).join(', ')
+        || 'No cash movements available (this needs the VPN).'}</td></tr>`;
+    return;
+  }
+
+  document.getElementById('cf-deposits').textContent = money(s.deposits);
+  document.getElementById('cf-deposit-count').textContent =
+    `${(s.deposit_count || 0).toLocaleString()} operations, median ${money(s.median_deposit)}`;
+  document.getElementById('cf-withdrawals').textContent = money(s.withdrawals);
+  document.getElementById('cf-withdrawal-count').textContent =
+    `${(s.withdrawal_count || 0).toLocaleString()} operations, median ${money(s.median_withdrawal)}`;
+  document.getElementById('cf-net').textContent = money(s.net_funding);
+  document.getElementById('cf-net').className =
+    'value ' + ((s.net_funding || 0) >= 0 ? 'pos' : 'neg');
+  document.getElementById('cf-internal').textContent = money(s.internal_volume);
+  document.getElementById('cf-internal-count').textContent =
+    `${(s.internal_count || 0).toLocaleString()} transfers, excluded from net`;
+
+  const rows = data.by_dimension || [];
+  const key = Object.keys(rows[0] || {})[0];
+  document.getElementById('cf-rows').innerHTML = rows.map(r => `
+    <tr>
+      <td>${r[key]}</td>
+      <td class="num">${(r.accounts || 0).toLocaleString()}</td>
+      <td class="num pos">${money(r.deposits)}</td>
+      <td class="num neg">${money(r.withdrawals)}</td>
+      <td class="num ${(r.net_funding || 0) >= 0 ? 'pos' : 'neg'}">${money(r.net_funding)}</td>
+      <td class="num ${(r.withdrawal_ratio || 0) > 0.9 ? 'warn' : ''}">${
+        r.withdrawal_ratio === null ? '--' : (r.withdrawal_ratio * 100).toFixed(0) + '%'}</td>
+    </tr>`).join('');
+
+  if (rows.length) {
+    zfxChart(document.getElementById('cf-chart'), {
+      backgroundColor: 'transparent',
+      grid: { left: 10, right: 26, top: 30, bottom: 8, containLabel: true },
+      legend: { data: ['Deposits', 'Withdrawals'], top: 0, right: 0,
+                textStyle: { color: '#8b9ab4', fontSize: 11 }, icon: 'roundRect' },
+      tooltip: Object.assign({ trigger: 'axis', axisPointer: { type: 'shadow' },
+        valueFormatter: money }, zfxTheme.tooltip),
+      xAxis: Object.assign({ type: 'value',
+        axisLabel: { formatter: money, color: '#55637d', fontSize: 10,
+                     fontFamily: 'JetBrains Mono' } }, zfxTheme.axis),
+      yAxis: Object.assign({ type: 'category', data: rows.map(r => r[key]).reverse(),
+        axisLabel: { color: '#8b9ab4', fontSize: 10 } }, zfxTheme.axis),
+      series: [
+        { name: 'Deposits', type: 'bar', data: rows.map(r => r.deposits).reverse(),
+          itemStyle: { color: '#2ee6a8', borderRadius: [0,3,3,0] } },
+        { name: 'Withdrawals', type: 'bar',
+          data: rows.map(r => Math.abs(r.withdrawals || 0)).reverse(),
+          itemStyle: { color: '#ff4d6d', borderRadius: [0,3,3,0] } },
+      ],
+    });
+  }
+
+  const flags = data.flags || [];
+  document.getElementById('cf-flags').innerHTML = flags.length ? flags.map(f => `
+    <tr>
+      <td><span class="tag ${f.severity === 'critical' ? 'tag-toxic'
+                           : f.severity === 'warning' ? 'tag-arb' : 'tag-neutral'}">${f.severity}</span></td>
+      <td style="font-family:var(--mono);font-size:11px">${f.account_key}</td>
+      <td><b>${f.pattern}</b></td>
+      <td class="dim" style="font-size:12px">${f.evidence}</td>
+      <td class="num"><a class="btn btn-sm" href="/trading/account?account=${f.account_key}">Inspect</a></td>
+    </tr>`).join('')
+    : '<tr><td colspan="5" class="empty">No account crossed a compliance threshold.</td></tr>';
+}
+
+zfxLive.register('cashflow', loadCash, 300000);
+</script>
+{% endblock %}

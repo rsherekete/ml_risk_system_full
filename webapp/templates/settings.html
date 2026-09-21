@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Data source - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Data source</h1>
+  <p>Your own database credentials. Nothing is shared between users.</p>
+</div>
+
+{% if saved %}<div class="alert alert-ok">Settings saved.</div>{% endif %}
+
+<div class="grid cols-2">
+  <div class="panel">
+    <h2>Connection</h2>
+    <p class="hint">MySQL is the default. BigQuery uses your Google application-default credentials.</p>
+    <form method="post" action="/settings">
+      <div class="field">
+        <label for="kind">Source</label>
+        <select id="kind" name="kind" onchange="toggleSource(this.value)">
+          <option value="mysql"    {{ 'selected' if source.kind == 'mysql' }}>MySQL (direct broker DB)</option>
+          <option value="bigquery" {{ 'selected' if source.kind == 'bigquery' }}>Google BigQuery</option>
+        </select>
+      </div>
+
+      <div id="mysql-fields">
+        <div class="field">
+          <label for="host">Host</label>
+          <input id="host" name="host" type="text" value="{{ source.host }}"
+                 placeholder="ld4-dbproxy.in.zfx.loc">
+        </div>
+        <div class="field">
+          <label for="port">Port</label>
+          <input id="port" name="port" type="number" value="{{ source.port or 3306 }}">
+        </div>
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" value="{{ source.username }}">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" value="{{ source.password }}">
+        </div>
+      </div>
+
+      <div id="bq-fields" style="display:none">
+        <div class="field">
+          <label for="bq_project">BigQuery project</label>
+          <input id="bq_project" name="bq_project" type="text" value="{{ source.bq_project }}"
+                 placeholder="zfx-dwh-prod">
+        </div>
+        <div class="alert alert-info" style="font-size:12px">
+          BigQuery authenticates with application-default credentials on this host
+          (<code>gcloud auth application-default login</code>). No key is stored here.
+        </div>
+      </div>
+
+      <button class="btn-primary" type="submit">Save</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2>Storage note</h2>
+    <p class="hint">Where credentials live and what that means.</p>
+    <div class="alert alert-info" style="font-size:12px">
+      Credentials are held in the local SQLite database beside this application,
+      in plain text. That is acceptable for a single-operator install on a
+      trusted machine and <b>is not acceptable on a shared host</b> &mdash; move
+      them to the OS keyring or a secrets manager before this is deployed
+      anywhere other people can reach the filesystem.
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleSource(kind) {
+  document.getElementById('mysql-fields').style.display = kind === 'mysql' ? '' : 'none';
+  document.getElementById('bq-fields').style.display    = kind === 'bigquery' ? '' : 'none';
+}
+toggleSource(document.getElementById('kind').value);
+</script>
+{% endblock %}

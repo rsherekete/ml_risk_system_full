@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}Trading Overview - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Trading Overview</h1>
+  <p>Client-level routing model measured against B-booking every account.</p>
+</div>
+
+{% include "_controls.html" %}
+{% include "_coverage.html" %}
+
+{% if has_data and curve is defined %}
+{% set flat_total = curve.flat_cum.iloc[-1] %}
+{% set model_total = curve.model_cum.iloc[-1] %}
+{% set flat_dd = curve.flat_dd.min() %}
+{% set model_dd = curve.model_dd.min() %}
+
+<div class="grid cols-4" style="margin-bottom:14px">
+  <div class="panel stat">
+    <span class="label">Model firm P&amp;L</span>
+    <span class="value {{ 'pos' if model_total >= flat_total else 'neg' }}">${{ '{:,.0f}'.format(model_total) }}</span>
+    <span class="delta {{ 'pos' if model_total >= flat_total else 'neg' }}">
+      {{ '{:+,.0f}'.format(model_total - flat_total) }} vs flat B-book
+    </span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Flat B-book</span>
+    <span class="value dim">${{ '{:,.0f}'.format(flat_total) }}</span>
+    <span class="delta dim">every account unhedged</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Model max drawdown</span>
+    <span class="value {{ 'pos' if model_dd > flat_dd else 'neg' }}">${{ '{:,.0f}'.format(model_dd) }}</span>
+    <span class="delta {{ 'pos' if model_dd > flat_dd else 'neg' }}">
+      {{ '{:+.1%}'.format((model_dd - flat_dd) / flat_dd|abs) }} vs flat
+    </span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Hedged</span>
+    <span class="value">{{ '{:.0%}'.format(config.hedge_fraction) }}</span>
+    <span class="delta dim">of account-days &middot; AUC {{ '%.4f'|format(meta.metrics.roc_auc) if meta and meta.metrics.roc_auc }}</span>
+  </div>
+</div>
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>Cumulative outperformance vs flat B-book</h2>
+  <p class="hint">
+    The model's cumulative P&amp;L <em>minus</em> the flat B-book's, day by day &mdash; the number
+    the routing decision is actually worth. It gets its own axis because the two raw curves differ
+    by about 1% of a $1.1bn total: plotted together they lie on top of each other and the entire
+    effect is invisible. Above zero is money the routing made; below zero is premium it cost.
+  </p>
+  <div id="outperformance" class="chart chart-tall"></div>
+</div>
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>Cumulative firm P&amp;L</h2>
+  <p class="hint">
+    Walk-forward out-of-sample. Both lines are the same client flow &mdash; the only
+    difference is which account-days were hedged. At this scale they overlap almost exactly,
+    which is the point of the chart above.
+  </p>
+  <div id="equity" class="chart chart-tall"></div>
+</div>
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>Daily profit</h2>
+  <p class="hint">
+    Per-day firm P&amp;L under each policy, and the difference between them.
+    Click a legend entry to hide that series &mdash; any combination of the three.
+  </p>
+  <div id="daily" class="chart chart-tall"></div>
+</div>
+
+<div class="grid cols-2">
+  <div class="panel">
+    <h2>Drawdown</h2>
+    <p class="hint">Distance below the running peak. Lower area is better.</p>
+    <div id="drawdown" class="chart"></div>
+  </div>
+  <div class="panel">
+    <h2>Policy comparison</h2>
+    <p class="hint">Every hedge fraction from the cached scores &mdash; no refit involved.</p>
+    <table>
+      <thead><tr><th>Policy</th><th class="num">Profit</th><th class="num">vs flat</th>
+        <th class="num">Max DD</th><th class="num">Sharpe</th><th class="num">Calmar</th></tr></thead>
+      <tbody>
+      {% if meta and meta.metrics %}
+        {% set flat = meta.metrics.flat_bbook %}
+        <tr>
+          <td><b>Flat B-book</b></td>
+          <td class="num">${{ '{:,.0f}'.format(flat.total_pnl_usd) }}</td>
+          <td class="num dim">&mdash;</td>
+          <td class="num">${{ '{:,.0f}'.format(flat.max_drawdown_usd) }}</td>
+          <td class="num">{{ '%.2f'|format(flat.sharpe) }}</td>
+          <td class="num">{{ '%.1f'|format(flat.calmar) }}</td>
+        </tr>
+        {% for key, row in meta.metrics.by_fraction.items() %}
+        {% set dp = row.total_pnl_usd - flat.total_pnl_usd %}
+        {% set dd = row.max_drawdown_usd - flat.max_drawdown_usd %}
+        <tr>
+          <td>Hedge {{ '{:.0%}'.format(key|float) }}
+            {% if dp > 0 and dd > 0 %}<span class="tag tag-edge">dominates</span>{% endif %}</td>
+          <td class="num">${{ '{:,.0f}'.format(row.total_pnl_usd) }}</td>
+          <td class="num {{ 'pos' if dp > 0 else 'neg' }}">{{ '{:+,.0f}'.format(dp) }}</td>
+          <td class="num {{ 'pos' if dd > 0 else 'neg' }}">${{ '{:,.0f}'.format(row.max_drawdown_usd) }}</td>
+          <td class="num">{{ '%.2f'|format(row.sharpe) }}</td>
+          <td class="num">{{ '%.1f'|format(row.calmar) }}</td>
+        </tr>
+        {% endfor %}
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{# Charts MUST live in the scripts block: base.html defines zfxChart in a
+   <script> that follows the content block, so anything inline in `content`
+   executes before that helper exists and silently fails. #}
+{% block scripts %}
+{% if has_data and curve is defined %}
+<script>
+const days = {{ curve.day.dt.strftime('%Y-%m-%d').tolist()|tojson }};
+const flat = {{ curve.flat_cum.round(0).tolist()|tojson }};
+const model = {{ curve.model_cum.round(0).tolist()|tojson }};
+const flatDd = {{ curve.flat_dd.round(0).tolist()|tojson }};
+const modelDd = {{ curve.model_dd.round(0).tolist()|tojson }};
+const dailyFlat = {{ curve.flat.round(0).tolist()|tojson }};
+const dailyModel = {{ curve.model.round(0).tolist()|tojson }};
+const money = v => '$' + (v/1e6).toFixed(1) + 'M';
+const money0 = v => '$' + Number(v).toLocaleString(undefined, {maximumFractionDigits: 0});
+
+// THE headline chart: cumulative outperformance. On the raw curves an $11M edge
+// on a $1.1bn book is a line width, so the difference is plotted on its own
+// axis where a desk can actually read it -- and where a policy that quietly
+// bleeds premium for months is impossible to miss.
+const outperf = model.map((v, i) => v - flat[i]);
+const finalOut = outperf.length ? outperf[outperf.length - 1] : 0;
+zfxChart(document.getElementById('outperformance'), {
+  backgroundColor: 'transparent',
+  grid: zfxTheme.grid,
+  tooltip: Object.assign({ trigger: 'axis', valueFormatter: money0 }, zfxTheme.tooltip),
+  dataZoom: [{ type: 'inside' },
+             { type: 'slider', height: 18, bottom: 8, borderColor: '#26324a',
+               fillerColor: 'rgba(34,211,238,.12)', handleStyle: { color: '#22d3ee' },
+               textStyle: { color: '#55637d', fontSize: 10 } }],
+  xAxis: Object.assign({ type: 'category', data: days, boundaryGap: false }, zfxTheme.axis),
+  yAxis: Object.assign({ type: 'value', axisLabel: { formatter: money,
+    color: '#55637d', fontSize: 11, fontFamily: 'JetBrains Mono' } }, zfxTheme.axis),
+  series: [{
+    name: 'Cumulative outperformance', type: 'line', data: outperf,
+    showSymbol: false, smooth: false, lineStyle: { width: 2,
+      color: finalOut >= 0 ? '#2ee6a8' : '#ff4d6d' },
+    itemStyle: { color: finalOut >= 0 ? '#2ee6a8' : '#ff4d6d' },
+    areaStyle: { opacity: 0.12, color: finalOut >= 0 ? '#2ee6a8' : '#ff4d6d' },
+    // Zero is the flat B-book. Crossing it is the whole question, so it is drawn
+    // rather than left to be inferred from the axis labels.
+    markLine: { silent: true, symbol: 'none',
+      data: [{ yAxis: 0 }],
+      lineStyle: { color: '#8b9ab4', type: 'dashed', width: 1 },
+      label: { formatter: 'flat B-book', color: '#8b9ab4', fontSize: 10,
+               position: 'insideEndTop' } }
+  }]
+});
+
+// Daily bars. The difference series is what a desk actually argues about, so it
+// gets its own colour scale (green above zero, red below) rather than a single
+// hue that hides the sign.
+const dailyDiff = dailyModel.map((v, i) => v - dailyFlat[i]);
+zfxChart(document.getElementById('daily'), {
+  backgroundColor: 'transparent',
+  grid: { left: 66, right: 24, top: 34, bottom: 60 },
+  legend: { data: ['Flat B-book', 'Model routing', 'Difference'], top: 0, right: 0,
+            textStyle: { color: '#8b9ab4', fontSize: 11 }, icon: 'roundRect',
+            inactiveColor: '#3a4358' },
+  tooltip: Object.assign({ trigger: 'axis', axisPointer: { type: 'shadow' },
+    valueFormatter: money0 }, zfxTheme.tooltip),
+  // A brush along the bottom: 90 days of bars is dense, and being able to zoom
+  // into a fortnight is the difference between a picture and a usable chart.
+  dataZoom: [{ type: 'inside' },
+             { type: 'slider', height: 18, bottom: 12, borderColor: '#26324a',
+               fillerColor: 'rgba(34,211,238,.12)', handleStyle: { color: '#22d3ee' },
+               textStyle: { color: '#55637d', fontSize: 10 } }],
+  xAxis: Object.assign({ type: 'category', data: days }, zfxTheme.axis),
+  yAxis: Object.assign({ type: 'value', axisLabel: { formatter: money,
+    color: '#55637d', fontSize: 11, fontFamily: 'JetBrains Mono' } }, zfxTheme.axis),
+  series: [
+    { name: 'Flat B-book', type: 'bar', data: dailyFlat,
+      itemStyle: { color: 'rgba(139,154,180,.55)', borderRadius: [2,2,0,0] } },
+    { name: 'Model routing', type: 'bar', data: dailyModel,
+      itemStyle: { color: '#22d3ee', borderRadius: [2,2,0,0] } },
+    { name: 'Difference', type: 'bar', data: dailyDiff.map(v => ({
+        value: v,
+        itemStyle: { color: v >= 0 ? '#2ee6a8' : '#ff4d6d', borderRadius: [2,2,0,0] } })) }
+  ]
+});
+
+zfxChart(document.getElementById('equity'), {
+  backgroundColor: 'transparent',
+  grid: zfxTheme.grid,
+  legend: { data: ['Model routing', 'Flat B-book'], top: 0, right: 0,
+            textStyle: { color: '#8b9ab4', fontSize: 11 }, icon: 'roundRect' },
+  tooltip: Object.assign({ trigger: 'axis',
+    valueFormatter: v => '$' + Number(v).toLocaleString() }, zfxTheme.tooltip),
+  xAxis: Object.assign({ type: 'category', data: days, boundaryGap: false }, zfxTheme.axis),
+  yAxis: Object.assign({ type: 'value', axisLabel: { formatter: money,
+    color: '#55637d', fontSize: 11, fontFamily: 'JetBrains Mono' } }, zfxTheme.axis),
+  series: [
+    { name: 'Model routing', type: 'line', data: model, smooth: true, symbol: 'none',
+      lineStyle: { width: 2.5, color: '#22d3ee' }, itemStyle: { color: '#22d3ee' },
+      areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,
+        [{offset:0,color:'rgba(34,211,238,.22)'},{offset:1,color:'rgba(34,211,238,0)'}]) } },
+    { name: 'Flat B-book', type: 'line', data: flat, smooth: true, symbol: 'none',
+      lineStyle: { width: 2, color: '#8b9ab4', type: 'dashed' }, itemStyle: { color: '#8b9ab4' } }
+  ]
+});
+
+zfxChart(document.getElementById('drawdown'), {
+  backgroundColor: 'transparent',
+  grid: zfxTheme.grid,
+  legend: { data: ['Model', 'Flat'], top: 0, right: 0,
+            textStyle: { color: '#8b9ab4', fontSize: 11 }, icon: 'roundRect' },
+  tooltip: Object.assign({ trigger: 'axis',
+    valueFormatter: v => '$' + Number(v).toLocaleString() }, zfxTheme.tooltip),
+  xAxis: Object.assign({ type: 'category', data: days, boundaryGap: false }, zfxTheme.axis),
+  yAxis: Object.assign({ type: 'value', axisLabel: { formatter: money,
+    color: '#55637d', fontSize: 11, fontFamily: 'JetBrains Mono' } }, zfxTheme.axis),
+  series: [
+    { name: 'Model', type: 'line', data: modelDd, smooth: true, symbol: 'none',
+      lineStyle: { width: 2, color: '#2ee6a8' }, itemStyle: { color: '#2ee6a8' },
+      areaStyle: { color: 'rgba(46,230,168,.14)' } },
+    { name: 'Flat', type: 'line', data: flatDd, smooth: true, symbol: 'none',
+      lineStyle: { width: 2, color: '#ff4d6d' }, itemStyle: { color: '#ff4d6d' },
+      areaStyle: { color: 'rgba(255,77,109,.10)' } }
+  ]
+});
+</script>
+{% endif %}
+{% endblock %}
+

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Warehouse - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Warehouse</h1>
+  <p>Local trade history: what is stored, how fresh it is, and how to extend it.</p>
+</div>
+
+{% if refresh.status == 'running' %}
+<div class="alert alert-info">
+  <b>Refresh running.</b> <span id="refresh-msg">{{ refresh.message }}</span>
+</div>
+{% elif refresh.status == 'error' %}
+<div class="alert alert-error"><b>Refresh failed.</b> {{ refresh.message }}</div>
+{% elif refresh.status == 'done' %}
+<div class="alert alert-ok"><b>Refresh complete.</b> {{ refresh.message }}</div>
+{% endif %}
+
+<div class="grid cols-4" style="margin-bottom:14px">
+  <div class="panel stat">
+    <span class="label">Stored on disk</span>
+    <span class="value">{{ '{:,.0f}'.format(summary.total_mb) }} MB</span>
+    <span class="delta dim">{{ summary.files }} monthly partitions</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Servers</span>
+    <span class="value">{{ summary.databases|length }}</span>
+    <span class="delta dim">of 6 in the model universe</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Target history</span>
+    <span class="value">{{ (history_days / 365)|round(1) }}y</span>
+    <span class="delta dim">{{ history_days }} days</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Refresh overlap</span>
+    <span class="value">{{ overlap_days }}d</span>
+    <span class="delta dim">recovers amended trades</span>
+  </div>
+</div>
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>Why refresh is incremental</h2>
+  <p class="hint" style="margin:0">
+    Two years across six servers is far too much to re-query whenever the dashboard
+    wants fresh numbers. Each server is read from its own watermark minus a
+    <b>{{ overlap_days }}-day overlap</b>, and rows are de-duplicated on trade identity
+    keeping the newest &mdash; so an amended or late-closing trade replaces the stored
+    copy instead of being missed or duplicated. Only the months a fetch touches are
+    rewritten.
+  </p>
+</div>
+
+<div class="grid cols-2" style="margin-bottom:14px">
+  <div class="panel">
+    <h2>Per-server coverage</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Server</th><th class="num">Months</th><th>Span</th>
+          <th class="num">Size</th></tr></thead>
+        <tbody>
+        {% for name, info in summary.databases.items() %}
+          <tr>
+            <td><b>{{ name }}</b></td>
+            <td class="num {{ 'pos' if info.months >= 24 else 'warn' }}">{{ info.months }}</td>
+            <td class="dim" style="font-family:var(--mono);font-size:11px">
+              {{ info.first_month }} &rarr; {{ info.last_month }}</td>
+            <td class="num">{{ '{:,.0f}'.format(info.size_mb) }} MB</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="empty">Nothing stored yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% set incomplete = summary.databases.values()|selectattr('months', 'lt', 24)|list %}
+    {% if incomplete or summary.databases|length < 5 %}
+    <div class="alert alert-info" style="margin-top:12px;font-size:12px">
+      <b>Coverage is incomplete.</b> Models trained now use whatever is stored, which
+      is less than the two-year target. The figures remain valid for the history behind
+      them, but they are not the two-year result.
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <h2>Refresh</h2>
+    <p class="hint">
+      Incremental by default. Set a day count only to backfill a gap.
+    </p>
+    {% if user.is_admin %}
+    <form method="post" action="/data/refresh">
+      <div class="field">
+        <label for="database">Server</label>
+        <select id="database" name="database">
+          <option value="">All servers</option>
+          {% for name in summary.databases %}<option value="{{ name }}">{{ name }}</option>{% endfor %}
+          <option value="mt4_live01">mt4_live01</option>
+          <option value="mt4_live02">mt4_live02</option>
+          <option value="mt5_live01">mt5_live01</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="days">Force window (days, 0 = incremental)</label>
+        <input id="days" name="days" type="number" min="0" max="1460" value="0">
+      </div>
+      <button class="btn-primary" type="submit"
+              {{ 'disabled' if refresh.status == 'running' }}>
+        {{ 'Refresh running…' if refresh.status == 'running' else 'Start refresh' }}
+      </button>
+    </form>
+    {% else %}
+    <div class="alert alert-info" style="font-size:12px">
+      Refreshing the warehouse is an administrator action.
+    </div>
+    {% endif %}
+
+    {% if refresh.log %}
+    <h3 style="margin-top:16px">Recent activity</h3>
+    <pre id="refresh-log" style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);margin:0;white-space:pre-wrap;max-height:240px;overflow:auto">{{ refresh.log|join('\n') }}</pre>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Source precedence</h2>
+  <p class="hint" style="margin:0">
+    <b>MySQL is primary</b> &mdash; it is the system of record and costs nothing per query.
+    BigQuery is the fallback, used only where MySQL has no copy: <code>mt5_dubai_live01</code>
+    does not exist in this MySQL instance and remains a BigQuery source. Kafka supplies
+    live flow for today, and is never mixed with settled warehouse figures &mdash; the two
+    are shown separately because a stale live number is more dangerous than an absent one.
+  </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if refresh.status == 'running' %}
+<script>
+// Poll rather than reload: a refresh can run for an hour.
+setInterval(async () => {
+  const data = await (await fetch('/data/status')).json();
+  const message = document.getElementById('refresh-msg');
+  if (message) message.textContent = data.message;
+  const log = document.getElementById('refresh-log');
+  if (log && data.log) log.textContent = data.log.join('\n');
+  if (data.status !== 'running') location.reload();
+}, 4000);
+</script>
+{% endif %}
+{% endblock %}

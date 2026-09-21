@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Research - ZFX Quant{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Research</h1>
+  <p>What the trade-level model is actually using, and how it behaves by symbol.</p>
+</div>
+
+{% include "_controls.html" %}
+{% include "_coverage.html" %}
+
+{% if meta and meta.metrics %}
+<div class="grid cols-2" style="margin-bottom:14px">
+  <div class="panel">
+    <h2>Feature importance</h2>
+    <p class="hint">
+      Split counts from the final fitted model. Importance says what the model
+      <b>uses</b>, not what causes P&amp;L &mdash; a heavily-used feature can still be a proxy.
+    </p>
+    <div id="importance" class="chart chart-tall"></div>
+  </div>
+  <div class="panel">
+    <h2>Feature groups</h2>
+    <p class="hint">Four families of information, all knowable at the moment a trade opens.</p>
+    <div style="font-size:12px;line-height:1.8">
+      <div><span class="tag tag-edge">Trade-intrinsic</span>
+        size, symbol, direction, hour, weekday, stop and target placement, risk-reward, EA flag.</div>
+      <div style="margin-top:8px"><span class="tag tag-magnitude">Market context</span>
+        trailing 1h / 4h / 24h returns, 24h volatility, previous-bar flow imbalance.</div>
+      <div style="margin-top:8px"><span class="tag tag-arb">Account history</span>
+        prior win rate, mean and dispersion of P&amp;L, typical holding time, typical size.</div>
+      <div style="margin-top:8px"><span class="tag tag-toxic">Markout profile</span>
+        whether this client's earlier fills were followed by favourable moves.</div>
+    </div>
+    <div class="alert alert-info" style="margin-top:14px;font-size:12px">
+      <b>The one rule that matters here.</b> A trade's <i>own</i> post-entry markout is the
+      outcome restated in other units &mdash; including it produces a near-perfect model that
+      cannot be traded. Only the account's profile over <b>earlier, already-closed</b> trades
+      is admissible, accumulated in close-time order and joined as-of each entry.
+    </div>
+  </div>
+</div>
+
+{% if meta.metrics.symbol_breakdown %}
+<div class="panel" style="margin-bottom:14px">
+  <h2>Behaviour by symbol</h2>
+  <p class="hint">Client P&amp;L is negative where the firm profits from B-booking that symbol.</p>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Symbol</th><th class="num">Trades</th><th class="num">Client P&amp;L</th>
+        <th class="num">Firm P&amp;L</th><th class="num">Mean model score</th></tr></thead>
+      <tbody>
+      {% for symbol, row in meta.metrics.symbol_breakdown.items()|sort(attribute='1.trades', reverse=true) %}
+        <tr>
+          <td>{{ symbol }}</td>
+          <td class="num">{{ '{:,}'.format(row.trades) }}</td>
+          <td class="num {{ 'neg' if row.client_pnl > 0 else 'pos' }}">
+            ${{ '{:,.0f}'.format(row.client_pnl) }}</td>
+          <td class="num {{ 'pos' if row.client_pnl < 0 else 'neg' }}">
+            ${{ '{:,.0f}'.format(-row.client_pnl) }}</td>
+          <td class="num">{{ '{:.1%}'.format(row.mean_score) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="panel">
+  <h2>Validation status</h2>
+  <p class="hint">What has been established, and what has not.</p>
+  <table>
+    <tbody>
+      <tr><td>Walk-forward out-of-sample</td>
+          <td><span class="tag tag-edge">done</span></td>
+          <td class="dim">Refit every {{ meta.config.refit_cadence_days }} days; scores are never in-sample.</td></tr>
+      <tr><td>Label purging</td>
+          <td><span class="tag tag-edge">done</span></td>
+          <td class="dim">A trade enters training only once it has closed &mdash; its label does not exist before that.</td></tr>
+      <tr><td>Point-in-time routing threshold</td>
+          <td><span class="tag tag-edge">done</span></td>
+          <td class="dim">Cutoff recomputed each day from that day's population, not a global quantile.</td></tr>
+      <tr><td>Feature leak guard</td>
+          <td><span class="tag tag-edge">done</span></td>
+          <td class="dim">Outcome columns asserted absent; an out-of-sample AUC above 0.95 aborts the run.</td></tr>
+      <tr><td>Held-out period validation</td>
+          <td><span class="tag tag-arb">outstanding</span></td>
+          <td class="dim">Not yet tested on a window the model has never seen. The single largest
+            remaining risk, given how many configurations were evaluated against these days.</td></tr>
+      <tr><td>Live A-book economics</td>
+          <td><span class="tag tag-arb">outstanding</span></td>
+          <td class="dim">Hedged flow is assumed to earn nothing. Real markup would improve these
+            numbers; LP slippage would erode them.</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if meta and meta.metrics and meta.metrics.feature_importance %}
+<script>
+const importance = {{ meta.metrics.feature_importance|tojson }};
+const entries = Object.entries(importance).slice(0, 22).reverse();
+const groups = {
+  hour:'ctx', weekday:'ctx', ctx_return_1h:'ctx', ctx_return_4h:'ctx', ctx_return_24h:'ctx',
+  ctx_vol_24h:'ctx', ctx_flow_prev:'ctx',
+  hist_win_rate:'hist', hist_mean_pnl:'hist', hist_pnl_std:'hist', hist_duration:'hist',
+  hist_edge:'hist', hist_mean_notional:'hist', trade_index:'hist', notional_vs_usual:'hist'
+};
+const colour = name => groups[name] === 'ctx' ? '#7c8cff'
+                    : groups[name] === 'hist' ? '#ffb020' : '#22d3ee';
+
+zfxChart(document.getElementById('importance'), {
+  backgroundColor: 'transparent',
+  grid: { left: 8, right: 26, top: 10, bottom: 8, containLabel: true },
+  tooltip: Object.assign({ trigger: 'axis', axisPointer: { type: 'shadow' } }, zfxTheme.tooltip),
+  xAxis: Object.assign({ type: 'value' }, zfxTheme.axis),
+  yAxis: Object.assign({ type: 'category', data: entries.map(e => e[0]),
+    axisLabel: { color: '#8b9ab4', fontSize: 10, fontFamily: 'JetBrains Mono' } }, zfxTheme.axis),
+  series: [{ type: 'bar', barWidth: '62%',
+    data: entries.map(e => ({ value: e[1],
+      itemStyle: { color: colour(e[0]), borderRadius: [0, 4, 4, 0] } })) }]
+});
+</script>
+{% endif %}
+{% endblock %}

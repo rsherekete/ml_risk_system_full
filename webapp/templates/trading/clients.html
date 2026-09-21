@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Client Intelligence - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Client Intelligence</h1>
+  <p>Behavioural taxonomy across the routable population, with the evidence behind each label.</p>
+</div>
+
+{% include "_controls.html" %}
+
+{% if has_data and manifest is defined and manifest|length %}
+<form method="get" class="toolbar">
+  <div>
+    <label for="day">As at</label>
+    <select id="day" name="day" onchange="this.form.submit()">
+      {% for d in days %}<option value="{{ d }}" {{ 'selected' if d == selected_day }}>{{ d }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="category">Category</label>
+    <select id="category" name="category" onchange="filterRows(this.value)">
+      <option value="">All categories</option>
+      {% for name in manifest.category.unique()|sort %}
+        <option value="{{ name }}">{{ name.replace('_',' ')|title }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="search">Account</label>
+    <input id="search" type="text" placeholder="login or server:login…" oninput="searchRows(this.value)"
+           onkeydown="if(event.key==='Enter'){event.preventDefault();lookupAccount();}">
+    <div id="lookup-hint" style="font-size:11px;margin-top:4px;color:var(--ink-faint)"></div>
+  </div>
+</form>
+
+<div class="grid cols-3" style="margin-bottom:14px">
+  <div class="panel">
+    <h2>Population by category</h2>
+    <p class="hint">Every routable account as at {{ selected_day }}.</p>
+    <div id="mix" class="chart" style="height:260px"></div>
+  </div>
+  <div class="panel">
+    <h2>Client P&amp;L by category</h2>
+    <p class="hint">Negative means the category loses money &mdash; profitable for the firm to B-book.</p>
+    <div id="pnl" class="chart" style="height:260px"></div>
+  </div>
+  <div class="panel">
+    <h2>What the labels mean</h2>
+    <p class="hint">Thresholds are set to be defensible, not generous.</p>
+    <div style="font-size:12px;line-height:1.7">
+      <div><span class="tag tag-edge">Persistent edge</span> Profit factor &gt; 1.1 over &ge; 20 closed trades.</div>
+      <div style="margin-top:7px"><span class="tag tag-arb">Latency arbitrage</span> Fills anticipate the move, corroborated across &ge; 50 trades.</div>
+      <div style="margin-top:7px"><span class="tag tag-toxic">Toxic flow</span> Doubling-down on &ge; 20% of trades.</div>
+      <div style="margin-top:7px"><span class="tag tag-magnitude">High magnitude</span> Top-decile gross notional for the day.</div>
+      <div style="margin-top:7px"><span class="tag tag-neutral">Scalper</span> &ge; 50% of trades held under five minutes.</div>
+      <div style="margin-top:7px"><span class="tag tag-neutral">Model signal</span> No single pattern dominates.</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Routable population &mdash; {{ '{:,}'.format(manifest|length) }} accounts</h2>
+  <p class="hint">Ranked by expected impact. Click any account to drill into its trades and markouts.</p>
+  <div class="table-scroll">
+    <table id="clients">
+      <thead>
+        <tr><th>Account</th><th>Category</th>
+          <th class="num"><span class="def" data-def="{{ define('score') }}">Model score</span></th>
+          <th class="num">Win rate</th><th class="num">Closed trades</th>
+          <th class="num">Profit factor</th><th class="num">Exposure</th>
+          <th class="num"><span class="def" data-def="{{ define('evidence_age') }}">Evidence</span></th>
+          <th>Justification</th><th class="num">Inspect</th></tr>
+      </thead>
+      <tbody>
+      {% for row in manifest.itertuples() %}
+        <tr data-category="{{ row.category }}" data-account="{{ row.account_key|lower }}">
+          <td><a href="/trading/account?account={{ row.account_key }}"
+                 style="font-family:var(--mono);font-size:12px">{{ row.account_key }}</a></td>
+          <td><span class="tag {{ row.css }}">{{ row.category.replace('_',' ') }}</span></td>
+          <td class="num">{{ '{:.1%}'.format(row.score) }}</td>
+          <td class="num">{{ '{:.0%}'.format(row.life_win_rate) if row.life_win_rate == row.life_win_rate else '--' }}</td>
+          <td class="num">{{ '{:,.0f}'.format(row.life_closes) if row.life_closes == row.life_closes else '--' }}</td>
+          <td class="num {{ 'pos' if row.life_profit_factor == row.life_profit_factor and row.life_profit_factor > 1 else '' }}">
+            {{ '%.2f'|format(row.life_profit_factor) if row.life_profit_factor == row.life_profit_factor else '--' }}</td>
+          <td class="num">{{ '${:,.0f}'.format(row.gross_notional) if row.gross_notional == row.gross_notional else '--' }}</td>
+          <td class="num {{ 'warn' if row.days_stale > 5 else 'dim' }}">
+            {{ 'today' if row.days_stale == 0 else '{}d'.format(row.days_stale) }}</td>
+          <td style="font-size:12px;color:var(--ink-dim);max-width:340px">{{ row.reason }}</td>
+          <td class="num">
+            <a class="btn btn-sm" href="/trading/account?account={{ row.account_key }}">Inspect</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if has_data and manifest is defined and manifest|length %}
+<script>
+function filterRows(category) {
+  document.querySelectorAll('#clients tbody tr').forEach(tr => {
+    tr.style.display = (!category || tr.dataset.category === category) ? '' : 'none';
+  });
+}
+function searchRows(text) {
+  const needle = text.toLowerCase();
+  let shown = 0;
+  document.querySelectorAll('#clients tbody tr').forEach(tr => {
+    const hit = tr.dataset.account.includes(needle);
+    tr.style.display = hit ? '' : 'none';
+    if (hit) shown++;
+  });
+  // Fall through to a universal lookup: brand-new / post-snapshot accounts
+  // (like an account that started trading today) aren't in this roster yet,
+  // but their live detail page works — offer to open it directly.
+  const hint = document.getElementById('lookup-hint');
+  if (needle && shown === 0) {
+    hint.innerHTML = `Not in this day's roster. <a href="#" onclick="lookupAccount();return false;" `
+      + `style="color:var(--accent)">Open account detail for “${needle}” →</a> (live lookup)`;
+  } else { hint.innerHTML = ''; }
+}
+async function lookupAccount() {
+  const q = (document.getElementById('search').value || '').trim();
+  if (!q) return;
+  const hint = document.getElementById('lookup-hint');
+  if (q.includes(':')) { location.href = '/trading/account?account=' + encodeURIComponent(q); return; }
+  hint.textContent = 'Resolving ' + q + ' across servers…';
+  try {
+    const j = await (await fetch('/api/account/resolve?q=' + encodeURIComponent(q))).json();
+    if (j.account_key) { location.href = '/trading/account?account=' + encodeURIComponent(j.account_key); }
+    else if (j.candidates && j.candidates.length) {
+      hint.innerHTML = 'Found on: ' + j.candidates.map(k =>
+        `<a href="/trading/account?account=${encodeURIComponent(k)}" style="color:var(--accent)">${k}</a>`).join(' · ');
+    } else { hint.textContent = 'No account matches “' + q + '”.'; }
+  } catch (e) { hint.textContent = 'Lookup failed — try the full server:login.'; }
+}
+
+const mix = {{ manifest.category.value_counts().to_dict()|tojson }};
+const palette = {
+  PERSISTENT_EDGE: '#2ee6a8', LATENCY_ARBITRAGE: '#ffb020', TOXIC_FLOW: '#ff4d6d',
+  HIGH_MAGNITUDE: '#7c8cff', SCALPER: '#8b9ab4', MOMENTUM_WINNER: '#22d3ee',
+  MODEL_SIGNAL: '#55637d'
+};
+zfxChart(document.getElementById('mix'), {
+  backgroundColor: 'transparent',
+  tooltip: Object.assign({ trigger: 'item',
+    formatter: p => `${p.name.replace(/_/g,' ')}<br/>${p.value.toLocaleString()} (${p.percent}%)` }, zfxTheme.tooltip),
+  series: [{
+    type: 'pie', radius: ['52%', '78%'], center: ['50%', '52%'],
+    itemStyle: { borderColor: '#0d1220', borderWidth: 2 },
+    label: { color: '#8b9ab4', fontSize: 10, formatter: p => p.name.replace(/_/g, ' ') },
+    labelLine: { lineStyle: { color: '#26324a' } },
+    data: Object.entries(mix).map(([name, value]) =>
+      ({ name, value, itemStyle: { color: palette[name] || '#55637d' } }))
+  }]
+});
+
+const pnlByCategory = {{ manifest.groupby('category')['pnl'].sum().round(0).to_dict()|tojson }};
+const entries = Object.entries(pnlByCategory).sort((a, b) => a[1] - b[1]);
+zfxChart(document.getElementById('pnl'), {
+  backgroundColor: 'transparent',
+  grid: { left: 8, right: 20, top: 14, bottom: 8, containLabel: true },
+  tooltip: Object.assign({ trigger: 'axis', axisPointer: { type: 'shadow' },
+    valueFormatter: v => '$' + Number(v).toLocaleString() }, zfxTheme.tooltip),
+  xAxis: Object.assign({ type: 'value',
+    axisLabel: { formatter: v => '$' + (v/1e6).toFixed(1) + 'M', color: '#55637d',
+                 fontSize: 10, fontFamily: 'JetBrains Mono' } }, zfxTheme.axis),
+  yAxis: Object.assign({ type: 'category', data: entries.map(e => e[0].replace(/_/g, ' ')),
+    axisLabel: { color: '#8b9ab4', fontSize: 10 } }, zfxTheme.axis),
+  series: [{
+    type: 'bar', barWidth: '58%',
+    data: entries.map(e => ({ value: e[1],
+      itemStyle: { color: e[1] < 0 ? '#2ee6a8' : '#ff4d6d', borderRadius: [0, 4, 4, 0] } }))
+  }]
+});
+</script>
+{% endif %}
+{% endblock %}

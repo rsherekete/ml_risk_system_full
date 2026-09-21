@@ -1,0 +1,115 @@
+syntax = "proto3";
+package oms_mt4;
+
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "Zeal.OMS.MT4.Events.Contract.Trades";
+option java_package = "com.zeal.oms.mt4.events.contract.trades";
+option cc_enable_arenas = true;
+
+message Trade {
+  google.protobuf.Timestamp timestamp = 1;
+  string order = 2;
+  string login = 3;
+
+  oneof Event {
+    OrderCreated orderCreated = 10;
+    OrderUpdated orderUpdated = 11;
+    OrderClosedBy orderClosedBy = 12;
+  }
+}
+message OrderCreated {
+  TradeRecord tradeRecord = 1;
+  OpenMode mode = 2;
+}
+message OrderUpdated {
+  TradeRecord tradeRecord = 1;
+  UpdateMode mode = 2;
+}
+message OrderClosedBy {
+  int32 main_order = 1;
+  int32 by_order = 2;
+  optional TradeRecord remain = 3;
+}
+message TradeRecord {
+  int32 order = 1;
+  int32 login = 2;
+  string symbol = 3;
+  int32 digits = 4;
+  TradeCommand command = 5;
+  int32 volume = 6;
+  google.protobuf.Timestamp openTime = 7;
+  TradeState state = 8;
+  double openPrice = 9;
+  double stopLoss = 10;
+  double takeProfit = 11;
+  google.protobuf.Timestamp closeTime = 12;
+  int32 gatewayVolume = 13;
+  google.protobuf.Timestamp expiration = 14;
+  TradeReason reason = 15;
+  bytes convReserv = 16;
+  repeated double convRates = 17;
+  double commission = 18;
+  double commissionAgent = 19;
+  double storage = 20;
+  double closePrice = 21;
+  double profit = 22;
+  double taxes = 23;
+  int32 magic = 24;
+  string comment = 25;
+  int32 gatewayOrder = 26;
+  int32 activation = 27;
+  int32 gatewayOpenPrice = 28;
+  int32 gatewayClosePrice = 29;
+  double marginRate = 30;
+  google.protobuf.Timestamp timeStamp = 31;
+  repeated int32 apiData = 32;
+  double marketBid = 33;
+  double marketAsk = 34;
+  int32 spreadDiffBid = 35;
+  int32 spreadDiffAsk = 36;
+  string group = 37;
+  string currency = 38;
+}
+enum TradeState {
+  TS_OPEN_NORMAL = 0;
+  TS_OPEN_REMAND = 1;
+  TS_OPEN_RESTORED = 2;
+  TS_CLOSED_NORMAL = 3;
+  TS_CLOSED_PART = 4;
+  TS_CLOSED_BY = 5;
+  TS_DELETED = 6;
+}
+enum TradeCommand {
+  OP_BUY = 0;
+  OP_SELL = 1;
+  OP_BUY_LIMIT = 2;
+  OP_SELL_LIMIT = 3;
+  OP_BUY_STOP = 4;
+  OP_SELL_STOP = 5;
+  OP_BALANCE = 6;
+  OP_CREDIT = 7;
+}
+enum TradeReason {
+  TR_REASON_CLIENT = 0;
+  TR_REASON_EXPERT = 1;
+  TR_REASON_DEALER = 2;
+  TR_REASON_SIGNAL = 3;
+  TR_REASON_GATEWAY = 4;
+  TR_REASON_MOBILE = 5;
+  TR_REASON_WEB = 6;
+  TR_REASON_API = 7;
+}
+enum OpenMode {
+  OPEN_NEW = 0;
+  OPEN_CLOSE = 1;
+  OPEN_RESTORE = 2;
+  OPEN_API = 3;
+  OPEN_ROLLOVER = 4;
+}
+enum UpdateMode {
+  UPDATE_NORMAL = 0;
+  UPDATE_ACTIVATE = 1;
+  UPDATE_CLOSE = 2;
+  UPDATE_DELETE = 3;
+}

@@ -1,0 +1,135 @@
+syntax = "proto3";
+package Zeal.OMS.MT5.Events.Contract.Deals;
+
+import "google/protobuf/timestamp.proto";
+
+option java_package = "com.zeal.oms.mt5.events.contract.deals";
+option cc_enable_arenas = true;
+
+message Deal {
+  google.protobuf.Timestamp timestamp = 1;
+  string deal = 2;
+  string login = 3;
+
+  oneof Event {
+    DealCreated dealCreated = 10;
+    DealUpdated dealUpdated = 11;
+    DealDeleted dealDeleted = 12;
+  }
+}
+message DealCreated {
+  DealRecord deal = 1;
+}
+message DealUpdated {
+  DealRecord deal = 1;
+}
+message DealDeleted {
+  DealRecord deal = 1;
+}
+message DealRecord {
+  uint64 deal = 1;
+  string externalID = 2;
+  uint64 login = 3;
+  uint64 dealer = 4;
+  uint64 order = 5;
+  DealAction action = 6;
+  DealEntry entry = 7;
+  uint32 digits = 8;
+  uint32 digitsCurrency = 9;
+  double contractSize = 10;
+  google.protobuf.Timestamp time = 11;
+  string symbol = 12;
+  double price = 13;
+  double priceSL = 14;
+  double priceTP = 15;
+  uint64 volume = 16;
+  uint64 volumeExt = 17;
+  uint64 volumeClosed = 18;
+  uint64 volumeClosedExt = 19;
+  double profit = 20;
+  double value = 21;
+  double storage = 22;
+  double commission = 23;
+  double fee = 24;
+  double rateProfit = 25;
+  double rateMargin = 26;
+  uint64 expertID = 27;
+  uint64 positionID = 28;
+  string comment = 29;
+  double profitRaw = 30;
+  double pricePosition = 31;
+  double tickValue = 32;
+  double tickSize = 33;
+  uint64 flags = 34;
+  DealReason reason = 35;
+  string gateway = 36;
+  double priceGateway = 37;
+  double marketBid = 38;
+  double marketAsk = 39;
+  double marketLast = 40;
+  DealModifyFlags modificationFlags = 41;
+  string group = 42;
+  int32 spreadDiff = 43;
+  int32 spreadDiffBalance = 44;
+  string currency = 45;
+}
+message DealModifyFlags {
+  bool ModifyFlagsAdmin = 1;
+  bool ModifyFlagsManager = 2;
+  bool ModifyFlagsPosition = 3;
+  bool ModifyFlagsRestore = 4;
+  bool ModifyFlagsApiAdmin = 5;
+  bool ModifyFlagsApiManager = 6;
+  bool ModifyFlagsApiServer = 7;
+  bool ModifyFlagsApiGateway = 8;
+}
+enum DealAction {
+  DEAL_BUY = 0;
+  DEAL_SELL = 1;
+  DEAL_BALANCE = 2;
+  DEAL_CREDIT = 3;
+  DEAL_CHARGE = 4;
+  DEAL_CORRECTION = 5;
+  DEAL_BONUS = 6;
+  DEAL_COMMISSION = 7;
+  DEAL_COMMISSION_DAILY = 8;
+  DEAL_COMMISSION_MONTHLY = 9;
+  DEAL_AGENT_DAILY = 10;
+  DEAL_AGENT_MONTHLY = 11;
+  DEAL_INTERESTRATE = 12;
+  DEAL_BUY_CANCELED = 13;
+  DEAL_SELL_CANCELED = 14;
+  DEAL_DIVIDEND = 15;
+  DEAL_DIVIDEND_FRANKED = 16;
+  DEAL_TAX = 17;
+  DEAL_AGENT = 18;
+  DEAL_SO_COMPENSATION = 19;
+  DEAL_SO_COMPENSATION_CREDIT = 20;
+}
+enum DealEntry {
+  ENTRY_IN = 0;
+  ENTRY_OUT = 1;
+  ENTRY_INOUT = 2;
+  ENTRY_OUT_BY = 3;
+}
+enum DealReason {
+  DEAL_REASON_CLIENT = 0;
+  DEAL_REASON_EXPERT = 1;
+  DEAL_REASON_DEALER = 2;
+  DEAL_REASON_SL = 3;
+  DEAL_REASON_TP = 4;
+  DEAL_REASON_SO = 5;
+  DEAL_REASON_ROLLOVER = 6;
+  DEAL_REASON_EXTERNAL_CLIENT = 7;
+  DEAL_REASON_VMARGIN = 8;
+  DEAL_REASON_GATEWAY = 9;
+  DEAL_REASON_SIGNAL = 10;
+  DEAL_REASON_SETTLEMENT = 11;
+  DEAL_REASON_TRANSFER = 12;
+  DEAL_REASON_SYNC = 13;
+  DEAL_REASON_EXTERNAL_SERVICE = 14;
+  DEAL_REASON_MIGRATION = 15;
+  DEAL_REASON_MOBILE = 16;
+  DEAL_REASON_WEB = 17;
+  DEAL_REASON_SPLIT = 18;
+}

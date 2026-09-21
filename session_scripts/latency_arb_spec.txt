@@ -1,0 +1,53 @@
+=== PAGE 1 ===
+Anti-FraudSystem-LatencyArbitrage
+Module
+ExecutiveObjective
+TransformtheexistingCRMAnti-Fraudmodulefromafragmented,predominantlymanual
+analyticalsystemintoaholistic,deterministicandevent-drivendetection,decision-makingand
+controlframework,usingLatencyArbitrageasthefirstpriorityusecase.TheexistingAI/ML
+behaviouralprofilingcapabilitywillbecalibratedinparallelandintegratedintotheRisk
+decisionworkflow.
+CurrentProblem
+Currentlimitation Impact
+Limitedevent-driven
+detection
+Thesystemwasnotoriginallybuiltaroundconfigurableeventtriggersand
+threshold-baseddetection.
+Limitedconfigurable
+controls
+Thereisinsufficientabilitytocustomiserules,thresholdsandescalation
+criteriawithintheAnti-Fraudworkflow.
+Noadvanced
+behaviouralprofiling
+Currentanalysisreliesheavilyonmanualmark-outtablesanddoesnot
+provideaconsolidatedviewofrisk,confidence,consistency,persistenceor
+economicimpact.
+Fragmented
+functionality
+Modulesandanalyticaloutputsarescattered,makingtheoverallriskpicture
+difficulttoassessinoneplace.
+Manualinvestigation Riskusersmustmanuallyidentify,reconstruct,compareandinterpretmany
+cases.
+Noconsolidated
+decisionlayer
+IndividualindicatorsarenotconsistentlycombinedintoastructuredRisk
+assessment.
+Limitedautomation
+pathway
+Detectionisnotnaturallyconnectedtocontrolleddownstreamactions.
+Three-WeekPlan-ETA27September2026
+
+=== PAGE 2 ===
+ExpectedOutcome
+Attheendofthreeweeks,theorganisationshouldhaveavalidatedfirstversionofamodern
+Anti-Fraudworkflow,withLatencyArbitrageastheprioritycapability.Thedeliverableis
+thereforebroaderthanadetectionmodel:itisthefoundationformovingtheCRMAnti-Fraud
+modulefromfragmentedmanualanalysistowardintegrateddetection,decision-makingand
+controlledautomationforriskmanagementactions.
+MeasurablesTarget
+
+=== PAGE 3 ===
+TaskAllocationandTracker
+👇 Differentviewsareavailable
+RequiredResources
+All

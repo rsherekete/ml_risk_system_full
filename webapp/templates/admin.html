@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}Administration - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Administration</h1>
+  <p>Approve access requests, set what each person may see, manage credentials and
+     sessions, and control which networks may reach this instance.</p>
+</div>
+
+{% if ok %}
+<div class="panel" style="margin-bottom:16px;border-color:rgba(64,200,160,.45)">
+  <b style="color:var(--ok, #40c8a0)">{{ ok }}</b>
+</div>
+{% endif %}
+{% if err %}
+<div class="panel" style="margin-bottom:16px;border-color:rgba(230,90,70,.5)">
+  <b style="color:var(--bad, #e65a46)">{{ err }}</b>
+</div>
+{% endif %}
+
+{% if pending %}
+<div class="panel" style="margin-bottom:16px;border-color:rgba(255,176,32,.35)">
+  <h2 style="color:var(--warn)">{{ pending|length }} request{{ 's' if pending|length != 1 }} awaiting approval</h2>
+  <p class="hint">These accounts exist but cannot sign in until approved.</p>
+  <table>
+    <thead><tr><th>User</th><th>Email</th><th>Requested</th><th class="num">Action</th></tr></thead>
+    <tbody>
+    {% for person in pending %}
+      <tr>
+        <td><b>{{ person.username }}</b></td>
+        <td class="dim">{{ person.email or '--' }}</td>
+        <td>{% for v in person.views %}<span class="tag tag-neutral">{{ v }}</span> {% endfor %}</td>
+        <td class="num">
+          <form method="post" action="/admin/approve" style="display:inline">
+            <input type="hidden" name="user_id" value="{{ person.id }}">
+            <input type="hidden" name="approved" value="1">
+            <button class="btn-primary btn-sm" type="submit">Approve</button>
+          </form>
+          <form method="post" action="/admin/delete" style="display:inline">
+            <input type="hidden" name="user_id" value="{{ person.id }}">
+            <button class="btn-danger btn-sm" type="submit">Reject</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="panel">
+  <h2>All users</h2>
+  <p class="hint">Role and view permissions take effect on the user's next request.</p>
+  <div class="table-scroll">
+  <table>
+    <thead>
+      <tr><th>User</th><th>Email</th><th>Status</th><th>Role &amp; access</th>
+          <th>Credentials &amp; sessions</th><th class="num">Action</th></tr>
+    </thead>
+    <tbody>
+    {% for person in people %}
+      <tr>
+        <td><b>{{ person.username }}</b>{% if person.id == user.id %}<span class="pill">you</span>{% endif %}</td>
+        <td class="dim">{{ person.email or '--' }}</td>
+        <td>
+          {% if person.approved %}<span class="tag tag-edge">Active</span>
+          {% else %}<span class="tag tag-arb">Pending</span>{% endif %}
+        </td>
+        <td>
+          <form method="post" action="/admin/permissions" style="display:flex;gap:8px;align-items:center">
+            <input type="hidden" name="user_id" value="{{ person.id }}">
+            <select name="role" style="width:auto;padding:5px 8px">
+              <option value="user" {{ 'selected' if person.role == 'user' }}>User</option>
+              <option value="admin" {{ 'selected' if person.role == 'admin' }}>Admin</option>
+            </select>
+            <label style="display:flex;align-items:center;gap:5px;margin:0;text-transform:none;letter-spacing:0;font-size:12px;color:var(--ink)">
+              <input type="checkbox" name="views" value="trading" style="width:auto"
+                     {{ 'checked' if 'trading' in person.views }}> Trading
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;margin:0;text-transform:none;letter-spacing:0;font-size:12px;color:var(--ink)">
+              <input type="checkbox" name="views" value="quant" style="width:auto"
+                     {{ 'checked' if 'quant' in person.views }}> Quant
+            </label>
+            <button class="btn-sm" type="submit">Save</button>
+          </form>
+        </td>
+        <td style="min-width:290px">
+          <form method="post" action="/admin/password"
+                style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+            <input type="hidden" name="user_id" value="{{ person.id }}">
+            <input type="password" name="password" required minlength="6"
+                   autocomplete="new-password" placeholder="new password"
+                   style="width:145px">
+            <button class="btn-sm" type="submit">Set</button>
+            {# Your own rotation keeps you signed in; someone else's always signs
+               them out, which is normally the point of changing it. #}
+            <span class="hint">{{ 'keeps you in' if person.id == user.id else 'signs them out' }}</span>
+          </form>
+          <form method="post" action="/admin/rename"
+                style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+            <input type="hidden" name="user_id" value="{{ person.id }}">
+            <input type="text" name="username" required minlength="3"
+                   value="{{ person.username }}" style="width:145px">
+            <button class="btn-sm" type="submit">Rename</button>
+          </form>
+          {% set n = sessions.get(person.id, 0) %}
+          <form method="post" action="/admin/revoke"
+                style="display:flex;gap:8px;align-items:center">
+            <input type="hidden" name="user_id" value="{{ person.id }}">
+            <input type="hidden" name="scope" value="user">
+            <button class="btn-sm" type="submit" {% if not n %}disabled{% endif %}>Sign out</button>
+            <span class="hint">{{ n }} live session{{ 's' if n != 1 }}</span>
+          </form>
+        </td>
+        <td class="num">
+          {% if person.approved %}
+            <form method="post" action="/admin/approve" style="display:inline">
+              <input type="hidden" name="user_id" value="{{ person.id }}">
+              <input type="hidden" name="approved" value="0">
+              <button class="btn-sm" type="submit">Suspend</button>
+            </form>
+          {% else %}
+            <form method="post" action="/admin/approve" style="display:inline">
+              <input type="hidden" name="user_id" value="{{ person.id }}">
+              <input type="hidden" name="approved" value="1">
+              <button class="btn-primary btn-sm" type="submit">Approve</button>
+            </form>
+          {% endif %}
+          {% if person.id != user.id %}
+            <form method="post" action="/admin/delete" style="display:inline">
+              <input type="hidden" name="user_id" value="{{ person.id }}">
+              <button class="btn-danger btn-sm" type="submit">Delete</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:16px">
+  <h2>Network allowlist</h2>
+  <p class="hint">
+    Checked before sign-in: a source outside these ranges gets 403 and never sees
+    the login page. Loopback is always allowed. Leave the box empty for no
+    restriction. This is a perimeter, not the access control &mdash; authentication is.
+  </p>
+  <p class="hint">
+    Currently <b>{{ allowlist_count }}</b> range{{ 's' if allowlist_count != 1 }} in
+    effect, from the <b>{{ allowlist_source }}</b>{% if allowlist_by %},
+    last changed by <b>{{ allowlist_by }}</b>{% endif %}.
+    You are connecting from <b>{{ client_ip }}</b>.
+  </p>
+  <form method="post" action="/admin/ip_allowlist">
+    <textarea name="allowlist" rows="3" spellcheck="false"
+              style="width:100%;font-family:var(--mono,monospace);font-size:13px"
+              placeholder="192.0.2.0/24, 198.51.100.0/24"
+              >{{ allowlist_raw }}</textarea>
+    <p class="hint">
+      Comma-separated addresses or CIDR ranges. <b>Use ranges for VPN users</b> &mdash;
+      a VPN hands out a different address per device and per session, so single
+      addresses look right and admit almost nobody.
+    </p>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <button class="btn-sm" type="submit">Save allowlist</button>
+      <label class="hint" style="display:flex;gap:6px;align-items:center">
+        <input type="checkbox" name="force" value="1">
+        Apply even if it would block me
+      </label>
+    </div>
+  </form>
+  <p class="hint" style="margin-top:10px">
+    A saved list that would block your own address is refused unless you tick the
+    box &mdash; locking yourself out of the machine you administer is the usual way
+    this goes wrong. Blocked requests are logged as
+    <code>[ip-allowlist] blocked &lt;ip&gt;</code>, so a teammate who cannot connect is
+    diagnosed from the log rather than guessed at.
+  </p>
+</div>
+
+<div class="panel" style="margin-top:16px">
+  <h2>Sessions</h2>
+  <p class="hint">
+    A password change does not end sessions already signed in &mdash; that is handled
+    per user above. Use this after a credential leak, when you want every cookie
+    dead regardless of who holds it.
+  </p>
+  <form method="post" action="/admin/revoke"
+        onsubmit="return confirm('Sign out every user on every device, including you?')">
+    <input type="hidden" name="scope" value="all">
+    <button class="btn-sm" type="submit">Sign everyone out</button>
+    <span class="hint">You will be signed out too, and land back on the login page.</span>
+  </form>
+</div>
+
+<div class="panel" style="margin-top:16px;border-color:rgba(255,176,32,.35)">
+  <h2 style="color:var(--warn)">Restart this instance</h2>
+  <p class="hint">
+    Changes to the Python code only take effect on a restart &mdash; templates reload
+    by themselves, application code does not. Until a restart, the app runs new
+    templates against old code, which is how a page can break in ways the files on
+    disk do not explain.
+  </p>
+  <p class="hint">
+    <b>The copy trader resumes on start.</b> <code>vantage.yaml</code> carries
+    <code>mode: live</code> and the kill switch is not persisted, so it comes back
+    disengaged whatever it was before &mdash; check
+    <a href="/vantage">the copier</a> once this returns.
+    The restart is refused while a history refresh or a partition write is in
+    flight, so it cannot truncate the warehouse.
+  </p>
+  <form method="post" action="/admin/restart"
+        onsubmit="return confirm('Restart now?\n\nEveryone loses the page for about a minute, and the copy trader resumes in live mode.')">
+    <button class="btn-sm" type="submit" style="border-color:rgba(255,176,32,.5)">Restart</button>
+    <span class="hint">Takes ~60&ndash;90s. This page will fail to load, then come back
+      on its own &mdash; a bound port is not a ready app, so give the caches a moment.</span>
+  </form>
+</div>
+{% endblock %}

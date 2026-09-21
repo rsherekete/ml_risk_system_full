@@ -1,0 +1,42 @@
+{
+  "n_impacted": 3055,
+  "window": {
+    "start": "2026-09-04 12:29:00",
+    "end": "2026-09-04 12:31:00",
+    "symbols": [
+      "XAUUSD"
+    ]
+  },
+  "totals": {
+    "window_pnl": -828438.0,
+    "opens_in_window": 4915,
+    "closes_in_window": 9437,
+    "held_through": 4599,
+    "actions_in_window": 16026,
+    "lots_in_window": 1042.46,
+    "stopped_out": 706,
+    "significant_loss": 79,
+    "significant_profit": 70,
+    "withdrawn_5d": 1282614.36,
+    "deposited_5d": 1544878.37,
+    "net_deposit_5d": 262264.02,
+    "net_deposits_total": 59739706.0,
+    "median_mltv": 132.0,
+    "behaviour_changed": 2217
+  },
+  "segments": {
+    "minimal": 1177,
+    "monitor": 1043,
+    "compensate_review": 482,
+    "retain_high_value": 303,
+    "abuse_candidate": 50
+  },
+  "cashflow_current_to": "2026-09-13 14:24:21",
+  "withdrawals_covered": true,
+  "notes": [
+    "Login frequency and complaints have no data source; trading-activity frequency is the engagement proxy.",
+    "Stop-out = >=2 losing closes within any 120s burst inside the window."
+  ],
+  "generated_at": "2026-09-13 17:24:07",
+  "rows_in_workbook": 800
+}

@@ -1,0 +1,1202 @@
+{% extends "base.html" %}
+{% block title %}Account Detail - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <a class="back-btn" href="#" onclick="if(history.length>1){history.back();return false;}else{location.href='/trading/clients';return false;}"
+     data-allow-jump style="margin-bottom:8px">← Back</a>
+  <h1>Account Detail</h1>
+  <p>Single-account drill-down: account P&amp;L, flagged-flow impact, and every trade with its markout evidence.</p>
+</div>
+
+{% include "_controls.html" %}
+
+<form method="get" class="toolbar">
+  <div style="min-width:280px">
+    <label for="account">Account</label>
+    <input id="account" name="account" type="text" value="{{ account_key or '' }}"
+           placeholder="e.g. mt4_live02:2395433" list="account-list">
+  </div>
+  {% if symbols %}
+  <div>
+    <label for="symbol">Symbol</label>
+    <select id="symbol" name="symbol" onchange="this.form.submit()">
+      <option value="">All symbols</option>
+      {% for s in symbols %}<option value="{{ s }}" {{ 'selected' if s == selected_symbol }}>{{ s }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  <button class="btn-primary" type="submit">Inspect</button>
+</form>
+
+{% if not account_key %}
+<div class="panel"><div class="empty">
+  <strong>Select an account</strong>
+  {% if beta %}
+  Enter an account key above, or click any account from
+  <a href="{{ beta_routes['latency'][0] }}">Latency Arbitrage</a> or
+  <a href="{{ beta_routes['toxic'][0] }}">Toxic Flow</a>.
+  {% else %}
+  Enter an account key above, or click any account from the
+  <a href="/trading/abook">A-Book Manifest</a> or <a href="/trading/clients">Client Intelligence</a>.
+  {% endif %}
+</div></div>
+{% else %}
+
+{% set live = account_live if account_live is defined and account_live else {} %}
+{% set pi = pnl_impact if pnl_impact is defined and pnl_impact else {} %}
+{% set tm_ = toxic_metrics if toxic_metrics is defined and toxic_metrics else {} %}
+{% if live or pi %}
+{% macro money(v) %}{% if v is not defined or v is none %}--{% else %}{{ '-' if v < 0 }}${{ '{:,.2f}'.format(v|abs) }}{% endif %}{% endmacro %}
+{% macro pct(v) %}{% if v is not defined or v is none %}--{% else %}{{ '{:.1%}'.format(v) }}{% endif %}{% endmacro %}
+{# Client money: a client profit is the firm's cost, shown red. #}
+{% macro cls(v) %}{% if v is defined and v is not none %}{{ 'neg' if v > 0 else 'pos' if v < 0 else '' }}{% endif %}{% endmacro %}
+{% set rz = pi.realized if pi and pi.realized else {} %}
+{% set floating = live.floating if live and live.floating is not none else none %}
+<div class="panel pi-panel" style="margin-bottom:14px">
+  <h2>Account P&amp;L and flagged-flow impact</h2>
+  <p class="hint">Floating P&amp;L from the account's open positions on the trade server; realised P&amp;L from every closed trade on record
+    ({{ rz.since or '--' }} to {{ rz.until or '--' }}, after commission and swap). The server balance is not used: order compression
+    books compressed trades into the balance while the trades stay in the database, so balance-based figures would count them twice.
+    Client profit is the firm's cost, shown in red.</p>
+  {% if pi.unreadable %}
+  {# Never let a broken partition read as "no trades". Every figure in this
+     panel comes from the warehouse, so if a month will not open, the numbers
+     below are incomplete and must say so rather than quietly showing zero. #}
+  <div class="alert alert-error" style="margin-bottom:12px">
+    <b>Incomplete data — these figures are understated.</b>
+    {{ pi.unreadable|length }} warehouse partition{{ 's' if pi.unreadable|length != 1 }}
+    could not be read for this account's server, so any trade in
+    {{ pi.unreadable|map(attribute='file')|join(', ')|replace('.parquet','') }}
+    is missing from the totals, the impact window and the realised curve.
+    The Trades table below reads a different source and is unaffected.
+    <div class="dim" style="font-size:11px;margin-top:5px">
+      {% for u in pi.unreadable %}{{ u.file }}: {{ u.error }}<br>{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  <div class="pi-grid">
+    <div class="pi-cell"><span class="pi-k">Floating P&amp;L</span><b class="pi-v {{ cls(floating) }}">{{ money(floating) }}</b>
+      <span class="pi-s">{{ live.open_positions or 0 }} open position{{ 's' if (live.open_positions or 0) != 1 }}</span></div>
+    <div class="pi-cell"><span class="pi-k">Realised P&amp;L</span><b class="pi-v {{ cls(rz.net_pnl) }}">{{ money(rz.net_pnl) }}</b>
+      <span class="pi-s" title="Trading P&amp;L {{ money(rz.trading_pnl) }} · commission {{ money(rz.commission) }} · swap {{ money(rz.swap) }}">{{ '{:,}'.format(rz.trades or 0) }} closed trades · trading {{ money(rz.trading_pnl) }}</span></div>
+    {% set total = (rz.net_pnl or 0) + (floating or 0) if (rz or floating is not none) else none %}
+    <div class="pi-cell pi-total"><span class="pi-k">Total P&amp;L</span><b class="pi-v {{ cls(total) }}">{{ money(total) }}</b>
+      <span class="pi-s">realised + floating</span></div>
+  </div>
+  {% if pi.window %}
+  <div class="pi-engines">
+    {% set lat = pi.latency %}
+    <div class="pi-engine pi-lat">
+      <div class="pi-eh"><span class="tm-flag-chip">⚑ Latency Arbitrage</span>
+        <span class="pi-s">{{ latency_now.verdict ~ ' · risk ' ~ latency_now.risk if latency_now is defined and latency_now else (flagged_status or 'not on the Latency table') }}</span></div>
+      <div class="pi-row">
+        <div><span class="pi-k">Flagged / total trades</span><b>{{ '{:,}'.format(lat.flagged) }} / {{ '{:,}'.format(lat.total) }}</b><span class="pi-s">{{ pct(lat.share) }} of trades</span></div>
+        <div><span class="pi-k">Latency events</span><b>{{ '{:,}'.format(lat.flagged) }}</b><span class="pi-s">fast, paid, fading advantage</span></div>
+        <div><span class="pi-k">Economic impact</span><b class="{{ cls(lat.flagged_pnl) }}">{{ money(lat.flagged_pnl) }}</b><span class="pi-s">P&amp;L of flagged trades · {{ money(lat.flagged_net_pnl) }} net</span></div>
+        <div><span class="pi-k">Share of client profit</span><b>{{ pct(lat.share_of_profit) }}</b><span class="pi-s">of winning-trade profit in the window</span></div>
+      </div>
+    </div>
+    {% set tox = pi.toxic %}
+    <div class="pi-engine pi-tox">
+      <div class="pi-eh"><span class="tm-flag-chip tm-toxic-chip">☣ Toxic Flow</span>
+        <span class="pi-s">{{ (tm_.state_label or tm_.state) ~ ' · toxicity ' ~ tm_.toxic_score if tm_ and tm_.state else 'not scored (no tick-covered trades)' }}</span></div>
+      <div class="pi-row">
+        <div><span class="pi-k">Flagged / total trades</span><b>{{ '{:,}'.format(tox.flagged) }} / {{ '{:,}'.format(tox.total) }}</b><span class="pi-s">{{ pct(tox.share) }} of trades</span></div>
+        <div><span class="pi-k">Toxic events</span><b>{{ '{:,}'.format(tox.flagged) }}</b>
+          {% if tox.by_signature %}<span class="pi-s" title="s5.3 curve signature per trade: Sharp/Fast includes every latency event; Persistent never does">{{ '{:,}'.format(tox.by_signature.sharp_fast) }} sharp/fast · {{ '{:,}'.format(tox.by_signature.persistent) }} persistent · {{ '{:,}'.format(tox.by_signature.other) }} other</span>{% endif %}
+          <span class="pi-s">{{ (tm_.sharp_deals_24h|int) if tm_ and tm_.sharp_deals_24h is not none else 0 }} sharp deals in a day</span></div>
+        <div><span class="pi-k">Economic impact</span><b class="{{ cls(tox.flagged_pnl) }}">{{ money(tox.flagged_pnl) }}</b>
+          <span class="pi-s" title="Adverse selection: the markout the firm gave up on materially adverse trades">P&amp;L of flagged trades · adverse selection {{ money(tm_.adverse_usd) if tm_ else '--' }}</span></div>
+        <div><span class="pi-k">Share of client profit</span><b>{{ pct(tox.share_of_profit) }}</b><span class="pi-s">of winning-trade profit in the window</span></div>
+      </div>
+    </div>
+  </div>
+  {% if pi.both and pi.both.flagged %}
+  <p class="hint" style="margin-top:8px"><b>{{ '{:,}'.format(pi.both.flagged) }}</b> trade{{ 's' if pi.both.flagged != 1 }} ({{ money(pi.both.flagged_pnl) }})
+    carry both flags. By design every latency event is also Sharp/Fast toxic flow (latency is the mechanism, toxicity the wider
+    economic effect), and a Persistent toxic trade is never a latency event. Do not add the two impact figures together.</p>
+  {% endif %}
+  <p class="hint" style="margin-top:8px">Impact window: trades closed in the last {{ pi.window.days|int }} days, the engines' scan window
+    ({{ '{:,}'.format(pi.window.trades) }} trades, realised {{ money(pi.window.net_pnl) }} after commission and swap).
+    Toxic Flow scores only trades with tick coverage.</p>
+  {% endif %}
+</div>
+<style>
+.pi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:10px 0 14px}
+.pi-cell{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.015)}
+.pi-total{border-color:var(--border-bright)}
+.pi-k{font-size:11px;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-dim)}
+.pi-v{font-size:19px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.pi-s{font-size:11.5px;color:var(--ink-dim)}
+.pi-engines{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+.pi-engine{border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.pi-lat{border-left:3px solid var(--warn)}
+.pi-tox{border-left:3px solid #b983ff}
+.pi-eh{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:8px}
+.pi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.pi-row>div{display:flex;flex-direction:column;gap:1px}
+.pi-row b{font-family:var(--mono);font-size:15px;font-variant-numeric:tabular-nums}
+</style>
+{% endif %}
+
+{% if trades is defined and trades is not none and trades|length %}
+<div class="panel">
+  <h2>Trades{{ ' -- ' + selected_symbol if selected_symbol }}</h2>
+  <p class="hint">Most recent {{ trades|length }} of this account's trades. Click an order for its markout evidence
+    (broker tape and independent reference at the fill and the seven spec horizons).
+    {% if flagged_orders is not defined %}{% set flagged_orders = (latency_now.flagged_orders if latency_now and latency_now.flagged_orders else []) %}{% endif %}
+  </p>
+    {% if toxic_orders is not defined %}{% set toxic_orders = {} %}{% endif %}
+    {% if flagged_orders or toxic_orders %}
+    <div class="tm-flagbar">
+      {% if flagged_orders %}
+      <span class="tm-flag-item"><span class="tm-flag-chip">⚑ Latency</span>
+      <b>{{ flagged_orders|length }} latency-flagged order{{ 's' if flagged_orders|length != 1 }}</b> — highlighted in amber.
+      {% if flagged_status %}<span class="tm-flag-status">This account is {{ flagged_status }}.</span>{% endif %}</span>
+      {% endif %}
+      {% if toxic_orders %}
+      <span class="tm-flag-item"><span class="tm-flag-chip tm-toxic-chip">☣ Toxic</span>
+      <b class="tm-toxic-count">{{ toxic_orders|length }} toxic order{{ 's' if toxic_orders|length != 1 }}</b> (materially adverse markout) — highlighted in violet.
+      {% if toxic_status %}<span class="tm-flag-status">Toxic Flow: {{ toxic_status }}.</span>{% endif %}</span>
+      {% endif %}
+      <span class="tm-flag-status">From the latest scan.</span>
+      <button type="button" class="btn btn-sm" id="tm-only-flagged" aria-pressed="false">Show flagged only</button>
+      <button type="button" class="btn btn-sm" id="tm-next-flagged">Jump to next flagged ↓</button>
+    </div>
+    {% endif %}
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th title="MT4 ticket / MT5 deal — click for the markout evidence">Order</th><th>Opened</th><th class="num">Duration</th><th>Symbol</th><th>Side</th><th class="num">Lots</th>
+        <th class="num">Notional (units)</th>
+        <th class="num">Open</th><th class="num">Close</th><th class="num">SL</th>
+        <th class="num">TP</th><th class="num">Net P&amp;L</th><th>Origin</th></tr></thead>
+      <tbody>
+      {% for t in trades.itertuples() %}
+        {% set has_order = t.order is defined and t.order and (t.order|string) not in ('nan', 'None') %}
+        {% set is_flagged = has_order and (t.order|string) in flagged_orders %}
+        {% set toxic_kind = toxic_orders.get(t.order|string) if has_order else none %}
+        <tr{% if is_flagged or toxic_kind %} class="{{ (['tm-flagged'] if is_flagged else []) | join }}{{ ' ' if is_flagged and toxic_kind }}{{ 'tm-toxic' if toxic_kind }}"{% endif %}>
+          <td style="white-space:nowrap">
+            <button class="tm-order" type="button"
+              data-order="{{ t.order if has_order else '' }}"
+              data-open="{{ t.open_time.isoformat() if t.open_time == t.open_time else '' }}"
+              data-close="{{ t.close_time.isoformat() if t.close_time is defined and t.close_time == t.close_time and t.close_time.isoformat is defined else '' }}"
+              data-symbol="{{ t.symbol }}" data-cmd="{{ t.cmd }}" data-lots="{{ t.volume_lots }}"
+              data-openpx="{{ t.open_price }}" data-closepx="{{ t.close_price }}" data-pnl="{{ t.net_profit }}"
+              title="{{ 'Markout evidence for this trade' if has_order else 'Order id not received yet — evidence is matched by open time and symbol' }}">{{ '#' ~ t.order if has_order else 'view' }}</button>
+            {# Replay the entry and exit over minute bars from the tick tape. #}
+            <button class="tm-replay" type="button"
+              data-order="{{ t.order if has_order else '' }}"
+              data-open="{{ t.open_time.isoformat() if t.open_time == t.open_time else '' }}"
+              data-close="{{ t.close_time.isoformat() if t.close_time is defined and t.close_time == t.close_time and t.close_time.isoformat is defined else '' }}"
+              data-symbol="{{ t.symbol }}" data-side="{{ t.cmd }}" data-lots="{{ t.volume_lots }}"
+              data-openpx="{{ t.open_price }}" data-closepx="{{ t.close_price }}" data-pnl="{{ t.net_profit }}"
+              title="Replay this trade over the tick tape">▶</button>
+            {% if is_flagged %}<span class="tm-flag tm-flag-chip" title="Flagged as a latency event in the latest scan">⚑ Latency</span>{% endif %}
+            {% if toxic_kind %}
+            {# "<signature>|<horizons>" (current), or an older scan's horizons / early-persistent label. #}
+            {% set tparts = toxic_kind.split('|') %}
+            {% set tsig = tparts[0] if tparts|length == 2 else '' %}
+            {% set thz = (tparts[1] if tparts|length == 2 else {'early': '100ms 500ms', 'persistent': '1s+', 'early+persistent': '100ms–60s'}.get(toxic_kind, toxic_kind)) %}
+            {% set tname = {'sharp_fast': 'Sharp/Fast', 'persistent': 'Persistent', 'other': 'Adverse'}.get(tsig, '') %}
+            {% set tdesc = {'sharp_fast': 'Sharp/Fast toxic: a strong 100–500 ms adverse markout that faded by 60 s, or a latency event (every latency event is sharp/fast toxic flow).',
+                            'persistent': 'Persistent toxic: the 60 s markout clears its minimum and the advantage did not fade. Informed or directional flow, never a latency event.',
+                            'other': 'Adverse at some horizon without either signature, e.g. adverse at 1 s / 5 s and reversed by 60 s.'}.get(tsig, 'Toxic Flow flag from an earlier scan.') %}
+            <span class="tm-flag tm-flag-chip tm-toxic-chip tm-sig-{{ tsig or 'old' }}" title="{{ tdesc }} Cleared the adverse minimum at: {{ thz.replace(' ', ', ') if thz else 'no horizon on its own (counted through the latency flag)' }}.{{ ' Latest Toxic Flow scan.' if tsig }}">☣ Toxic{{ ' · ' ~ tname if tname else ' · ' ~ thz.replace(' ', ' · ') }}</span>{% endif %}
+          </td>
+          <td style="font-family:var(--mono);font-size:11px">{{ t.open_time.strftime('%Y-%m-%d %H:%M:%S') if t.open_time == t.open_time else '--' }}</td>
+          <td class="num" style="font-family:var(--mono);font-size:11px">{{ fmt_duration(t.duration_s) if fmt_duration is defined else '--' }}</td>
+          <td>{{ t.symbol }}</td>
+          <td class="{{ 'pos' if t.cmd == 'buy' else 'neg' }}">{{ t.cmd }}</td>
+          <td class="num">{{ '%.4f'|format(t.volume_lots) }}</td>
+          <td class="num dim">{{ ('{:,.0f}'.format(t.notional_units) if t.notional_units >= 10 else '{:,.2f}'.format(t.notional_units)) if t.notional_units == t.notional_units else '--' }}</td>
+          <td class="num">{{ '%.5f'|format(t.open_price) if t.open_price == t.open_price else '--' }}</td>
+          <td class="num">{{ '%.5f'|format(t.close_price) if t.close_price == t.close_price else '--' }}</td>
+          <td class="num dim">{{ '%.5f'|format(t.sl) if t.sl == t.sl and t.sl else '--' }}</td>
+          <td class="num dim">{{ '%.5f'|format(t.tp) if t.tp == t.tp and t.tp else '--' }}</td>
+          <td class="num {{ 'pos' if t.net_profit > 0 else 'neg' }}">
+            {{ '{:,.2f}'.format(t.net_profit) if t.net_profit == t.net_profit else '--' }}</td>
+          <td class="dim" style="font-size:11px">{{ t.reason if t.reason and t.reason == t.reason and (t.reason|string) != 'None' else '--' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Per-trade markout evidence -->
+<div class="tm-overlay" id="tm-overlay" hidden>
+  <div class="tm-panel" role="dialog" aria-modal="true" aria-labelledby="tm-title">
+    <div class="tm-bar">
+      <h2 id="tm-title">Markout evidence</h2>
+      <div class="tm-bar-actions">
+        <button class="btn btn-sm" id="tm-print" disabled>Print / PDF</button>
+        <button class="btn btn-sm" id="tm-csv" disabled>CSV</button>
+        <button class="btn btn-sm" id="tm-close" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div id="tm-body" class="tm-body"></div>
+  </div>
+</div>
+
+<!-- Per-trade REPLAY: the entry and exit played back over the tick tape -->
+<div class="tm-overlay" id="rp-overlay" hidden>
+  <div class="tm-panel" role="dialog" aria-modal="true" aria-labelledby="rp-title">
+    <div class="tm-bar">
+      <h2 id="rp-title">Trade replay</h2>
+      <div class="tm-bar-actions">
+        <button class="btn btn-sm" id="rp-close" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="tm-body">
+      <p class="hint" id="rp-meta">—</p>
+      <div id="rp-chart" style="width:100%;height:380px"></div>
+      <div class="rp-transport">
+        <button class="btn btn-sm" id="rp-play">▶ Play</button>
+        <button class="btn btn-sm" id="rp-restart">⟲ Restart</button>
+        <span class="rp-speed" id="rp-speed">
+          <button class="btn btn-sm on" data-s="1">1×</button>
+          <button class="btn btn-sm" data-s="2">2×</button>
+          <button class="btn btn-sm" data-s="4">4×</button>
+        </span>
+        <span class="rp-scrub" id="rp-scrub"></span>
+      </div>
+      <p class="hint" id="rp-note" style="color:var(--warn)" hidden></p>
+    </div>
+  </div>
+</div>
+<style>
+.tm-replay{font:inherit;font-family:var(--mono);font-size:11px;background:none;
+  border:1px solid var(--border-bright);color:var(--pos);border-radius:6px;
+  padding:2px 6px;cursor:pointer;margin-left:4px}
+.tm-replay:hover{border-color:var(--pos);box-shadow:0 0 10px rgba(46,230,168,.35)}
+.rp-transport{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.rp-speed{display:inline-flex;gap:4px}
+.rp-speed .btn.on{border-color:var(--accent);color:var(--accent)}
+.rp-scrub{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+.tm-order{font:inherit;font-family:var(--mono);font-size:11px;background:none;border:1px solid var(--border-bright);
+  color:var(--accent);border-radius:6px;padding:2px 7px;cursor:pointer}
+.tm-order:hover{border-color:var(--accent);box-shadow:0 0 10px var(--accent-glow)}
+.tm-flag{margin-left:6px;cursor:help}
+.tm-flag-chip{display:inline-block;font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:10px;
+  color:#1a1206;background:var(--warn);white-space:nowrap}
+tr.tm-flagged td{background:rgba(255,176,32,.13)}
+tr.tm-flagged td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+tr.tm-flagged:hover td{background:rgba(255,176,32,.2)}
+tr.tm-flagged.tm-focus td{background:rgba(255,176,32,.32);transition:background .4s}
+.tm-flagbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:6px 0 10px;padding:8px 12px;
+  border:1px solid rgba(255,176,32,.35);border-radius:10px;background:rgba(255,176,32,.06);font-size:12.5px;color:var(--ink-dim)}
+.tm-flagbar b{color:var(--warn)}
+.tm-flag-status{color:var(--ink-dim);font-size:12px}
+.tm-flag-item{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px}
+.tm-toxic-chip{background:#b983ff;color:#15091f}
+.tm-toxic-chip.tm-sig-persistent{background:#7c4dff;color:#f3edff}
+.tm-toxic-chip.tm-sig-other{background:#d9c4ff;color:#15091f}
+.tm-toxic-count{color:#c9a0ff!important}
+tr.tm-toxic td{background:rgba(185,131,255,.12)}
+tr.tm-toxic td:first-child{box-shadow:inset 3px 0 0 #b983ff}
+tr.tm-toxic:hover td{background:rgba(185,131,255,.2)}
+tr.tm-toxic.tm-focus td{background:rgba(185,131,255,.3);transition:background .4s}
+tr.tm-flagged.tm-toxic td:first-child{box-shadow:inset 3px 0 0 var(--warn),inset 6px 0 0 #b983ff}
+#tm-only-flagged[aria-pressed="true"]{border-color:var(--warn);color:var(--warn)}
+.tm-overlay{position:fixed;inset:0;background:rgba(4,7,14,.72);z-index:60;display:flex;justify-content:center;
+  align-items:flex-start;padding:4vh 16px;overflow:auto}
+.tm-overlay[hidden]{display:none}
+.tm-panel{width:min(1080px,100%);background:var(--bg-raised);border:1px solid var(--border-bright);border-radius:14px;
+  box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.tm-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;
+  border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-raised);border-radius:14px 14px 0 0}
+.tm-bar h2{margin:0;font-size:16px}
+.tm-bar-actions{display:flex;gap:8px}
+.tm-body{padding:18px 20px 22px}
+.tm-head{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:14px}
+.tm-kv{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.tm-kv span{display:block;font-size:10.5px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.5px}
+.tm-kv b{font-size:13px;color:var(--ink);font-family:var(--mono);font-weight:500}
+.tm-verdict{border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.5;
+  border:1px solid var(--border-bright);background:var(--panel)}
+.tm-verdict.flag{border-color:rgba(255,77,109,.45);background:rgba(255,77,109,.07)}
+.tm-verdict.dir{border-color:rgba(124,140,255,.45);background:rgba(124,140,255,.07)}
+.tm-verdict b.tag{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;margin-right:8px;border:1px solid currentColor}
+.tm-fill{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.tm-pill{font-size:12px;padding:5px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--border);color:var(--ink-dim)}
+.tm-pill b{color:var(--ink)} .tm-pill.warn{border-color:rgba(255,176,32,.45)} .tm-pill.warn b{color:var(--warn)}
+.tm-table{width:100%;border-collapse:collapse;font-size:12px}
+.tm-table th{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint);text-align:right;
+  padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+.tm-table th:first-child,.tm-table td:first-child{text-align:left}
+.tm-table td{padding:7px 8px;border-bottom:1px solid rgba(27,36,56,.6);text-align:right;font-family:var(--mono);white-space:nowrap}
+.tm-table tr.fill td{background:rgba(34,211,238,.04)}
+.tm-table tr.spec td:first-child{font-weight:600;color:var(--ink)}
+.tm-table tr.tm-interim td{color:var(--ink-dim);padding-top:4px;padding-bottom:4px}
+.tm-table tr.tm-interim td:first-child{padding-left:16px}
+.tm-table .grp{text-align:center;color:var(--ink-dim);border-bottom:none;padding-bottom:0}
+.tm-pos{color:var(--pos)} .tm-neg{color:var(--neg)} .tm-na{color:var(--ink-faint)}
+.tm-hit{color:var(--warn);font-weight:600}
+.tm-foot{margin-top:14px;font-size:11.5px;color:var(--ink-dim);line-height:1.5}
+.tm-foot b{color:var(--ink)}
+.tm-loading{padding:40px;text-align:center;color:var(--ink-dim)}
+.tm-h{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-faint);margin:16px 0 8px;font-weight:600}
+.tm-legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;color:var(--ink-dim);margin-bottom:4px}
+.tm-leg{display:inline-flex;align-items:center;gap:6px}
+.tm-chart{position:relative;margin-bottom:6px}
+.tm-chart svg{width:100%;height:auto;display:block}
+.tm-tip{position:absolute;top:6px;min-width:220px;background:var(--panel);border:1px solid var(--border-bright);border-radius:8px;
+  padding:8px 10px;font-size:12px;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.tm-tip-h{color:var(--ink-dim);margin-bottom:4px}
+.tm-tip-r{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.tm-tip-r i{width:12px;height:2px;display:inline-block}
+.tm-tip-r b{color:var(--ink);font-family:var(--mono);font-weight:500}
+.tm-tip-r span{color:var(--ink-dim)}
+</style>
+{% endif %}
+
+{% if history is defined and history|length %}
+<div class="grid cols-3" style="margin-bottom:14px">
+  <div class="panel stat">
+    <span class="label">Active days</span>
+    <span class="value">{{ history|length }}</span>
+    <span class="delta dim">in the sample window</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Latest model score</span>
+    {% if history.score.iloc[-1] == history.score.iloc[-1] %}
+    <span class="value">{{ '{:.1%}'.format(history.score.iloc[-1]) }}</span>
+    <span class="delta dim">probability of a strong forward run</span>
+    {% else %}
+    <span class="value dim">live</span>
+    <span class="delta dim">post-snapshot trades, not yet scored</span>
+    {% endif %}
+  </div>
+  {# "On record" is every closed trade in the warehouse -- the same population the
+     Account P&L panel totals. The table below is capped at 500 newest (plus any
+     flagged order older than the cap), so on an active account the two differ by
+     design; say so rather than let the tile look like a wrong count. With a symbol
+     filter applied only the listed count is meaningful. #}
+  {% set _listed = trades|length if trades is defined and trades is not none else 0 %}
+  {% set _onrec = pi.realized.trades if (pi and pi.realized and not selected_symbol) else none %}
+  <div class="panel stat">
+    <span class="label">Trades on record</span>
+    <span class="value">{{ '{:,}'.format(_onrec or _listed) }}</span>
+    <span class="delta dim">{{ selected_symbol or 'all symbols' }}{% if _onrec and _listed < _onrec %}
+      &middot; {{ '{:,}'.format(_listed) }} listed below{% endif %}</span>
+  </div>
+</div>
+
+{% set PROFILE_NAMES = {'persistent_edge':'Persistent Edge','toxic_flow':'Toxic Flow',
+  'high_magnitude':'High Magnitude','scalper':'Scalper','news_vol':'News/Event/Vol',
+  'bonus_arb':'Bonus Arbitrage','swap_arb':'Swap Arbitrage','martingale':'Martingale',
+  'high_exposure_recovery':'High Exposure / Recovery'} %}
+<div class="panel" style="margin-bottom:14px">
+  <h2>Model classification</h2>
+  <p class="hint">Every behavioural profile this client currently qualifies for,
+    with the five-axis scores the AntiFraud system decided on. Empty = clean
+    under the current rules.</p>
+  {% if classification is defined and classification %}
+  <div class="grid cols-2" style="gap:12px">
+    {% for p in classification %}
+    <div class="panel" style="border:1px solid rgba(34,211,238,.25)">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <b style="font-size:15px;color:#22d3ee">{{ PROFILE_NAMES.get(p.profile, p.profile) }}</b>
+        <span class="{{ 'warn' if p.band in ('very strong','strong') else 'dim' }}">{{ p.band }}</span>
+      </div>
+      <div class="dim" style="font-size:11px;margin:2px 0 8px">{{ p.objective }}</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px">
+        <span><b>{{ '%.0f'|format(p.score) }}</b><br><span class="dim">score</span></span>
+        <span><b>{{ '%.0f'|format(p.confidence) }}%</b><br><span class="dim">confidence</span></span>
+        <span><b>{{ '%.0f'|format(p.stability) }}</b><br><span class="dim">stability</span></span>
+        <span><b>{{ '%.0f'|format(p.severity) }}</b><br><span class="dim">severity</span></span>
+        <span><b>{{ '%.0f'|format(p.evidence) }}</b><br><span class="dim">evidence</span></span>
+        <span><b>{{ '%.1f'|format(p.priority) }}</b><br><span class="dim">priority</span></span>
+        <span><b>{{ p.obs_days }}</b><br><span class="dim">obs days</span></span>
+      </div>
+      <div class="dim" style="font-size:11px;margin-top:8px;font-family:var(--mono)">{{ p.why }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">No behavioural profile qualifies — clean under current rules.</div>
+  {% endif %}
+
+  {% if rule_status is defined and rule_status %}
+  <div class="panel" style="margin-top:12px">
+    <b style="font-size:13px;color:#22d3ee">Registry rules currently satisfied</b>
+    <table style="font-size:12px;margin-top:6px">
+      <thead><tr><th>Category</th><th>ML</th><th>Last trigger</th><th class="dim">Definition</th></tr></thead>
+      <tbody>
+      {% for r in rule_status %}
+      <tr><td><b>{{ r.label }}</b></td>
+        <td>{{ '✦ ML' if r.use_ml else 'rule' }}</td>
+        <td class="dim">{{ r.last_trigger }}</td>
+        <td class="dim" style="font-family:var(--mono);font-size:10px">{{ r.definition[:60] }}</td></tr>
+      {% endfor %}
+      </tbody></table>
+  </div>
+  {% endif %}
+  {% if latency_now is defined and latency_now %}
+  <div class="panel" style="margin-top:12px;border:1px solid rgba(255,176,32,.35)">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <b style="font-size:15px;color:#ffb020">⚡ Latency Arbitrage profile</b>
+      <span class="warn">{{ latency_now.verdict }}</span>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin-top:8px">
+      <span><b>{{ latency_now.risk }}</b><br><span class="dim">risk</span></span>
+      <span><b>{{ '{:.0%}'.format(latency_now.ml or 0) }}</b><br><span class="dim">ML score</span></span>
+      <span><b>{{ '{:.0%}'.format(latency_now.confidence) }}</b><br><span class="dim">confidence</span></span>
+      <span><b>{{ '{:.0%}'.format(latency_now.consistency) }}</b><br><span class="dim">consistency</span></span>
+      <span><b>{{ '{:.0%}'.format(latency_now.persistence) }}</b><br><span class="dim">persistence</span></span>
+      <span><b>${{ '{:,.0f}'.format(latency_now.econ_usd) }}</b><br><span class="dim">extracted</span></span>
+      <span><b>{{ latency_now.flagged }}/{{ latency_now.trades }}</b><br><span class="dim">proven trades</span></span>
+      <span><b>{{ latency_now.med_hold_s }}s</b><br><span class="dim">med hold</span></span>
+    </div>
+    <div class="dim" style="font-size:11px;margin-top:8px">Action: {{ latency_now.action }}</div>
+  </div>
+  {% endif %}
+  {% if latency_history is defined and latency_history|length %}
+  <details style="margin-top:8px"><summary class="dim" style="cursor:pointer">Latency score history ({{ latency_history|length }} days)</summary>
+    <table style="font-size:11px;margin-top:6px"><thead><tr><th>Day</th><th class="num">Risk</th>
+      <th class="num">ML</th><th class="num">Conf</th><th class="num">Extracted $</th><th>Verdict</th></tr></thead>
+      <tbody>
+      {% for h in latency_history %}
+      <tr><td class="dim">{{ h.day }}</td><td class="num">{{ h.risk }}</td>
+        <td class="num">{{ '{:.0%}'.format(h.ml) if h.ml is not none else '--' }}</td>
+        <td class="num">{{ '{:.0%}'.format(h.confidence) }}</td>
+        <td class="num">{{ '{:,.0f}'.format(h.econ_usd) }}</td><td>{{ h.verdict }}</td></tr>
+      {% endfor %}
+      </tbody></table>
+  </details>
+  {% endif %}
+</div>
+
+<div class="grid cols-2" style="margin-bottom:14px">
+  <div class="panel">
+    <h2>Cumulative realised P&amp;L</h2>
+    <p class="hint">Built from every closed trade on record, by close date, after
+      commission and swap &mdash; the same trades as the Account P&amp;L panel above, so
+      the curve ends on the realised figure quoted there. Falling is profitable for
+      the firm.</p>
+    {% if eq_days is defined and eq_days %}
+    <div id="account-equity" class="chart"></div>
+    {% else %}
+    <div class="empty-note" style="padding:30px 0;text-align:center;color:#55637d">
+      no realised trades to plot</div>
+    {% endif %}
+  </div>
+  <div class="panel">
+    <h2>Model score over time</h2>
+    {% if hist_has_score %}
+    <p class="hint">How the routing call evolved. Above the line, the account would be hedged.</p>
+    <div id="account-score" class="chart"></div>
+    {% else %}
+    <p class="hint">Live trades past the scored-frame edge — no model score yet. The
+      next scores refresh will backfill this curve.</p>
+    <div class="empty-note" style="padding:30px 0;text-align:center;color:#55637d">
+      not yet scored</div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="panel" style="margin-bottom:14px">
+  <div class="panel-head">
+    <h2>Price path with this account's trades</h2>
+    <div class="live-controls" data-live="chart"></div>
+  </div>
+  <p class="hint">
+    Entries and exits marked on the actual price. This is how you tell a client
+    that is <i>profitable</i> from one that consistently <i>buys the low</i> &mdash;
+    the second is a timing advantage and a very different risk.
+  </p>
+  <div class="toolbar" style="margin-bottom:10px">
+    <div>
+      <label for="chart-symbol">Symbol</label>
+      <select id="chart-symbol" onchange="loadChart()"></select>
+    </div>
+    <div>
+      <label for="chart-days">Window</label>
+      <select id="chart-days" onchange="loadChart()">
+        <option value="1">1 day</option>
+        <option value="3" selected>3 days</option>
+        <option value="7">7 days</option>
+        <option value="14">14 days</option>
+      </select>
+    </div>
+    <div>
+      <label for="chart-minutes">Bar width</label>
+      <select id="chart-minutes" onchange="loadChart()">
+        <option value="1">1 minute</option>
+        <option value="5" selected>5 minutes</option>
+        <option value="15">15 minutes</option>
+        <option value="60">1 hour</option>
+      </select>
+    </div>
+  </div>
+  <div id="price-chart" class="chart chart-tall"></div>
+  <div id="chart-note" class="hint" style="margin-top:8px"></div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if account_key %}
+<script>
+async function loadChart() {
+  const symbol = document.getElementById('chart-symbol').value;
+  const days = document.getElementById('chart-days').value;
+  const minutes = document.getElementById('chart-minutes').value;
+  const note = document.getElementById('chart-note');
+  note.textContent = 'Loading price history…';
+
+  const data = await (await fetch(
+    `/api/account/chart?account={{ account_key|urlencode }}`
+    + `&symbol=${encodeURIComponent(symbol || '')}&days=${days}&minutes=${minutes}`)).json();
+
+  const select = document.getElementById('chart-symbol');
+  if (!select.options.length && data.symbols) {
+    select.innerHTML = data.symbols.map(s =>
+      `<option value="${s}" ${s === data.symbol ? 'selected' : ''}>${s}</option>`).join('');
+  }
+  if (!data.bars || !data.bars.length) {
+    note.textContent = data.note || 'No price history available for this window.';
+    return;
+  }
+  note.textContent = `${data.bars.length} bars, ${data.trades.length} entry/exit markers`;
+
+  const times = data.bars.map(b => b.time);
+  const index = new Map(times.map((t, i) => [t, i]));
+  // Markers are placed on the nearest bar: a fill inside a 5-minute bar has no
+  // exact x position, and snapping is honest about that resolution.
+  const place = (marker) => {
+    let i = index.get(marker.time);
+    if (i === undefined) {
+      const target = new Date(marker.time.replace(' ', 'T'));
+      i = times.findIndex(t => new Date(t.replace(' ', 'T')) >= target);
+      if (i < 0) i = times.length - 1;
+    }
+    return i;
+  };
+
+  const entries = data.trades.filter(t => t.kind === 'entry');
+  const exits = data.trades.filter(t => t.kind === 'exit');
+  const point = (t) => ({
+    value: [place(t), t.price], side: t.side, lots: t.lots, pnl: t.pnl, kind: t.kind,
+  });
+
+  zfxChart(document.getElementById('price-chart'), {
+    backgroundColor: 'transparent',
+    grid: { left: 72, right: 24, top: 24, bottom: 54 },
+    legend: { data: ['Price', 'Entry', 'Exit'], top: 0, right: 0,
+              textStyle: { color: '#8b9ab4', fontSize: 11 }, icon: 'roundRect' },
+    tooltip: Object.assign({ trigger: 'axis', axisPointer: { type: 'cross' },
+      formatter: (params) => {
+        const lines = [];
+        params.forEach(p => {
+          if (p.seriesName === 'Price' && Array.isArray(p.value)) {
+            lines.push(`${p.name}<br/>O ${p.value[1]} H ${p.value[4]} L ${p.value[3]} C ${p.value[2]}`);
+          } else if (p.data && p.data.kind) {
+            const d = p.data;
+            lines.push(`<b>${d.kind.toUpperCase()}</b> ${d.side} ${d.lots} lots @ ${d.value[1]}`
+              + (d.pnl !== null ? `<br/>trade P&L ${d.pnl.toFixed(2)}` : ''));
+          }
+        });
+        return lines.join('<br/>');
+      } }, zfxTheme.tooltip),
+    dataZoom: [{ type: 'inside' },
+               { type: 'slider', height: 18, bottom: 12, borderColor: '#26324a',
+                 fillerColor: 'rgba(34,211,238,.12)', handleStyle: { color: '#22d3ee' },
+                 textStyle: { color: '#55637d', fontSize: 10 } }],
+    xAxis: Object.assign({ type: 'category', data: times }, zfxTheme.axis),
+    yAxis: Object.assign({ type: 'value', scale: true }, zfxTheme.axis),
+    series: [
+      { name: 'Price', type: 'candlestick',
+        data: data.bars.map(b => [b.open, b.close, b.low, b.high]),
+        itemStyle: { color: '#2ee6a8', color0: '#ff4d6d',
+                     borderColor: '#2ee6a8', borderColor0: '#ff4d6d' } },
+      // Entries point up, exits point down, so direction is readable without
+      // consulting the legend.
+      { name: 'Entry', type: 'scatter', data: entries.map(point),
+        symbol: 'triangle', symbolSize: 11,
+        itemStyle: { color: '#22d3ee', borderColor: '#04121a', borderWidth: 1 } },
+      { name: 'Exit', type: 'scatter', data: exits.map(point),
+        symbol: 'diamond', symbolSize: 10,
+        itemStyle: { color: '#ffb020', borderColor: '#04121a', borderWidth: 1 } },
+    ],
+  });
+}
+
+zfxLive.register('chart', loadChart, 60000);
+</script>
+{% endif %}
+
+{% if (hist_days is defined and hist_days) or (eq_days is defined and eq_days) %}
+<script>
+(function () {
+  const hDays = {{ (hist_days or [])|tojson }};
+  const scores = {{ (hist_scores or [])|tojson }};
+  // Realised equity: its own date axis, built from closed trades rather than
+  // from the scores frame the score chart uses. The two no longer share a
+  // category axis, so they are NOT echarts.connect-ed -- the trade history
+  // normally starts well before the model's scored window, and linking two
+  // different date domains by category INDEX lines up unrelated days.
+  const eqDays = {{ (eq_days or [])|tojson }};
+  const eqCum = {{ (eq_cum or [])|tojson }};
+  const LIB_MISSING = '<div style="padding:30px;text-align:center;color:#ff4d6d">'
+    + 'chart library failed to load (echarts CDN blocked?)</div>';
+
+  // The two charts draw INDEPENDENTLY. They used to share one function that
+  // bailed out early if the equity element was missing, which silently took the
+  // score chart down with it whenever the account had no realised-trade series.
+  function drawEquity() {
+    const el = document.getElementById('account-equity');
+    if (!el) return;
+    if (typeof echarts === 'undefined' || typeof zfxChart !== 'function') {
+      el.innerHTML = LIB_MISSING;
+      return;
+    }
+    try {
+      zfxChart(el, {
+        backgroundColor: 'transparent', grid: zfxTheme.grid,
+        tooltip: Object.assign({ trigger: 'axis',
+          axisPointer: { type: 'line' },
+          valueFormatter: v => '$' + Number(v).toLocaleString() }, zfxTheme.tooltip),
+        xAxis: Object.assign({ type: 'category', data: eqDays, boundaryGap: false }, zfxTheme.axis),
+        yAxis: Object.assign({ type: 'value' }, zfxTheme.axis),
+        series: [{ type: 'line', data: eqCum, smooth: true,
+          symbol: eqDays.length < 3 ? 'circle' : 'none', symbolSize: 8,
+          lineStyle: { width: 2, color: '#22d3ee' }, itemStyle: { color: '#22d3ee' },
+          areaStyle: { color: 'rgba(34,211,238,.12)' } }]
+      });
+    } catch (e) {
+      el.innerHTML = '<div style="padding:30px;text-align:center;color:#ff4d6d">'
+        + 'chart error: ' + e.message + '</div>';
+    }
+  }
+
+  function drawScore() {
+    const sEl = document.getElementById('account-score');
+    if (!sEl) return;
+    if (typeof echarts === 'undefined' || typeof zfxChart !== 'function') {
+      sEl.innerHTML = LIB_MISSING;
+      return;
+    }
+    try {
+      zfxChart(sEl, {
+        backgroundColor: 'transparent', grid: zfxTheme.grid,
+        tooltip: Object.assign({ trigger: 'axis',
+          axisPointer: { type: 'line' },
+          valueFormatter: v => (v*100).toFixed(1) + '%' }, zfxTheme.tooltip),
+        xAxis: Object.assign({ type: 'category', data: hDays, boundaryGap: false }, zfxTheme.axis),
+        yAxis: Object.assign({ type: 'value', min: 0, max: 1,
+          axisLabel: { formatter: v => (v*100).toFixed(0) + '%', color: '#55637d',
+                       fontSize: 11, fontFamily: 'JetBrains Mono' } }, zfxTheme.axis),
+        series: [{ type: 'line', data: scores, smooth: true, connectNulls: true,
+          symbol: 'circle', symbolSize: 5,
+          lineStyle: { width: 2, color: '#7c8cff' }, itemStyle: { color: '#7c8cff' } }]
+      });
+    } catch (e) {
+      sEl.innerHTML = '<div style="padding:30px;text-align:center;color:#ff4d6d">'
+        + 'chart error: ' + e.message + '</div>';
+    }
+  }
+
+  function drawAll() { drawEquity(); drawScore(); }
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', drawAll);
+  else drawAll();
+})();
+</script>
+{% endif %}
+
+{# These two scripts need a SELECTED ACCOUNT: both embed account_key via tojson,
+   which raises on Undefined and 500s the whole page. They used to sit inside
+   `{% if markouts and markouts.post %}` -- a guard that happened to imply an
+   account but really gated them on the account-level markout corpus, so the
+   per-trade evidence silently did nothing for any account missing from it.
+   Guard on what they actually require instead. #}
+{% if account_key %}
+<script>
+/* Per-trade markout evidence: click an order in the trades table. */
+(function(){
+  const overlay = document.getElementById('tm-overlay');
+  if (!overlay) return;
+  const ACCOUNT = {{ account_key|tojson }};
+  const body = document.getElementById('tm-body');
+  const btnPrint = document.getElementById('tm-print'), btnCsv = document.getElementById('tm-csv');
+  let current = null;
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const num = (v, d) => v == null ? '—' : Number(v).toFixed(d);
+  const signed = (v, d = 2) => v == null ? '—' : (v > 0 ? '+' : '') + Number(v).toFixed(d);
+  const cls = v => v == null ? 'tm-na' : v > 0 ? 'tm-pos' : v < 0 ? 'tm-neg' : '';
+  const money = v => v == null ? '—' : (v < 0 ? '−$' : '$') + Math.abs(v).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+  function close(){ overlay.hidden = true; document.body.style.overflow = ''; }
+  document.getElementById('tm-close').onclick = close;
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !overlay.hidden) close(); });
+
+  const onlyBtn = document.getElementById('tm-only-flagged'), nextBtn = document.getElementById('tm-next-flagged');
+  if (onlyBtn) onlyBtn.onclick = () => {
+    const on = onlyBtn.getAttribute('aria-pressed') !== 'true';
+    onlyBtn.setAttribute('aria-pressed', String(on));
+    onlyBtn.textContent = on ? 'Show all trades' : 'Show flagged only';
+    document.querySelectorAll('.tm-order').forEach(b => { const tr = b.closest('tr'); if (tr) tr.hidden = on && !tr.matches('.tm-flagged, .tm-toxic'); });
+  };
+  let flagIdx = -1;
+  if (nextBtn) nextBtn.onclick = () => {
+    const rows = [...document.querySelectorAll('tr.tm-flagged, tr.tm-toxic')].filter(tr => !tr.hidden && tr.offsetParent !== null);
+    if (!rows.length) return;
+    flagIdx = (flagIdx + 1) % rows.length;
+    rows.forEach(tr => tr.classList.remove('tm-focus'));
+    rows[flagIdx].classList.add('tm-focus');
+    rows[flagIdx].scrollIntoView({behavior: 'smooth', block: 'center'});
+    nextBtn.textContent = `Jump to next flagged ↓ (${flagIdx + 1}/${rows.length})`;
+  };
+  document.querySelectorAll('.tm-order').forEach(btn => btn.addEventListener('click', async () => {
+    overlay.hidden = false; document.body.style.overflow = 'hidden';
+    btnPrint.disabled = btnCsv.disabled = true; current = null;
+    document.getElementById('tm-title').textContent = 'Markout evidence' + (btn.dataset.order ? ' — order #' + btn.dataset.order : ' — ' + btn.dataset.symbol + ' opened ' + String(btn.dataset.open).replace('T', ' ').slice(0, 19));
+    body.innerHTML = '<div class="tm-loading">Building the evidence — reading broker and reference ticks around the fill…</div>';
+    const d = btn.dataset;
+    const p = new URLSearchParams({account: ACCOUNT, order: d.order, open_time: d.open, symbol: d.symbol, cmd: d.cmd,
+      volume_lots: d.lots, close_time: d.close, open_price: d.openpx, close_price: d.closepx, net_profit: d.pnl});
+    try {
+      const r = await (await fetch('/api/antifraud/latency/trade_markout?' + p)).json();
+      if (r.error) { body.innerHTML = `<div class="tm-loading">Could not build the evidence: ${esc(r.error)}</div>`; return; }
+      current = r; body.innerHTML = render(r, false); wireChart(body, r); btnPrint.disabled = btnCsv.disabled = false;
+    } catch (e) { body.innerHTML = '<div class="tm-loading">Could not reach the server.</div>'; }
+  }));
+
+  function verdictClass(s){ return s.latency_flag ? 'flag' : s.directional ? 'dir' : ''; }
+  function verdictTag(s){ return s.latency_flag ? 'Latency flag' : s.directional ? 'Directional' : 'No latency signature'; }
+
+
+  /* Markout chart: broker and reference executable markout from the fill
+     across the spec horizons (evenly spaced checkpoints), the engine's
+     deciding thresholds and the zero line. Light palette for the printed report. */
+  const TM_PAL = {
+    dark:  {broker: '#22d3ee', ref: '#a78bfa', ref2: '#f472b6', thr: '#ffb020', grid: '#1b2438', zero: '#55637d', ax: '#55637d', lab: '#c5d0e0', ring: '#0a0e18', entry: '#e6edf7', exit: '#2ee6a8'},
+    light: {broker: '#0e7490', ref: '#6d28d9', ref2: '#be185d', thr: '#b45309', grid: '#e3e6ea', zero: '#8a94a3', ax: '#6b7280', lab: '#374151', ring: '#ffffff', entry: '#111827', exit: '#047857'}};
+  /* The independent references this evidence carries, each with its own
+     row keys (ref_<feed>_bid ...). Older cached results have one combined
+     reference under ref_bid / ref_exec_bps. */
+  function tmFeeds(r){
+    const list = (r.sources && r.sources.references) || [];
+    if (!list.length) return [{feed: null, label: 'Independent reference', meta: (r.sources || {}).reference || {}}];
+    return list.map(m => ({feed: m.feed, label: m.label || m.feed, meta: m}));
+  }
+  const tmKey = (f, k) => f.feed ? `ref_${f.feed}_${k}` : ({bid: 'ref_bid', ask: 'ref_ask', exec_bps: 'ref_exec_bps', mid_bps: 'ref_mid_bps'})[k];
+  const TM_REF_COLORS = {dark: ['#a78bfa', '#f472b6', '#facc15', '#34d399', '#fb923c', '#60a5fa'],
+                         light: ['#6d28d9', '#be185d', '#a16207', '#047857', '#c2410c', '#1d4ed8']};
+  const tmRefColor = (P, i) => { const set = P === TM_PAL.light ? TM_REF_COLORS.light : TM_REF_COLORS.dark; return set[i % set.length]; };
+  const TM_GEOM = {W: 900, H: 260, L: 52, R: 150, T: 30, B: 34};
+  /* x position of an elapsed time (seconds after the fill) on the evenly
+     spaced horizon axis: linear between the two neighbouring horizons. */
+  function tmX(rows, seconds, px){
+    const hs = rows.map(x => x.seconds);
+    if (seconds <= hs[0]) return px(0);
+    for (let i = 1; i < hs.length; i++) {
+      if (seconds <= hs[i]) return px(i - 1) + (seconds - hs[i - 1]) / (hs[i] - hs[i - 1]) * (px(i) - px(i - 1));
+    }
+    return null;   // beyond the last horizon
+  }
+  /* Realised markout at the exit: direction x (close - open) / open, bps. */
+  function tmExit(r){
+    const t = r.trade, hold = t.hold_seconds, d = String(t.cmd).toLowerCase().startsWith('b') ? 1 : -1;
+    if (hold == null || t.close_price == null || !t.open_price) return null;
+    return {hold, bps: d * (t.close_price - t.open_price) / t.open_price * 1e4, time: String(t.close_time || '').slice(11, 23)};
+  }
+  function chartSVG(r, printable){
+    const P = TM_PAL[printable ? 'light' : 'dark'];
+    const {W, H, L, R, T, B} = TM_GEOM;
+    const pts = r.rows.filter(x => x.measurable);
+    const series = [{key: 'markout_bps', name: 'Broker tape', color: P.broker, dash: ''}]
+      .concat(tmFeeds(r).map((f, i) => ({key: tmKey(f, 'exec_bps'), name: f.label + ' (executable)',
+                                         color: tmRefColor(P, i), dash: ['6 4', '2 3', '8 3 2 3'][i % 3]})))
+      .filter(sr => pts.some(x => x[sr.key] != null));
+    if (!series.length) return '<p class="tm-na">No ticks cover this fill, so there is no curve to draw.</p>';
+    const n = r.rows.length;
+    const ex = tmExit(r), lastH = r.rows[r.rows.length - 1].seconds;
+    const exitInside = ex && ex.hold >= 0 && ex.hold <= lastH;
+    const vals = pts.flatMap(x => series.map(sr => x[sr.key])).concat(pts.map(x => x.threshold_bps))
+      .concat(exitInside ? [ex.bps] : []).filter(v => v != null).concat([0]);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const pad = Math.max((hi - lo) * 0.12, 0.25); lo -= pad; hi += pad;
+    const px = i => L + i / (n - 1) * (W - L - R), py = v => T + (hi - v) / (hi - lo) * (H - T - B);
+    const idx = x => r.rows.indexOf(x);
+    let marks = '';
+    {
+      const xe = px(0);
+      marks += `<line x1="${xe}" x2="${xe}" y1="${T - 12}" y2="${H - B}" stroke="${P.entry}" stroke-width="1.5" opacity=".75"/>`
+        + `<text x="${xe + 6}" y="${T - 2}" font-size="11" fill="${P.lab}">Entry ${esc(String(r.trade.open_time || '').slice(11, 23))}</text>`;
+      if (exitInside) {
+        const xx = tmX(r.rows, ex.hold, px);
+        const anchor = xx > W - R - 170 ? 'end' : 'start', dx = anchor === 'end' ? -6 : 6;
+        marks += `<line x1="${xx}" x2="${xx}" y1="${T - 12}" y2="${H - B}" stroke="${P.exit}" stroke-width="1.5" stroke-dasharray="5 3"/>`
+          + `<text x="${xx + dx}" y="${T - 2}" text-anchor="${anchor}" font-size="11" fill="${P.lab}">Exit +${ex.hold.toFixed(1)} s · ${esc(ex.time)} · realised ${ex.bps > 0 ? '+' : ''}${ex.bps.toFixed(2)} bps</text>`;
+      }
+    }
+    let g = '';
+    // Round-number gridlines (1 / 2 / 2.5 / 5 x 10^k), about four of them.
+    const raw = (hi - lo) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(v => v >= raw) || raw;
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      if (Math.abs(v) < step / 1000 || Math.abs(py(v) - py(0)) < 14) continue;
+      const txt = Number.isInteger(Math.round(v * 100) / 100) ? String(Math.round(v)) : v.toFixed(step < 1 ? 2 : 1);
+      g += `<line x1="${L}" x2="${W - R}" y1="${py(v)}" y2="${py(v)}" stroke="${P.grid}"/><text x="${L - 8}" y="${py(v) + 4}" text-anchor="end" font-size="11" fill="${P.ax}">${txt}</text>`;
+    }
+    g += `<line x1="${L}" x2="${W - R}" y1="${py(0)}" y2="${py(0)}" stroke="${P.zero}" stroke-dasharray="2 3"/><text x="${L - 8}" y="${py(0) + 4}" text-anchor="end" font-size="11" fill="${P.ax}">0</text>`;
+    g += r.rows.map((x, i) => `<text x="${px(i)}" y="${H - 12}" text-anchor="middle" font-size="${x.seconds > 0 && x.seconds < 1 ? 9.5 : x.spec ? 11 : 9.5}" fill="${x.measurable ? P.ax : P.grid}" ${x.spec ? 'font-weight="600"' : ''}>${esc(x.seconds > 0 && x.seconds < 1 ? String(Math.round(x.seconds * 1000)) : x.horizon)}</text>`).join('')
+      + (r.rows.some(x => x.seconds > 0 && x.seconds < 1) ? `<text x="${(px(1) + px(4)) / 2}" y="${H - 1}" text-anchor="middle" font-size="9" fill="${P.ax}">ms</text>` : '');
+    // Deciding thresholds: a short amber bar at each horizon the latency flag is judged on.
+    pts.filter(x => x.threshold_bps != null).forEach(x => {
+      const cx = px(idx(x)), cy = py(x.threshold_bps);
+      g += `<line x1="${cx - 14}" x2="${cx + 14}" y1="${cy}" y2="${cy}" stroke="${P.thr}" stroke-width="2"/>`;
+    });
+    const ends = [];
+    series.forEach(sr => {
+      const p = pts.filter(x => x[sr.key] != null).map(x => [px(idx(x)), py(x[sr.key]), x.spec]);
+      g += `<path d="${p.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(1) + ',' + q[1].toFixed(1)).join('')}" fill="none" stroke="${sr.color}" stroke-width="2" stroke-dasharray="${sr.dash}"/>`;
+      g += p.map(q => `<circle cx="${q[0]}" cy="${q[1]}" r="${q[2] ? 4 : 2.5}" fill="${sr.color}" stroke="${P.ring}" stroke-width="${q[2] ? 2 : 1}"/>`).join('');
+      const last = p[p.length - 1];
+      if (last) ends.push({x: last[0] + 10, y: last[1] + 4, name: sr.name});
+    });
+    ends.sort((a, b) => a.y - b.y);
+    for (let k = 1; k < ends.length; k++) if (ends[k].y - ends[k - 1].y < 15) ends[k].y = ends[k - 1].y + 15;
+    ends.forEach(e => { g += `<text x="${e.x}" y="${e.y}" font-size="11.5" fill="${P.lab}">${esc(e.name)}</text>`; });
+    if (exitInside) {
+      // realised exit: a diamond where the client actually closed
+      const xx = tmX(r.rows, ex.hold, px), yy = py(ex.bps);
+      g += `<path d="M${xx},${yy - 6} L${xx + 6},${yy} L${xx},${yy + 6} L${xx - 6},${yy} Z" fill="${P.exit}" stroke="${P.ring}" stroke-width="2"/>`;
+    }
+    g = marks + g;
+    const legend = series.map(sr => `<span class="tm-leg"><svg width="24" height="8"><line x1="0" x2="24" y1="4" y2="4" stroke="${sr.color}" stroke-width="2" stroke-dasharray="${sr.dash}"/></svg>${esc(sr.name)}</span>`).join('')
+      + (pts.some(x => x.threshold_bps != null) ? `<span class="tm-leg"><svg width="24" height="8"><line x1="4" x2="20" y1="4" y2="4" stroke="${P.thr}" stroke-width="2"/></svg>Engine threshold (deciding horizons)</span>` : '')
+      + `<span class="tm-leg"><svg width="16" height="12"><line x1="8" x2="8" y1="0" y2="12" stroke="${P.entry}" stroke-width="1.5"/></svg>Entry</span>`
+      + (exitInside
+          ? `<span class="tm-leg"><svg width="16" height="12"><line x1="8" x2="8" y1="0" y2="12" stroke="${P.exit}" stroke-width="1.5" stroke-dasharray="4 2"/></svg>Exit · ◆ realised markout</span>`
+          : `<span class="tm-leg tm-na">${ex ? `Exit after the ${lastH} s window (held ${ex.hold >= 3600 ? (ex.hold / 3600).toFixed(1) + ' h' : ex.hold >= 60 ? (ex.hold / 60).toFixed(1) + ' min' : ex.hold.toFixed(1) + ' s'})` : 'Position still open'}</span>`)
+      + `<span class="tm-leg tm-na">bps from the fill price · above zero favours the client · bold horizons = spec checkpoints · small = 20, 30, 40, 50 s slices</span>`;
+    const hover = printable ? '' :
+      `<line class="tm-cross" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="${P.ax}" visibility="hidden"/>
+       <rect class="tm-hit" x="${L - 20}" y="${T}" width="${W - L - R + 40}" height="${H - T - B}" fill="transparent"/>`;
+    return `<div class="tm-legend">${legend}</div>
+      <div class="tm-chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Markout by horizon: broker tape and independent reference">${g}${hover}</svg>
+        ${printable ? '' : '<div class="tm-tip" hidden></div>'}</div>`;
+  }
+  function wireChart(root, r){
+    const svg = root.querySelector('.tm-chart svg');
+    const hit = svg && svg.querySelector('.tm-hit');
+    if (!hit) return;
+    const tip = root.querySelector('.tm-tip'), cross = svg.querySelector('.tm-cross');
+    const {W, L, R} = TM_GEOM, n = r.rows.length, px = i => L + i / (n - 1) * (W - L - R);
+    hit.onpointermove = e => {
+      const box = svg.getBoundingClientRect(), vx = (e.clientX - box.left) / box.width * W;
+      let i = 0;
+      r.rows.forEach((_, k) => { if (Math.abs(px(k) - vx) < Math.abs(px(i) - vx)) i = k; });
+      const x = r.rows[i];
+      cross.setAttribute('x1', px(i)); cross.setAttribute('x2', px(i)); cross.setAttribute('visibility', 'visible');
+      tip.replaceChildren();
+      const head = document.createElement('div'); head.className = 'tm-tip-h';
+      head.textContent = (x.seconds === 0 ? 'At the fill' : x.horizon + ' after the fill') + ' · ' + x.time.slice(11);
+      tip.appendChild(head);
+      const line = (color, value, label) => {
+        const row = document.createElement('div'); row.className = 'tm-tip-r';
+        const key = document.createElement('i'); key.style.background = color;
+        const b = document.createElement('b'); b.textContent = value;
+        const sp = document.createElement('span'); sp.textContent = label;
+        row.append(key, b, sp); tip.appendChild(row);
+      };
+      if (!x.measurable) line('transparent', '—', 'not measurable (second-stamped fill)');
+      else {
+        line(TM_PAL.dark.broker, x.markout_bps == null ? '—' : signed(x.markout_bps) + ' bps',
+             'broker' + (x.markout_usd == null ? '' : ' · ' + money(x.markout_usd)));
+        tmFeeds(r).forEach((f, k) => {
+          const v = x[tmKey(f, 'exec_bps')];
+          line(tmRefColor(TM_PAL.dark, k), v == null ? '—' : signed(v) + ' bps', f.label + ' (executable)');
+        });
+        if (x.threshold_bps != null)
+          line(TM_PAL.dark.thr, num(x.threshold_bps, 2) + ' bps', x.clears_threshold ? 'threshold — cleared' : 'threshold — not cleared');
+      }
+      tip.hidden = false;
+      tip.style.left = Math.max(0, Math.min(px(i) / W * box.width + 14, box.width - 240)) + 'px';
+    };
+    hit.onpointerleave = () => { cross.setAttribute('visibility', 'hidden'); tip.hidden = true; };
+  }
+
+  function render(r, printable){
+    const t = r.trade, s = r.summary, src = r.sources, feeds = tmFeeds(r);
+    const dp = Math.min(5, Math.max(2, (String(t.open_price).split('.')[1] || '').length));
+    // "Vantage Raw ECN +0.12 · IC Markets Raw +0.30" for a per-reference breakdown.
+    const byRef = obj => obj && Object.keys(obj).length > 1
+      ? ' (' + feeds.filter(f => obj[f.feed] != null).map(f => f.label + ' ' + signed(obj[f.feed])).join(' · ') + ')' : '';
+    const kv = (k, v) => `<div class="tm-kv"><span>${k}</span><b>${v}</b></div>`;
+    const head = [
+      kv('Account', esc(r.account)), kv('Order', esc(r.order || '—')), kv('Symbol', esc(t.symbol)),
+      kv('Side', esc(String(t.cmd).toUpperCase())), kv('Lots', num(t.volume_lots, 2)),
+      kv('Opened (UTC)', esc(String(t.open_time || '').slice(0, 23))), kv('Closed (UTC)', esc(String(t.close_time || '—').slice(0, 23))),
+      kv('Hold', t.hold_seconds == null ? '—' : num(t.hold_seconds, 1) + ' s'), kv('Open price', num(t.open_price, dp)),
+      kv('Close price', num(t.close_price, dp)), kv('Net P&amp;L', money(t.net_profit)), kv('Fill timestamp', esc(s.precision))].join('');
+    const pill = (warn, label, value) => `<span class="tm-pill ${warn ? 'warn' : ''}">${label} <b>${value}</b></span>`;
+    const fills = [
+      pill(s.stale_quote, 'Broker quote age at fill', s.quote_age_ms == null ? '—' : num(s.quote_age_ms, 0) + ' ms' + (s.stale_quote ? ' (stale)' : '')),
+      pill(s.behind_reference, 'Broker vs reference at fill', s.gap_to_reference_bps == null ? '—' : signed(s.gap_to_reference_bps) + ' bps' + (s.behind_reference ? ' (behind)' : '') + byRef(s.gap_by_reference_bps)),
+      pill(s.reference_led, 'Move in the 500 ms before fill · reference / broker',
+        s.reference_move_before_fill_bps == null ? '—' : signed(s.reference_move_before_fill_bps) + ' / ' + signed(s.broker_move_before_fill_bps) + ' bps' + byRef(s.reference_move_by_reference_bps)),
+      pill(false, 'Early peak', s.early_peak_bps == null ? '—' : signed(s.early_peak_bps) + ' bps'),
+      pill(false, 'At 60 s', s.markout_60s_bps == null ? '—' : signed(s.markout_60s_bps) + ' bps'),
+      pill(false, 'Advantage faded', s.decay_pct == null ? '—' : num(s.decay_pct, 0) + '%')].join('');
+    const rows = r.rows.map(x => {
+      if (!x.measurable) return `<tr class="${x.spec ? 'spec' : 'tm-interim'}"><td>${esc(x.horizon)}</td><td>${esc(x.time.slice(11))}</td><td colspan="${6 + 3 * feeds.length}" class="tm-na" style="text-align:left">not measurable — this fill is stamped to the second</td></tr>`;
+      const hit = x.clears_threshold;
+      return `<tr class="${x.seconds === 0 ? 'fill' : ''} ${x.spec ? 'spec' : 'tm-interim'}">
+        <td>${esc(x.horizon)}</td><td>${esc(x.time.slice(11))}</td>
+        <td>${num(x.broker_bid, dp)}</td><td>${num(x.broker_ask, dp)}</td>
+        <td class="${hit ? 'tm-hit' : cls(x.markout_bps)}">${signed(x.markout_bps)}${hit ? ' ✓' : ''}</td>
+        <td class="${cls(x.markout_usd)}">${money(x.markout_usd)}</td>
+        <td class="tm-na">${x.threshold_bps == null ? '—' : num(x.threshold_bps, 2)}</td>
+        ${feeds.map(f => `<td>${num(x[tmKey(f, 'bid')], dp)}</td><td>${num(x[tmKey(f, 'ask')], dp)}</td>
+        <td class="${cls(x[tmKey(f, 'exec_bps')])}">${signed(x[tmKey(f, 'exec_bps')])}</td>`).join('')}
+        <td class="${cls(x.ref_mid_bps)}">${signed(x.ref_mid_bps)}</td></tr>`;
+    }).join('');
+    return `<div class="tm-head">${head}</div>
+      <div class="tm-verdict ${verdictClass(s)}"><b class="tag">${verdictTag(s)}</b>${esc(s.verdict)}</div>
+      <div class="tm-fill">${fills}</div>
+      <h3 class="tm-h">Markout curve</h3>
+      ${chartSVG(r, printable)}
+      <h3 class="tm-h">Markout table</h3>
+      <div style="overflow-x:auto"><table class="tm-table">
+        <thead>
+          <tr><th></th><th></th><th colspan="5" class="grp">Broker tape</th>${feeds.map(f => `<th colspan="3" class="grp">${esc(f.label)}</th>`).join('')}<th class="grp">References</th></tr>
+          <tr><th>Horizon</th><th>Time (UTC)</th><th>Bid</th><th>Ask</th><th title="Direction × (broker mid − fill price) ÷ fill price">Markout bps</th>
+            <th>Markout $</th><th title="Engine's early-markout threshold at this horizon (✓ = cleared)">Threshold</th>
+            ${feeds.map(() => `<th>Bid</th><th>Ask</th><th title="Against this reference's executable opposite side">Executable bps</th>`).join('')}
+            <th title="Average of the references' mid markouts">Mid bps (avg)</th></tr>
+        </thead><tbody>${rows}</tbody></table></div>
+      <div class="tm-foot">
+        <div><b>Broker ticks:</b> ${esc(src.broker)} (${src.broker_ticks} in the window)</div>
+        ${feeds.map(f => { const m = f.meta || {};
+          return `<div><b>${esc(f.label)}:</b> ${m.source ? `server clock UTC+${m.server_offset_h}, price basis ${num(m.basis, 3)}, ${m.ticks != null ? m.ticks : src.reference_ticks} ticks` : esc(m.note || 'unavailable')}</div>`; }).join('')}
+        ${feeds.length > 1 ? `<div><b>References combined:</b> a signal counts when ${esc(s.reference_combine_label || 'every venue')} covering the fill show it.</div>` : ''}
+        <div><b>Markout $:</b> ${esc(src.usd_conversion)} · <b>Trade record:</b> ${esc(r.trade_source)}</div>
+        <div><b>Method:</b> ${esc(r.method)} A latency flag needs the early threshold cleared, the advantage to fade by at least ${esc(r.thresholds.min_decay_pct)}% at 60 s, a hold of at most ${esc(r.thresholds.max_hold_seconds)} s and a profitable trade.</div>
+        ${(r.notes || []).map(n => `<div><b>Note:</b> ${esc(n)}</div>`).join('')}
+        <div class="tm-na">Generated ${esc(r.generated_at)} UTC</div>
+      </div>`;
+  }
+
+  btnPrint.onclick = () => {
+    if (!current) return;
+    const w = window.open('', '_blank');
+    if (!w) { alert('Allow pop-ups to print the evidence.'); return; }
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Markout evidence ${esc(current.account)} #${esc(current.order || '')}</title>
+      <style>
+        :root{--mono:Consolas,"SF Mono",monospace;--ink:#111;--ink-dim:#444;--ink-faint:#777;--border:#ccc;--border-bright:#999;--panel:#f6f7f9;--pos:#0a7d4f;--neg:#b3261e;--warn:#9a5b00}
+        body{font:12px/1.45 -apple-system,"Segoe UI",Roboto,sans-serif;color:#111;margin:24px}
+        h1{font-size:18px;margin:0 0 4px} .sub{color:#555;margin:0 0 14px}
+        ${[...document.querySelectorAll('style')].map(st => st.textContent).filter(tx => tx.includes('.tm-head')).join('\n')}
+        .tm-verdict{background:#f6f7f9} .tm-verdict.flag{background:#fdecec} .tm-verdict.dir{background:#eef0ff}
+        .tm-table th,.tm-table td{border-bottom:1px solid #ddd} .tm-table tr.fill td{background:#eef9fb}
+        @page{size:A4 landscape;margin:12mm}
+      </style></head><body>
+      <h1>Trade markout evidence</h1><p class="sub">${esc(current.account)} · order #${esc(current.order || '—')} · ${esc(current.trade.symbol)}</p>
+      ${render(current, true)}</body></html>`);
+    w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
+  };
+
+  btnCsv.onclick = () => {
+    if (!current) return;
+    const t = current.trade, q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    const meta = [['account', current.account], ['order', current.order], ['symbol', t.symbol], ['side', t.cmd], ['lots', t.volume_lots],
+      ['open_time_utc', t.open_time], ['close_time_utc', t.close_time], ['open_price', t.open_price], ['close_price', t.close_price],
+      ['net_profit', t.net_profit], ['verdict', current.summary.verdict],
+      ['broker_source', current.sources.broker],
+      ...tmFeeds(current).map(f => ['reference_source' + (f.feed ? '_' + f.feed : ''), (f.meta || {}).source || (f.meta || {}).note]),
+      ['generated_utc', current.generated_at]]
+      .map(([k, v]) => '# ' + k + ',' + q(v)).join('\n');
+    const cols = ['horizon', 'spec', 'time', 'measurable', 'broker_bid', 'broker_ask', 'markout_bps', 'markout_usd', 'threshold_bps',
+      'clears_threshold', 'ref_bid', 'ref_ask', 'ref_exec_bps', 'ref_mid_bps', 'ref_feed',
+      ...tmFeeds(current).filter(f => f.feed).flatMap(f => ['bid', 'ask', 'exec_bps', 'mid_bps'].map(k => tmKey(f, k)))];
+    const csv = meta + '\n' + cols.join(',') + '\n' + current.rows.map(x => cols.map(c => q(x[c])).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv'}));
+    a.download = `markout_${current.account.replace(':', '_')}_${current.order || 'trade'}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+})();
+</script>
+
+<!-- ============ TRADE REPLAY (Order tab) ============================
+     Plays ONE trade back over minute bars built from the broker tick tape:
+     the candles reveal left to right and the entry / exit flags appear as the
+     playhead reaches them, so you watch the fill in the context it happened
+     rather than reading two prices off a row. Same tape and the same
+     /api/replay/chart endpoint as the standalone Replay wall. -->
+<script>
+(function () {
+  const ACCOUNT = {{ account_key|tojson }};
+  const overlay = document.getElementById('rp-overlay');
+  if (!overlay) return;
+
+  const host = document.getElementById('rp-chart');
+  const metaEl = document.getElementById('rp-meta');
+  const noteEl = document.getElementById('rp-note');
+  const scrubEl = document.getElementById('rp-scrub');
+  const playBtn = document.getElementById('rp-play');
+  let st = null;                            // current playback state
+
+  function stop() { if (st && st.tick) { clearInterval(st.tick); st.tick = null; }
+                    if (st) st.playing = false; playBtn.textContent = '▶ Play'; }
+
+  function close() {
+    stop();
+    if (st && st.chart) { st.chart.dispose(); }
+    st = null;
+    overlay.hidden = true;
+  }
+  document.getElementById('rp-close').onclick = close;
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !overlay.hidden) close();
+  });
+
+  // Snap a wall-clock stamp to the nearest bar the endpoint returned.
+  function nearest(times, target) {
+    if (!target) return -1;
+    let best = -1, bestD = Infinity;
+    const t = Date.parse(String(target).replace(' ', 'T'));
+    times.forEach((x, i) => {
+      const d = Math.abs(Date.parse(String(x).replace(' ', 'T')) - t);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
+  }
+
+  document.querySelectorAll('.tm-replay').forEach(btn => {
+    btn.onclick = async () => {
+      const d = btn.dataset;
+      overlay.hidden = false;
+      noteEl.hidden = true;
+      scrubEl.textContent = '';
+      host.innerHTML = '';
+      document.getElementById('rp-title').textContent =
+        'Trade replay' + (d.order ? ' — #' + d.order : '');
+      const pnl = Number(d.pnl);
+      metaEl.textContent = `${d.symbol} · ${String(d.side).toUpperCase()} `
+        + `${Number(d.lots).toFixed(4)} lots · ${d.open || '?'} → ${d.close || 'open'} · `
+        + `P&L ${isNaN(pnl) ? '—' : pnl.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+
+      if (typeof echarts === 'undefined') {
+        host.innerHTML = '<div class="hint">chart library failed to load</div>';
+        return;
+      }
+      scrubEl.textContent = 'loading tick bars…';
+      let j;
+      try {
+        const qs = `account=${encodeURIComponent(ACCOUNT)}`
+          + `&symbol=${encodeURIComponent(d.symbol)}`
+          + `&open=${encodeURIComponent(d.open || '')}`
+          + `&close=${encodeURIComponent(d.close || '')}`;
+        j = await (await fetch('/api/replay/chart?' + qs)).json();
+      } catch (e) { j = {error: 'request failed'}; }
+
+      if (!j || !j.bars || !j.bars.length) {
+        scrubEl.textContent = '';
+        host.innerHTML = '<div class="hint">'
+          + (j && (j.note || j.error) ? (j.note || j.error)
+                                      : 'no tick bars stored for this window')
+          + '</div>';
+        return;
+      }
+      if (j.note) { noteEl.textContent = '⚠ ' + j.note; noteEl.hidden = false; }
+      setup(j, d);
+    };
+  });
+
+  function setup(j, d) {
+    stop();
+    const times = j.bars.map(b => b.time);
+    const ohlc = j.bars.map(b => [b.open, b.close, b.low, b.high]);
+    // Prefer the snapped times the endpoint returns; fall back to nearest bar.
+    const snap = {};
+    (j.trades || []).forEach(t => { snap[t.kind] = times.indexOf(t.time); });
+    const flags = [
+      {idx: snap.entry != null && snap.entry >= 0 ? snap.entry : nearest(times, d.open),
+       price: Number(d.openpx), kind: 'entry', side: d.side},
+      {idx: snap.exit != null && snap.exit >= 0 ? snap.exit : nearest(times, d.close),
+       price: Number(d.closepx), kind: 'exit', side: d.side},
+    ].filter(f => f.idx >= 0 && !isNaN(f.price));
+
+    const chart = echarts.init(host, null, {renderer: 'canvas'});
+    st = {chart, times, ohlc, flags, i: times.length - 1, speed: 1,
+          tick: null, playing: false};
+    draw(st.i);                             // open fully revealed
+    scrub();
+
+    playBtn.onclick = () => st.playing ? stop() : play();
+    document.getElementById('rp-restart').onclick = () => {
+      stop(); st.i = 0; draw(0); scrub();
+    };
+    document.querySelectorAll('#rp-speed button').forEach(b => b.onclick = () => {
+      document.querySelectorAll('#rp-speed button')
+        .forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      const wasPlaying = st.playing;
+      stop(); st.speed = parseFloat(b.dataset.s);
+      if (wasPlaying) play();
+    });
+  }
+
+  function play() {
+    st.playing = true; playBtn.textContent = '❚❚ Pause';
+    if (st.i >= st.times.length - 1) st.i = 0;
+    const stepMs = Math.max(24, 90 / st.speed);
+    st.tick = setInterval(() => {
+      st.i++;
+      if (st.i >= st.times.length - 1) { st.i = st.times.length - 1; draw(st.i); scrub(); stop(); return; }
+      draw(st.i); scrub();
+    }, stepMs);
+  }
+
+  function scrub() {
+    scrubEl.textContent = (st.times[st.i] || '') + '  ·  '
+      + (st.i + 1) + '/' + st.times.length;
+  }
+
+  function draw(upto) {
+    const shown = st.flags.filter(f => f.idx <= upto).map(f => ({
+      value: f.price, xAxis: st.times[f.idx], yAxis: f.price,
+      symbol: f.kind === 'entry' ? (f.side === 'buy' ? 'triangle' : 'pin') : 'diamond',
+      symbolSize: f.kind === 'entry' ? 15 : 13,
+      symbolRotate: (f.kind === 'entry' && f.side === 'sell') ? 180 : 0,
+      itemStyle: {color: f.kind === 'entry'
+        ? (f.side === 'buy' ? '#2ee6a8' : '#ffb020') : '#ff4d6d'},
+      label: {show: true, position: f.kind === 'entry' ? 'bottom' : 'top',
+              formatter: f.kind === 'entry'
+                ? (f.side === 'buy' ? 'BUY' : 'SELL') : 'CLOSE',
+              color: '#e6edf7', fontSize: 9, fontFamily: 'JetBrains Mono'},
+    }));
+    st.chart.setOption({
+      backgroundColor: 'transparent', animation: false,
+      grid: {left: 56, right: 16, top: 16, bottom: 28},
+      tooltip: Object.assign({trigger: 'axis'}, zfxTheme.tooltip),
+      xAxis: {type: 'category', data: st.times, boundaryGap: true,
+              axisLabel: {color: '#55637d', fontSize: 9,
+                          fontFamily: 'JetBrains Mono',
+                          formatter: v => String(v || '').slice(11)}},
+      yAxis: Object.assign({type: 'value', scale: true}, zfxTheme.axis),
+      series: [{
+        type: 'candlestick', data: st.ohlc,
+        itemStyle: {color: '#2ee6a8', color0: '#ff4d6d',
+                    borderColor: '#2ee6a8', borderColor0: '#ff4d6d'},
+        markLine: {symbol: 'none', silent: true,
+                   lineStyle: {color: '#22d3ee', width: 1.4},
+                   label: {show: false},
+                   data: [{xAxis: st.times[upto]}]},
+        markPoint: {data: shown, silent: true},
+      }],
+    }, true);
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}

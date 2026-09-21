@@ -1,0 +1,32 @@
+# Copy this file to server.yaml and fill in your actual connection settings.
+# server.yaml is ignored by git and must never be committed.
+defaults:
+  port: 3306
+  user: CHANGE-ME
+  password: CHANGE-ME
+
+servers:
+  mt5_demo01:
+    host: db-proxy.example.internal
+    database: mt5_demo01
+  mt4_live01:
+    host: db-proxy.example.internal
+    database: mt4_live01
+  mt5_live01:
+    host: db-proxy.example.internal
+    database: mt5_live01
+  mt5_dubai_live01:
+    host: db-proxy.example.internal
+    database: mt5_dubai_live01
+  mt4_demo01:
+    host: db-proxy.example.internal
+    database: mt4_demo01
+  mt4_live02:
+    host: db-proxy.example.internal
+    database: mt4_live02
+  mt4_live03:
+    host: db-proxy.example.internal
+    database: mt4_live03
+  mt4_live04:
+    host: db-proxy.example.internal
+    database: mt4_live04

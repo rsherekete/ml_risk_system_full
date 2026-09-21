@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Trade Signals - ZFX Quant{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Trade Signals</h1>
+  <p>Individual trades to copy (A-book) rather than take the other side of, for the selected day.</p>
+</div>
+
+{% include "_controls.html" %}
+
+{% if has_data %}
+<form method="get" class="toolbar">
+  <div>
+    <label for="day">Trading day</label>
+    <select id="day" name="day" onchange="this.form.submit()">
+      {% for d in days %}<option value="{{ d }}" {{ 'selected' if d == selected_day }}>{{ d }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="symbol">Symbol</label>
+    <select id="symbol" name="symbol" onchange="this.form.submit()">
+      <option value="">All symbols</option>
+      {% for s in symbols %}<option value="{{ s }}" {{ 'selected' if s == selected_symbol }}>{{ s }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="hedge">Copy fraction</label>
+    <select id="hedge" name="hedge" onchange="this.form.submit()">
+      {% for value in [0.01, 0.02, 0.05, 0.10, 0.20] %}
+        <option value="{{ value }}" {{ 'selected' if config.hedge_fraction == value }}>{{ '{:.0%}'.format(value) }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="threshold">Or P(win) &ge;</label>
+    <select id="threshold" name="threshold" onchange="this.form.submit()">
+      <option value="0" {{ 'selected' if not config.probability_threshold }}>Use fraction</option>
+      {% for value in [0.6, 0.7, 0.8, 0.9] %}
+        <option value="{{ value }}" {{ 'selected' if config.probability_threshold == value }}>{{ value }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div style="flex:1"></div>
+  <a class="btn btn-primary" href="/quant/signals.csv?day={{ selected_day }}&hedge={{ config.hedge_fraction }}&threshold={{ config.probability_threshold }}&symbol={{ selected_symbol }}">
+    Download signals (CSV)
+  </a>
+</form>
+
+{% if signals is defined and signals is not none and signals|length %}
+<div class="grid cols-4" style="margin-bottom:14px">
+  <div class="panel stat">
+    <span class="label">Trades to copy</span>
+    <span class="value">{{ '{:,}'.format(signals|length) }}</span>
+    <span class="delta dim">of {{ '{:,}'.format(summary.rows) if summary else 0 }} that day</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Notional to mirror</span>
+    <span class="value">${{ '{:,.0f}'.format(signals.notional.sum()) }}</span>
+    <span class="delta dim">{{ '%.2f'|format(signals.volume_lots.sum()) }} lots</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Realised on these trades</span>
+    <span class="value {{ 'pos' if signals.pnl.sum() > 0 else 'neg' }}">
+      ${{ '{:,.0f}'.format(signals.pnl.sum()) }}</span>
+    <span class="delta dim">client P&amp;L &mdash; copying earns this, B-booking pays it</span>
+  </div>
+  <div class="panel stat">
+    <span class="label">Mean confidence</span>
+    <span class="value">{{ '{:.1%}'.format(signals.score.mean()) }}</span>
+    <span class="delta dim">{{ '{:.0%}'.format((signals.pnl > 0).mean()) }} actually won</span>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Signals &mdash; {{ selected_day }}{{ ' / ' + selected_symbol if selected_symbol }}</h2>
+  <p class="hint">
+    Ranked by expected dollar impact. Direction is the client's; copying means taking
+    the <b>same</b> side, so the firm earns what the client earns instead of paying it.
+  </p>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th style="width:34px">#</th><th>Opened</th><th>Account</th><th>Symbol</th>
+          <th>Side</th><th class="num">Lots</th><th class="num">Notional</th>
+          <th class="num">P(win)</th><th class="num">Expected impact</th>
+          <th class="num">Realised</th></tr>
+      </thead>
+      <tbody>
+      {% for row in signals.itertuples() %}
+        <tr>
+          <td class="dim">{{ loop.index }}</td>
+          <td style="font-family:var(--mono);font-size:11px">
+            {{ row.open_time.strftime('%H:%M:%S') if row.open_time == row.open_time else '--' }}</td>
+          <td><a href="/trading/account?account={{ row.account_key }}"
+                 style="font-family:var(--mono);font-size:11px">{{ row.account_key }}</a></td>
+          <td>{{ row.symbol }}</td>
+          <td class="{{ 'pos' if row.direction > 0 else 'neg' }}">{{ 'BUY' if row.direction > 0 else 'SELL' }}</td>
+          <td class="num">{{ '%.2f'|format(row.volume_lots) }}</td>
+          <td class="num">${{ '{:,.0f}'.format(row.notional) }}</td>
+          <td class="num">{{ '{:.1%}'.format(row.score) }}</td>
+          <td class="num"><b>${{ '{:,.0f}'.format(row.expected_impact) }}</b></td>
+          <td class="num {{ 'pos' if row.pnl > 0 else 'neg' }}">{{ '{:,.2f}'.format(row.pnl) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="panel"><div class="empty"><strong>No signals</strong>
+  No trade on {{ selected_day }} met the current threshold.</div></div>
+{% endif %}
+{% endif %}
+{% endblock %}

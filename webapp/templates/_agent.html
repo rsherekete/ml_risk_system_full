@@ -1,0 +1,261 @@
+{# The LLM operations agent dock: a floating orb on every page. Opens into a
+   chat panel; tool steps are shown as they happened; "navigate" answers drive
+   the browser visibly (banner, then go). Conversation survives navigation via
+   sessionStorage, which is what makes autopilot feel continuous. #}
+<style>
+  .agent-orb { position: fixed; right: 22px; bottom: 22px; z-index: 90;
+    width: 54px; height: 54px; border-radius: 50%; border: 1px solid var(--border-bright);
+    background: radial-gradient(circle at 35% 30%, #17233d, #0a0e18 75%);
+    color: var(--accent); font-size: 22px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 26px rgba(34,211,238,.25);
+    transition: transform .2s, box-shadow .25s;
+    animation: orbBreathe 5s ease-in-out infinite; }
+  .agent-orb:hover { transform: scale(1.1); box-shadow: 0 0 40px rgba(34,211,238,.45); }
+  @keyframes orbBreathe {
+    50% { box-shadow: 0 0 40px rgba(34,211,238,.42) } }
+
+  .agent-panel { position: fixed; right: 22px; bottom: 88px; z-index: 91;
+    width: min(460px, calc(100vw - 34px)); max-height: min(620px, 76vh);
+    display: none; flex-direction: column; border-radius: 16px;
+    background: rgba(10,14,24,.97); border: 1px solid var(--border-bright);
+    box-shadow: 0 18px 60px rgba(0,0,0,.6), 0 0 40px rgba(34,211,238,.1);
+    backdrop-filter: blur(16px); overflow: hidden;
+    animation: agentIn .28s cubic-bezier(.2,.9,.3,1.2); }
+  .agent-panel.on { display: flex; }
+  @keyframes agentIn { from { opacity: 0; transform: translateY(16px) scale(.97) } }
+
+  .agent-head { display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .agent-head b { font-size: 13px; letter-spacing: .04em; }
+  .agent-head .status { font-family: var(--mono); font-size: 10px;
+    color: var(--ink-faint); margin-left: auto; }
+  .agent-head .status.ok { color: var(--pos); }
+
+  .agent-log { flex: 1; overflow-y: auto; padding: 14px;
+    display: flex; flex-direction: column; gap: 10px; min-height: 120px; }
+  .agent-msg { max-width: 92%; padding: 9px 12px; border-radius: 12px;
+    font-size: 13px; line-height: 1.5; white-space: pre-wrap;
+    animation: msgIn .25s ease; }
+  @keyframes msgIn { from { opacity: 0; transform: translateY(6px) } }
+  .agent-msg.user { align-self: flex-end;
+    background: rgba(34,211,238,.12); border: 1px solid rgba(34,211,238,.3); }
+  .agent-msg.bot { align-self: flex-start;
+    background: var(--panel-hi); border: 1px solid var(--border); }
+  .agent-msg.step { align-self: flex-start; font-family: var(--mono);
+    font-size: 10.5px; color: var(--ink-faint); padding: 3px 10px;
+    background: transparent; border: 1px dashed var(--border); }
+  .agent-msg table { font-size: 11px; margin-top: 6px; border-collapse: collapse; }
+  .agent-msg th, .agent-msg td { padding: 3px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+  .agent-msg .csv-link { display: inline-block; margin-top: 6px; font-size: 12px; }
+
+  .agent-input-row { display: flex; gap: 8px; padding: 12px 14px;
+    border-top: 1px solid var(--border); }
+  .agent-input-row input { flex: 1; background: var(--panel);
+    border: 1px solid var(--border-bright); border-radius: 10px;
+    color: var(--ink); padding: 9px 12px; font-size: 13px; outline: none; }
+  .agent-input-row input:focus { border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow); }
+
+  .agent-nav-banner { position: fixed; top: 66px; left: 50%;
+    transform: translateX(-50%); z-index: 95;
+    background: rgba(10,14,24,.97); border: 1px solid var(--accent);
+    color: var(--ink); border-radius: 999px; padding: 9px 20px;
+    font-family: var(--mono); font-size: 12px;
+    box-shadow: 0 0 34px rgba(34,211,238,.35);
+    animation: agentIn .25s ease; }
+  .agent-thinking { display: inline-block; }
+  .agent-thinking span { display: inline-block; width: 5px; height: 5px;
+    margin-right: 3px; border-radius: 50%; background: var(--accent);
+    animation: thinkDot 1.2s ease-in-out infinite; }
+  .agent-thinking span:nth-child(2) { animation-delay: .18s }
+  .agent-thinking span:nth-child(3) { animation-delay: .36s }
+  @keyframes thinkDot { 40% { transform: translateY(-5px); opacity: .5 } }
+</style>
+
+<button class="agent-orb" id="agent-orb" title="Operations agent" onclick="agentToggle()">◉</button>
+
+<div class="agent-panel" id="agent-panel">
+  <div class="agent-head">
+    <span style="font-size:16px;color:var(--accent)">◉</span>
+    <b>Operations Agent</b>
+    <span class="status" id="agent-status">checking&hellip;</span>
+    <button class="icon-btn" onclick="agentToggle()" title="Close">&times;</button>
+  </div>
+  <div class="agent-log" id="agent-log"></div>
+  <div class="agent-input-row">
+    <input id="agent-input" type="text" autocomplete="off"
+           placeholder="Ask, task, or 'take me to…' — BQ · MySQL · engine"
+           onkeydown="if(event.key==='Enter') agentSend()">
+    <button class="btn" id="agent-run" onclick="agentSend()">Run</button>
+    <button class="btn" id="agent-cancel" onclick="agentCancel()"
+            style="display:none;border-color:var(--neg);color:var(--neg)">Cancel</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  const LOGKEY = 'zfx-agent-log', HISTKEY = 'zfx-agent-history';
+
+  window.agentToggle = function () {
+    const panel = document.getElementById('agent-panel');
+    panel.classList.toggle('on');
+    if (panel.classList.contains('on')) {
+      restoreLog();
+      agentHealth();
+      document.getElementById('agent-input').focus();
+    }
+  };
+
+  function log() { return document.getElementById('agent-log'); }
+  function saveLog() {
+    try { sessionStorage.setItem(LOGKEY, log().innerHTML.slice(-80000)); } catch (e) {}
+  }
+  function restoreLog() {
+    try {
+      const html = sessionStorage.getItem(LOGKEY);
+      if (html && !log().dataset.restored) {
+        log().innerHTML = html; log().dataset.restored = '1';
+        log().scrollTop = log().scrollHeight;
+      }
+    } catch (e) {}
+    if (!log().children.length)
+      addMsg('bot', 'Ready. I can query BigQuery snapshots, live MySQL, the ' +
+        'engine, export CSVs, and drive the app (“take me to antifraud”).');
+  }
+  function addMsg(kind, html) {
+    const el = document.createElement('div');
+    el.className = 'agent-msg ' + kind;
+    el.innerHTML = html;
+    log().appendChild(el);
+    log().scrollTop = log().scrollHeight;
+    saveLog();
+    return el;
+  }
+  const esc = t => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+  async function agentHealth() {
+    try {
+      const j = await (await fetch('/api/agent/health')).json();
+      const el = document.getElementById('agent-status');
+      if (j.configured && j.needs_workspace && j.can_configure) {
+        el.textContent = 'needs workspace id'; el.className = 'status';
+        if (!log().dataset.wsprompt) {
+          log().dataset.wsprompt = '1';
+          addMsg('bot', 'Key stored, but it is an <b>identity-linked</b> key that ' +
+            'needs a workspace ID. Send: <b>key &lt;your-key&gt;|&lt;workspace-id&gt;</b> ' +
+            '(find the id at console.anthropic.com/settings/workspaces). Or just send ' +
+            '<b>ws &lt;workspace-id&gt;</b> to add it to the stored key.');
+        }
+      }
+      else if (j.configured) { el.textContent = 'LLM ' + (j.model || 'ready'); el.className = 'status ok'; }
+      else if (j.can_configure) {
+        el.textContent = 'no key -- paste one below';
+        el.className = 'status';
+        if (!log().dataset.keyprompt) {
+          log().dataset.keyprompt = '1';
+          addMsg('bot', 'No LLM key configured. Paste an Anthropic API key in the ' +
+            'input as: <b>key sk-ant-…</b> (add <b>|workspace-id</b> for identity-linked ' +
+            'keys; stored locally, never shown again). ' +
+            'Until then I answer with the deterministic assistant.');
+        }
+      }
+      else {
+        el.textContent = 'assistant'; el.className = 'status';
+      }
+    } catch (e) {}
+  }
+
+  function agentReset() {
+    document.getElementById('agent-cancel').style.display = 'none';
+    document.getElementById('agent-run').style.display = '';
+    window._agentAbort = null;
+  }
+  window.agentCancel = function () {
+    // stop the server loop, then abort the wait
+    if (window._agentRid) {
+      const f = new FormData(); f.append('request_id', window._agentRid);
+      fetch('/api/agent/cancel', {method: 'POST', body: f}).catch(() => {});
+    }
+    if (window._agentAbort) { try { window._agentAbort.abort(); } catch (e) {} }
+  };
+
+  window.agentSend = async function () {
+    const input = document.getElementById('agent-input');
+    const question = input.value.trim();
+    if (!question) return;
+    input.value = '';
+
+    if (/^key\s+\S+/.test(question)) {           // key sk-ant-...  (|wsid optional)
+      const key = question.replace(/^key\s+/, '');
+      const form = new FormData(); form.append('key', key);
+      const j = await (await fetch('/api/agent/key', {method: 'POST', body: form})).json();
+      addMsg('bot', j.needs_workspace
+        ? 'Key saved -- now send <b>ws &lt;workspace-id&gt;</b> to finish (identity-linked key).'
+        : (j.configured ? 'Key saved -- full agent enabled.' : 'Key not accepted.'));
+      agentHealth();
+      return;
+    }
+    if (/^ws\s+\S+/.test(question)) {            // ws <workspace-id>
+      const ws = question.replace(/^ws\s+/, '').trim();
+      const form = new FormData(); form.append('workspace', ws);
+      const j = await (await fetch('/api/agent/workspace', {method: 'POST', body: form})).json();
+      addMsg('bot', j.workspace_set ? 'Workspace set -- full agent enabled.' : 'Not accepted.');
+      agentHealth();
+      return;
+    }
+
+    addMsg('user', esc(question));
+    const thinking = addMsg('bot',
+      '<span class="agent-thinking"><span></span><span></span><span></span></span>');
+    let history = [];
+    try { history = JSON.parse(sessionStorage.getItem(HISTKEY) || '[]'); } catch (e) {}
+
+    const rid = 'r' + Date.now() + Math.random().toString(36).slice(2, 8);
+    window._agentRid = rid;
+    window._agentAbort = new AbortController();
+    document.getElementById('agent-cancel').style.display = '';
+    document.getElementById('agent-run').style.display = 'none';
+
+    const form = new FormData();
+    form.append('question', question);
+    form.append('history', JSON.stringify(history));
+    form.append('request_id', rid);
+    let j;
+    try {
+      j = await (await fetch('/api/agent', {method: 'POST', body: form,
+                             signal: window._agentAbort.signal})).json();
+    }
+    catch (e) {
+      thinking.remove();
+      addMsg('bot', e.name === 'AbortError' ? '⏹ Cancelled.' : 'network error');
+      agentReset();
+      return;
+    }
+    agentReset();
+    thinking.remove();
+    (j.steps || []).forEach(s => addMsg('step', '⚙ ' + esc(s)));
+    let html = esc(j.text || '');
+    if (j.table && j.table.length && j.columns) {
+      html += '<div style="overflow-x:auto"><table><thead><tr>'
+        + j.columns.map(c => '<th>' + esc(c) + '</th>').join('') + '</tr></thead><tbody>'
+        + j.table.slice(0, 25).map(r => '<tr>' + j.columns.map(c =>
+            '<td>' + esc(r[c]) + '</td>').join('') + '</tr>').join('')
+        + '</tbody></table></div>';
+      if (j.table.length > 25) html += `<small>(${j.table.length} rows total)</small>`;
+    }
+    if (j.csv_url) html += `<a class="csv-link" href="${j.csv_url}">⬇ download CSV</a>`;
+    addMsg('bot', html);
+    try { sessionStorage.setItem(HISTKEY, JSON.stringify(j.history || [])); } catch (e) {}
+
+    if (j.navigate) {
+      const banner = document.createElement('div');
+      banner.className = 'agent-nav-banner';
+      banner.textContent = '◉ autopilot → ' + j.navigate;
+      document.body.appendChild(banner);
+      saveLog();
+      setTimeout(() => { window.location.href = j.navigate; }, 900);
+    }
+  };
+})();
+</script>

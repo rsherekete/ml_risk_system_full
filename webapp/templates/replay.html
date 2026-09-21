@@ -1,0 +1,502 @@
+{% extends "base.html" %}
+{% block title %}Replay — Biggest &amp; Suspicious Wins{% endblock %}
+{% block content %}
+<style>
+  .rp-head { margin-bottom: 16px; }
+  .rp-head h1 { font-size: 22px; letter-spacing: .01em; margin: 0 0 4px; }
+  .rp-lead { color: var(--accent); font-size: 13px; margin: 0 0 2px;
+    font-family: var(--mono); letter-spacing: .02em; }
+  .rp-sub { color: var(--ink-faint); font-size: 12px; margin: 0; }
+
+  .rp-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    margin: 14px 0 18px; }
+  .rp-seg { display: inline-flex; border: 1px solid var(--border);
+    border-radius: 999px; overflow: hidden; background: rgba(13,18,32,.7); }
+  .rp-seg button { font-family: var(--mono); font-size: 12px; color: var(--ink-dim);
+    background: transparent; border: none; padding: 8px 16px; cursor: pointer;
+    transition: background .2s, color .2s; }
+  .rp-seg button.on { background: linear-gradient(135deg, rgba(34,211,238,.2),
+    rgba(124,140,255,.16)); color: var(--ink); }
+  .rp-select { font-family: var(--mono); font-size: 12px; color: var(--ink);
+    background: rgba(13,18,32,.7); border: 1px solid var(--border);
+    border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+  .rp-refresh { margin-left: auto; display: flex; align-items: center; gap: 10px;
+    color: var(--ink-faint); font-family: var(--mono); font-size: 11px; }
+  .rp-refresh .btn-refresh { cursor: pointer; color: var(--ink-dim);
+    border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px;
+    background: rgba(13,18,32,.7); }
+  .rp-refresh .btn-refresh:hover { border-color: var(--accent); color: var(--ink); }
+
+  .rp-grid { display: grid; gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .rp-card { background: rgba(13,18,32,.82); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+    transition: border-color .2s, box-shadow .2s, transform .2s;
+    animation: rpIn .4s ease both; }
+  @keyframes rpIn { from { opacity: 0; transform: translateY(10px) } }
+  .rp-card:hover { border-color: var(--border-bright);
+    box-shadow: 0 10px 34px rgba(0,0,0,.35); }
+  .rp-card.open { border-color: var(--accent);
+    box-shadow: 0 0 30px rgba(34,211,238,.18); grid-column: 1 / -1; }
+  .rp-card-top { display: flex; align-items: flex-start; gap: 10px; padding: 14px; }
+  .rp-sym { font-family: var(--mono); font-weight: 600; font-size: 13px;
+    padding: 5px 9px; border-radius: 8px; color: var(--ink);
+    background: rgba(34,211,238,.12); border: 1px solid var(--border-bright);
+    white-space: nowrap; }
+  .rp-sym .rp-side { font-size: 10px; color: var(--ink-faint); }
+  .rp-mid { flex: 1; min-width: 0; }
+  .rp-pnl { font-size: 20px; font-weight: 700; font-family: var(--mono);
+    color: var(--pos); line-height: 1.1; }
+  .rp-pnl small { font-size: 11px; color: var(--ink-faint); font-weight: 400; }
+  .rp-acct { display: block; font-family: var(--mono); font-size: 11px;
+    color: var(--ink-dim); text-decoration: none; margin-top: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rp-acct:hover { color: var(--accent); }
+  .rp-facts { display: flex; gap: 12px; margin-top: 6px; flex-wrap: wrap; }
+  .rp-facts span { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
+  .rp-facts b { color: var(--ink-dim); font-weight: 500; }
+  .rp-susp { font-family: var(--mono); font-size: 10px; color: #ffb020;
+    border: 1px solid rgba(255,176,32,.4); border-radius: 6px; padding: 2px 6px; }
+  .rp-play-btn { align-self: center; font-family: var(--mono); font-size: 12px;
+    cursor: pointer; color: var(--ink); background: rgba(34,211,238,.14);
+    border: 1px solid var(--border-bright); border-radius: 8px; padding: 7px 12px;
+    white-space: nowrap; transition: background .2s; }
+  .rp-play-btn:hover { background: rgba(34,211,238,.26); }
+
+  .rp-detail { border-top: 1px solid var(--border); padding: 0; display: none; }
+  .rp-card.open .rp-detail { display: block; }
+  .rp-detail-inner { display: grid; grid-template-columns: 2fr 1fr; gap: 14px;
+    padding: 14px; }
+  @media (max-width: 760px) { .rp-detail-inner { grid-template-columns: 1fr } }
+  .rp-chart { width: 100%; height: 320px; }
+  .rp-transport { display: flex; align-items: center; gap: 8px; margin-top: 8px;
+    flex-wrap: wrap; }
+  .rp-transport button { font-family: var(--mono); font-size: 12px; cursor: pointer;
+    color: var(--ink); background: rgba(13,18,32,.9); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px; }
+  .rp-transport button:hover { border-color: var(--accent); }
+  .rp-transport .rp-scrub { color: var(--ink-faint); font-size: 11px;
+    margin-left: auto; font-family: var(--mono); }
+  .rp-speed { display: inline-flex; border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; }
+  .rp-speed button { border: none; border-radius: 0; padding: 6px 9px; }
+  .rp-speed button.on { background: rgba(34,211,238,.2); color: var(--ink); }
+
+  .rp-snap { font-family: var(--mono); }
+  .rp-snap h3 { font-size: 12px; color: var(--ink-faint); text-transform: uppercase;
+    letter-spacing: .12em; margin: 0 0 8px; }
+  .rp-snap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    margin-bottom: 12px; }
+  .rp-snap-cell { background: rgba(8,12,22,.7); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; }
+  .rp-snap-cell .k { font-size: 10px; color: var(--ink-faint); }
+  .rp-snap-cell .v { font-size: 14px; color: var(--ink); }
+  .rp-exp { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .rp-exp th { text-align: right; color: var(--ink-faint); font-weight: 500;
+    padding: 4px 6px; border-bottom: 1px solid var(--border); }
+  .rp-exp th:first-child { text-align: left; }
+  .rp-exp td { text-align: right; padding: 4px 6px; color: var(--ink-dim);
+    border-bottom: 1px solid rgba(27,36,56,.5); }
+  .rp-exp td:first-child { text-align: left; color: var(--ink); }
+  .rp-exp td.pos { color: var(--pos); } .rp-exp td.neg { color: var(--neg); }
+
+  .rp-empty { text-align: center; color: var(--ink-faint); padding: 60px 0;
+    font-family: var(--mono); font-size: 13px; }
+  .rp-flash { animation: rpFlash 1s ease; }
+  @keyframes rpFlash { 0% { box-shadow: 0 0 0 2px var(--accent) inset } }
+</style>
+
+<div class="rp-head">
+  <p class="rp-lead">// surveillance replay wall</p>
+  <h1>Replay the biggest &amp; most suspicious client wins</h1>
+  <p class="rp-sub">A client win is a firm loss. These are the round-trips worth
+    watching back frame-by-frame — every card plays the entry and exit over real
+    tick bars, with the account's live balance, equity and net exposure alongside.
+    New content rolls in every 5 minutes.</p>
+</div>
+
+<div class="rp-controls">
+  <div class="rp-seg" id="rp-mode">
+    <button data-mode="wins" class="on">💰 Biggest wins</button>
+    <button data-mode="suspicious">⚠ Suspicious</button>
+  </div>
+  <select class="rp-select" id="rp-window">
+    <option value="60">Last 1 hour</option>
+    <option value="240">Last 4 hours</option>
+    <option value="720" selected>Last 12 hours</option>
+    <option value="1440">Last 24 hours</option>
+    <option value="4320">Last 3 days</option>
+    <option value="10080">Last 7 days</option>
+  </select>
+  <div class="rp-refresh">
+    <span id="rp-status">loading…</span>
+    <span class="btn-refresh" id="rp-manual">↻ refresh</span>
+  </div>
+</div>
+
+<div class="rp-grid" id="rp-grid"></div>
+<div class="rp-empty" id="rp-empty" hidden>No closed trades in this window yet.</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const grid = document.getElementById('rp-grid');
+  const empty = document.getElementById('rp-empty');
+  const status = document.getElementById('rp-status');
+  let mode = 'wins', minutes = 720, timer = null, countdown = null;
+  const players = {};                        // card id -> playback state
+
+  function fmtUsd(v) {
+    const a = Math.abs(v);
+    if (a >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
+    if (a >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'k';
+    return '$' + Math.round(v);
+  }
+  function fmtDur(m) {
+    if (m == null) return '—';
+    if (m < 60) return m.toFixed(0) + 'm';
+    if (m < 1440) return (m / 60).toFixed(1) + 'h';
+    return (m / 1440).toFixed(1) + 'd';
+  }
+  function nearest(times, target) {
+    if (!target || !times.length) return times[0] || '';
+    let best = times[0], bestD = Infinity;
+    const t = Date.parse(target.replace(' ', 'T'));
+    times.forEach(x => { const d = Math.abs(Date.parse(x.replace(' ', 'T')) - t);
+      if (d < bestD) { bestD = d; best = x; } });
+    return best;
+  }
+
+  async function load(flash) {
+    status.textContent = 'loading…';
+    try {
+      const r = await fetch(`/api/replay/board?mode=${mode}&minutes=${minutes}&limit=30`);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if (j.error) {                         // server reached but errored
+        status.textContent = 'error: ' + j.error;
+        empty.hidden = false;
+        empty.textContent = 'Could not load replays: ' + j.error;
+        return;
+      }
+      render(j.cards || [], flash);
+      const when = new Date().toLocaleTimeString();
+      status.textContent = (j.cards || []).length + ' shown · updated ' + when;
+      startCountdown();
+    } catch (e) {
+      status.textContent = 'load failed — is the server up?';
+      empty.hidden = false;
+      empty.textContent = 'Could not reach the replay service (' + e.message
+        + '). If the server was just restarted, wait a moment and press ↻ refresh.';
+    }
+  }
+  // TRADE ZOOM: arriving with ?ticket=NNN opens that one trade directly.
+  async function openTicket(tk) {
+    status.textContent = 'resolving ticket ' + tk + '…';
+    try {
+      const j = await (await fetch('/api/replay/by_ticket?ticket='
+        + encodeURIComponent(tk))).json();
+      if (j.error || !j.card) { status.textContent = 'ticket: ' + (j.error || 'not found'); return; }
+      render([j.card], true);               // show just this trade
+      status.textContent = 'trade zoom — ticket ' + tk;
+      const btn = grid.querySelector('.rp-card .rp-play-btn');
+      if (btn) btn.click();                 // auto-expand into the replay
+    } catch (e) { status.textContent = 'ticket lookup failed'; }
+  }
+
+  function render(cards, flash) {
+    // preserve any open card so a refresh doesn't collapse what you're watching
+    const openId = document.querySelector('.rp-card.open')?.dataset.id;
+    grid.innerHTML = '';
+    empty.hidden = cards.length > 0;
+    cards.forEach((c, i) => {
+      const id = c.account_key + '|' + c.symbol + '|' + (c.close_time || i);
+      const card = document.createElement('div');
+      card.className = 'rp-card';
+      card.dataset.id = id;
+      card.dataset.card = JSON.stringify(c);
+      const susp = (c.score != null)
+        ? `<span class="rp-susp" title="toxic-shape score">score ${c.score.toFixed(2)}</span>` : '';
+      card.innerHTML = `
+        <div class="rp-card-top">
+          <div class="rp-sym">${c.symbol}<br><span class="rp-side">${c.side.toUpperCase()}</span></div>
+          <div class="rp-mid">
+            <div class="rp-pnl">+$${Math.round(c.pnl).toLocaleString()} <small>client win</small></div>
+            <a class="rp-acct" href="/trading/account?account=${encodeURIComponent(c.account_key)}"
+               title="Open account detail">${c.account_key} ↗</a>
+            <div class="rp-facts">
+              <span><b>${c.lots}</b> lots</span>
+              <span><b>${fmtUsd(c.usd)}</b> notional</span>
+              <span><b>${fmtDur(c.duration_min)}</b> held</span>
+              ${susp}
+            </div>
+          </div>
+          <button class="rp-play-btn">► Replay</button>
+        </div>
+        <div class="rp-detail"><div class="rp-detail-inner">
+          <div>
+            <div class="rp-chart"></div>
+            <div class="rp-transport">
+              <button class="rp-tp-play">▶ Play</button>
+              <button class="rp-tp-restart">⟲</button>
+              <span class="rp-speed">
+                <button data-s="0.5">0.5×</button>
+                <button data-s="1" class="on">1×</button>
+                <button data-s="2">2×</button>
+                <button data-s="4">4×</button>
+              </span>
+              <span class="rp-scrub">—</span>
+            </div>
+          </div>
+          <div class="rp-snap"><h3>Live account</h3>
+            <div class="rp-snap-body">loading…</div></div>
+        </div></div>`;
+      card.querySelector('.rp-play-btn').addEventListener('click', () => toggle(card, c));
+      grid.appendChild(card);
+      if (id === openId) { card.classList.add('open'); openDetail(card, c); }
+    });
+    if (flash) grid.querySelectorAll('.rp-card').forEach(el => {
+      el.classList.add('rp-flash'); setTimeout(() => el.classList.remove('rp-flash'), 1000);
+    });
+  }
+
+  function toggle(card, c) {
+    const isOpen = card.classList.contains('open');
+    if (isOpen) { card.classList.remove('open'); return; }
+    card.classList.add('open');
+    openDetail(card, c);
+  }
+
+  async function openDetail(card, c) {
+    loadSnapshot(card, c.account_key);
+    loadChart(card, c);
+  }
+
+  async function loadSnapshot(card, account) {
+    const body = card.querySelector('.rp-snap-body');
+    try {
+      const r = await fetch('/api/replay/snapshot?account=' + encodeURIComponent(account));
+      const s = await r.json();
+      const cell = (k, v) => `<div class="rp-snap-cell"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+      const money = v => (v == null ? '—' : '$' + Number(v).toLocaleString(undefined, {maximumFractionDigits: 0}));
+      let rows = '';
+      (s.exposure || []).forEach(e => {
+        const cls = e.usd >= 0 ? 'pos' : 'neg';
+        rows += `<tr><td>${e.symbol}</td><td>${e.lots.toFixed(2)}</td>
+          <td class="${cls}">${fmtUsd(e.usd)}</td>
+          <td class="${e.floating >= 0 ? 'pos' : 'neg'}">${money(e.floating)}</td></tr>`;
+      });
+      body.innerHTML = `
+        <div class="rp-snap-grid">
+          ${cell('Balance', money(s.balance))}
+          ${cell('Equity', money(s.equity))}
+          ${cell('Floating P&L', money(s.floating))}
+          ${cell('Open positions', s.open_positions ?? 0)}
+        </div>
+        ${rows ? `<h3>Net exposure (canonical)</h3>
+        <table class="rp-exp"><thead><tr><th>Symbol</th><th>Lots</th><th>USD</th><th>Float</th></tr></thead>
+        <tbody>${rows}</tbody></table>` : '<p style="color:var(--ink-faint);font-size:11px">No open positions right now.</p>'}`;
+    } catch (e) {
+      body.innerHTML = '<p style="color:var(--ink-faint);font-size:11px">snapshot unavailable</p>';
+    }
+  }
+
+  async function loadChart(card, c) {
+    const host = card.querySelector('.rp-chart');
+    const scrub = card.querySelector('.rp-scrub');
+    scrub.textContent = 'loading bars…';
+    try {
+      const qs = `account=${encodeURIComponent(c.account_key)}`
+        + `&symbol=${encodeURIComponent(c.symbol_raw || c.symbol)}`
+        + `&open=${encodeURIComponent(c.open_time || '')}`
+        + `&close=${encodeURIComponent(c.close_time || '')}`;
+      const r = await fetch('/api/replay/chart?' + qs);
+      const d = await r.json();
+      if (!d.bars || !d.bars.length) { scrub.textContent = d.note || 'no tick bars stored'; return; }
+      setupPlayer(card, d, c);
+      if (d.note) {
+        let cap = card.querySelector('.rp-note');
+        if (!cap) { cap = document.createElement('div'); cap.className = 'rp-note';
+          cap.style.cssText = 'color:#ffb020;font-size:10px;font-family:var(--mono);margin-top:4px';
+          card.querySelector('.rp-transport').after(cap); }
+        cap.textContent = '⚠ ' + d.note;
+      }
+    } catch (e) { scrub.textContent = 'chart unavailable'; }
+  }
+
+  // ---- tick playback: a playhead sweeps the candles, flags reveal as it passes
+  function setupPlayer(card, d, c) {
+    const host = card.querySelector('.rp-chart');
+    const id = card.dataset.id;
+    if (players[id]) { clearInterval(players[id].tick); }
+    const times = d.bars.map(b => b.time);
+    const ohlc = d.bars.map(b => [b.open, b.close, b.low, b.high]);
+    // Build the two flags from the card itself; snap each to the nearest bar
+    // the endpoint returned (its `trades` carry the snapped times).
+    const snap = {};
+    (d.trades || []).forEach(t => { snap[t.kind] = times.indexOf(t.time); });
+    const flags = [
+      { idx: snap.entry ?? times.indexOf(nearest(times, c.open_time)),
+        price: c.open_price, kind: 'entry', side: c.side },
+      { idx: snap.exit ?? times.indexOf(nearest(times, c.close_time)),
+        price: c.close_price, kind: 'exit', side: c.side, pnl: c.pnl }
+    ].filter(f => f.idx >= 0);
+    const chart = echarts.init(host, null, { renderer: 'canvas' });
+    const st = { chart, times, ohlc, flags, i: times.length - 1, speed: 1, tick: null,
+                 playing: false, card, chartSymbol: c.symbol, events: null,
+                 windowStart: (times[0] || ''), balance: c.balance ?? null };
+    players[id] = st;
+    // The client's deals through this window -> animate their Live Account as the
+    // playhead moves, so you watch how they built/managed and closed the position.
+    const eqs = `account=${encodeURIComponent(c.account_key)}`
+      + `&start=${encodeURIComponent(times[0] || '')}&end=${encodeURIComponent(times[times.length-1] || '')}`;
+    fetch('/api/replay/account_events?' + eqs).then(r => r.json()).then(j => {
+      st.events = j.events || [];
+      if (j.balance != null) st.balance = j.balance;
+      draw(st, st.i);                        // redraw so the panel reflects the end
+    }).catch(() => { st.events = []; });
+    draw(st, st.i);                          // start fully revealed (static view)
+
+    const playBtn = card.querySelector('.rp-tp-play');
+    const scrub = card.querySelector('.rp-scrub');
+    playBtn.onclick = () => st.playing ? pause(st, playBtn) : play(st, playBtn, scrub);
+    card.querySelector('.rp-tp-restart').onclick = () => { st.i = 0; draw(st, 0); updateScrub(st, scrub); };
+    card.querySelectorAll('.rp-speed button').forEach(b => b.onclick = () => {
+      card.querySelectorAll('.rp-speed button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on'); st.speed = parseFloat(b.dataset.s);
+      if (st.playing) { pause(st, playBtn); play(st, playBtn, scrub); }
+    });
+    updateScrub(st, scrub);
+  }
+
+  function play(st, btn, scrub) {
+    st.playing = true; btn.textContent = '❚❚ Pause';
+    if (st.i >= st.times.length - 1) st.i = 0;
+    const stepMs = Math.max(24, 90 / st.speed);
+    st.tick = setInterval(() => {
+      st.i++;
+      if (st.i >= st.times.length - 1) { st.i = st.times.length - 1; draw(st, st.i); updateScrub(st, scrub); pause(st, btn); return; }
+      draw(st, st.i); updateScrub(st, scrub);
+    }, stepMs);
+  }
+  function pause(st, btn) { st.playing = false; btn.textContent = '▶ Play'; if (st.tick) clearInterval(st.tick); }
+  function updateScrub(st, scrub) {
+    scrub.textContent = (st.times[st.i] || '') + '  ·  ' + (st.i + 1) + '/' + st.times.length;
+  }
+
+  function draw(st, upto) {
+    const shownFlags = st.flags.filter(f => f.idx <= upto).map(f => ({
+      value: f.price, xAxis: st.times[f.idx], yAxis: f.price,
+      symbol: f.kind === 'entry' ? (f.side === 'buy' ? 'triangle' : 'pin') : 'diamond',
+      symbolSize: f.kind === 'entry' ? 15 : 13,
+      symbolRotate: (f.kind === 'entry' && f.side === 'sell') ? 180 : 0,
+      itemStyle: { color: f.kind === 'entry' ? (f.side === 'buy' ? '#2ee6a8' : '#ffb020') : '#ff4d6d' },
+      label: { show: true, position: f.kind === 'entry' ? 'bottom' : 'top',
+               formatter: f.kind === 'entry' ? (f.side === 'buy' ? 'BUY' : 'SELL') : 'CLOSE',
+               color: '#e6edf7', fontSize: 9, fontFamily: 'JetBrains Mono' } }));
+    st.chart.setOption({
+      backgroundColor: 'transparent', animation: false,
+      grid: { left: 56, right: 16, top: 16, bottom: 28 },
+      tooltip: Object.assign({ trigger: 'axis' }, zfxTheme.tooltip),
+      xAxis: Object.assign({ type: 'category', data: st.times, boundaryGap: true,
+        axisLabel: { color: '#55637d', fontSize: 9, fontFamily: 'JetBrains Mono',
+          formatter: v => (v || '').slice(11) } }, {}),
+      yAxis: Object.assign({ type: 'value', scale: true }, zfxTheme.axis),
+      series: [{
+        type: 'candlestick', data: st.ohlc,
+        itemStyle: { color: '#2ee6a8', color0: '#ff4d6d',
+                     borderColor: '#2ee6a8', borderColor0: '#ff4d6d' },
+        markLine: {
+          symbol: 'none', silent: true,
+          lineStyle: { color: '#22d3ee', width: 1.4, type: 'solid' },
+          label: { show: false },
+          data: [{ xAxis: st.times[upto] }] },
+        markPoint: { data: shownFlags, silent: true }
+      }]
+    }, true);
+    updateAccountAsOf(st, upto);            // animate the client's Live Account
+  }
+
+  // Reconstruct the client's account state as of the playhead bar, from their
+  // deals in the window. Pausing simply stops draw() being called, so the panel
+  // stays frozen at that instant -- exactly the "freeze the values" behaviour.
+  function reconstructAsOf(st, upto) {
+    const T = st.times[upto] || '';                       // "YYYY-MM-DD HH:MM"
+    const barClose = (st.ohlc[upto] || [])[1];            // chart symbol price now
+    const open = {};                                      // key -> aggregated position
+    let realized = 0;
+    (st.events || []).forEach(e => {
+      if ((e.time || '').slice(0, 16) > T) return;        // event after playhead
+      const key = e.position_id || (e.symbol + '|' + e.direction);
+      if (e.kind === 'in') {
+        open[key] = open[key] || { lots: 0, entry: e.price, symbol: e.symbol,
+                                   direction: e.direction, contract: e.contract };
+        open[key].lots += e.lots;
+      } else {
+        if ((e.time || '') >= (st.windowStart || '')) realized += e.profit || 0;
+        if (open[key]) { open[key].lots -= e.lots; if (open[key].lots <= 1e-6) delete open[key]; }
+      }
+    });
+    let netLots = 0, netUsd = 0, floating = 0, count = 0;
+    Object.values(open).forEach(p => {
+      const signed = p.lots * p.direction;
+      netLots += signed; count++;
+      const px = (p.symbol === st.chartSymbol && barClose) ? barClose : p.entry;
+      netUsd += signed * p.contract * px;
+      if (p.symbol === st.chartSymbol && barClose)
+        floating += (barClose - p.entry) * signed * p.contract;
+    });
+    const equity = (st.balance != null) ? (st.balance + floating) : null;
+    return { asof: T, realized, floating, netLots, netUsd, count, equity, balance: st.balance };
+  }
+
+  function updateAccountAsOf(st, upto) {
+    const body = st.card && st.card.querySelector('.rp-snap-body');
+    if (!body || !st.events || !st.events.length) return;
+    const a = reconstructAsOf(st, upto);
+    const m = v => (v == null ? '—' : (v < 0 ? '-$' : '$') + Math.abs(Math.round(v)).toLocaleString());
+    const cell = (k, v, cls) => `<div class="rp-snap-cell"><div class="k">${k}</div>`
+      + `<div class="v ${cls || ''}">${v}</div></div>`;
+    body.innerHTML =
+      `<div style="font-family:var(--mono);font-size:10px;color:var(--accent);margin-bottom:6px">`
+      + `▶ as of ${a.asof}${st.playing ? '' : '  (paused)'}</div>`
+      + `<div class="rp-snap-grid">`
+      + cell('Balance', m(a.balance))
+      + cell('Equity', m(a.equity))
+      + cell('Realized (window)', m(a.realized), a.realized >= 0 ? 'pos' : 'neg')
+      + cell('Floating', m(a.floating), a.floating >= 0 ? 'pos' : 'neg')
+      + cell('Open positions', a.count)
+      + cell('Net exposure', a.netLots.toFixed(2) + ' lots')
+      + `</div>`
+      + `<div style="font-family:var(--mono);font-size:11px;color:var(--ink-faint)">`
+      + `net notional ${a.netUsd >= 0 ? '' : '-'}$${Math.abs(Math.round(a.netUsd)).toLocaleString()} `
+      + `(${a.netLots >= 0 ? 'net long' : 'net short'})</div>`;
+  }
+
+  function startCountdown() {
+    if (countdown) clearInterval(countdown);
+    let left = 300;
+    countdown = setInterval(() => {
+      left--; if (left <= 0) { clearInterval(countdown); return; }
+    }, 1000);
+  }
+
+  // controls
+  document.getElementById('rp-mode').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    document.querySelectorAll('#rp-mode button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on'); mode = b.dataset.mode; load(false);
+  });
+  document.getElementById('rp-window').addEventListener('change', e => {
+    minutes = parseInt(e.target.value, 10); load(false);
+  });
+  document.getElementById('rp-manual').addEventListener('click', () => load(true));
+
+  // deep-link: /replay?ticket=NNN opens that trade in zoom; else the wall
+  const _tk = new URLSearchParams(location.search).get('ticket');
+  if (_tk) { openTicket(_tk); }
+  else { load(false); timer = setInterval(() => load(true), 300000); }
+})();
+</script>
+{% endblock %}

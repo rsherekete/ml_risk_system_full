@@ -1,0 +1,15 @@
+﻿{% extends "base.html" %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card" style="text-align:center">
+    <h1>No access</h1>
+    <p class="sub">
+      {% if denied_view %}Your account does not have permission for the
+      <b>{{ denied_view|capitalize }}</b> area.{% else %}
+      Your account has no views enabled yet.{% endif %}
+    </p>
+    <p style="font-size:13px;color:var(--ink-dim)">An administrator can grant this from the admin console.</p>
+    <a href="/logout" class="btn">Sign out</a>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Latency Arbitrage Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+  :root{
+    --ground:#f6f7f9; --surface:#ffffff; --sunk:#eef1f5;
+    --ink:#111722; --ink-2:#394254; --muted:#5c6779; --line:#dfe4ec;
+    --accent:#2c4a76; --accent-soft:#e6ecf5;
+    --warn:#a35a09; --warn-soft:#fbf0e2; --crit:#a32118; --ok:#1c6b48;
+    --sans:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+    --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0d121c; --surface:#151c29; --sunk:#111826;
+      --ink:#e7ecf4; --ink-2:#c3ccdb; --muted:#93a0b5; --line:#263145;
+      --accent:#7ba6dd; --accent-soft:#1b2740;
+      --warn:#d9922b; --warn-soft:#2a2313; --crit:#e2776d; --ok:#4cc38a;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0d121c; --surface:#151c29; --sunk:#111826;
+    --ink:#e7ecf4; --ink-2:#c3ccdb; --muted:#93a0b5; --line:#263145;
+    --accent:#7ba6dd; --accent-soft:#1b2740;
+    --warn:#d9922b; --warn-soft:#2a2313; --crit:#e2776d; --ok:#4cc38a;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground); color:var(--ink); font-family:var(--serif);
+    font-size:17px; line-height:1.62; margin:0; padding-block:40px 64px; padding-left:20px; padding-right:20px;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:74ch; margin:0 auto; display:flex; flex-direction:column; gap:34px}
+  h1,h2,h3,.eyebrow,.tag,.num,table,.chip{font-family:var(--sans)}
+  h1{font-size:clamp(28px,4.6vw,40px); line-height:1.12; margin:0; font-weight:600; letter-spacing:-.015em; text-wrap:balance}
+  h2{font-size:21px; font-weight:600; margin:0 0 4px; letter-spacing:-.01em; text-wrap:balance}
+  h3{font-size:15px; font-weight:600; margin:0 0 2px}
+  p{margin:0 0 14px} p:last-child{margin-bottom:0}
+  .eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin-bottom:10px}
+  header{border-bottom:2px solid var(--ink); padding-bottom:22px}
+  header .sub{color:var(--muted); font-size:15px; margin-top:10px}
+  header .meta{font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-top:14px; display:flex; flex-wrap:wrap; gap:6px 18px}
+  section{display:flex; flex-direction:column}
+  .lede{font-size:18.5px; color:var(--ink-2)}
+  .note{background:var(--sunk); border-left:3px solid var(--accent); padding:14px 16px; font-size:15.5px; color:var(--ink-2)}
+  .note strong{color:var(--ink)}
+  .caution{background:var(--warn-soft); border-left:3px solid var(--warn)}
+  .scroll{overflow-x:auto; margin-top:14px}
+  table{border-collapse:collapse; width:100%; font-size:14px; font-variant-numeric:tabular-nums}
+  th{text-align:left; font-weight:600; font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted);
+     border-bottom:1px solid var(--line); padding:8px 12px 8px 0; white-space:nowrap}
+  td{padding:9px 12px 9px 0; border-bottom:1px solid var(--line); vertical-align:top}
+  td.n,th.n{text-align:right; font-family:var(--mono); white-space:nowrap}
+  tbody tr:last-child td{border-bottom:none}
+  code,.mono{font-family:var(--mono); font-size:.88em}
+  .stages{display:flex; flex-direction:column; gap:2px; margin-top:14px; counter-reset:stage}
+  .stage{display:grid; grid-template-columns:34px 1fr; gap:14px; padding:13px 0; border-bottom:1px solid var(--line)}
+  .stage:last-child{border-bottom:none}
+  .stage .idx{font-family:var(--mono); font-size:12px; color:var(--accent); padding-top:3px}
+  .stage p{font-size:15px; color:var(--ink-2); margin:2px 0 0}
+  .stage .src{font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-top:5px; display:block}
+  figure{margin:0}
+  figcaption{font-size:12.5px; color:var(--muted); margin-top:8px; font-family:var(--sans)}
+  svg{display:block; width:100%; height:auto}
+  .tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px; background:var(--line);
+    border:1px solid var(--line); margin-top:14px}
+  .tile{background:var(--surface); padding:14px 16px}
+  .tile b{display:block; font-family:var(--mono); font-size:23px; font-weight:500; letter-spacing:-.02em}
+  .tile span{display:block; font-family:var(--sans); font-size:12px; color:var(--muted); margin-top:3px; line-height:1.35}
+  .chip{display:inline-block; font-family:var(--mono); font-size:11px; padding:2px 8px; border:1px solid var(--line);
+    border-radius:3px; color:var(--ink-2); background:var(--surface); white-space:nowrap}
+  .chip.warn{color:var(--warn); border-color:var(--warn)}
+  .chip.crit{color:var(--crit); border-color:var(--crit)}
+  .chip.ok{color:var(--ok); border-color:var(--ok)}
+  ul{margin:8px 0 0; padding-left:20px} li{margin-bottom:7px}
+  footer{border-top:1px solid var(--line); padding-top:18px; font-size:13px; color:var(--muted); font-family:var(--sans)}
+  @media (max-width:520px){ body{font-size:16px} .stage{grid-template-columns:24px 1fr; gap:10px} }
+</style>
+
+<style>
+  html{color-scheme:light}
+  body{margin:0}
+  img{max-width:100%} [hidden]{display:none!important}
+  @page{ size:A4; margin:16mm 14mm; }
+  @media print{
+    :root{ --ground:#ffffff; --surface:#ffffff; --sunk:#f3f5f8; --ink:#111722; --ink-2:#333c4d;
+           --muted:#5c6779; --line:#ccd3de; --accent:#2c4a76;
+           --warn:#8a4c07; --warn-soft:#f7efe2; --crit:#8c1c15; --ok:#155839; }
+    body{ background:#fff; font-size:10.5pt; padding:0 }
+    .wrap{ max-width:none; gap:22px }
+    section, figure, .scroll, .tiles, .stage{ break-inside:avoid }
+    h2{ break-after:avoid }
+    .scroll{ overflow:visible }
+    a[href]:after{ content:"" }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="eyebrow">Anti-Fraud System · P1 Engine A</div>
+  <h1>Latency Arbitrage Engine</h1>
+  <p class="sub">How client trades become evidence, a score, a verdict and an execution decision — from the data pipeline through to the tags the automation layer acts on.</p>
+  <div class="meta">
+    <span>Implements: Latency Arbitrage Detection Engine — Functional &amp; Scoring Specification</span>
+    <span>Figures: scan of 16 Sep 2026, 09:27 UTC</span>
+  </div>
+</header>
+
+<section>
+  <div class="eyebrow">What it looks for</div>
+  <h2>A fast advantage that fades</h2>
+  <p class="lede">Latency arbitrage is a client profiting from prices that are briefly behind the market — a stale or slow quote — rather than from a view on where the market is going. Its signature is an advantage that appears within milliseconds of the fill and has disappeared a minute later.</p>
+  <p>Everything in the engine follows from that definition. A favourable move that <em>holds</em> is directional or informed flow, which is a different risk with a different treatment. Separating the two is the engine's main job, and the reason a client's score can be low even when they are consistently profitable.</p>
+  <div class="note"><strong>Spec principle we keep to:</strong> a score is a risk signal, not an accusation. Repeated behaviour counts for more than a single event, and client profitability alone never proves anything.</div>
+</section>
+
+<section>
+  <div class="eyebrow">Pipeline</div>
+  <h2>Five stages, from trade record to measurement</h2>
+  <div class="stages">
+    <div class="stage"><span class="idx">01</span><div>
+      <h3>Trades</h3>
+      <p>Every closed trade from all six trading servers, held locally so a scan never depends on a live database.</p>
+      <span class="src">MySQL → local warehouse · topped up every 15 min · 2,066,995 trades in the 7-day window</span>
+    </div></div>
+    <div class="stage"><span class="idx">02</span><div>
+      <h3>Millisecond fill times</h3>
+      <p>Sub-second horizons need millisecond timestamps. MT5 records them natively; MT4 books to the whole second, so fills are matched to their Kafka trade events, which carry the execution stamp.</p>
+      <span class="src">MT5 <code>time_msc</code> · MT4 Kafka <code>tradeRecord.timeStamp</code> (96% matched) · 98.2% of fills millisecond-stamped</span>
+    </div></div>
+    <div class="stage"><span class="idx">03</span><div>
+      <h3>Broker tick tape</h3>
+      <p>The price the client actually dealt on, taken from the trade server's own tick table — bid, ask and the age of the quote at the moment of the fill.</p>
+      <span class="src">Server <code>ticks</code> tables · 97.3% of trades covered through the 60-second horizon</span>
+    </div></div>
+    <div class="stage"><span class="idx">04</span><div>
+      <h3>Independent reference market</h3>
+      <p>A second, unrelated venue — a Vantage Raw ECN feed in its own read-only terminal. Its clock offset is re-derived each day against our tape, and the standing price difference between the two brokers is removed, so what remains is a genuine gap rather than a constant.</p>
+      <span class="src">6.47M reference ticks · covers 100% of qualifying trades</span>
+    </div></div>
+    <div class="stage"><span class="idx">05</span><div>
+      <h3>Markouts</h3>
+      <p>Each qualifying trade is marked out at the seven horizons the spec fixes, on both feeds. The reference markout uses the executable opposite side — a buy exits at the reference bid, a sell at the ask.</p>
+      <span class="src">100 / 200 / 300 / 500 ms · 1 s · 5 s · 60 s</span>
+    </div></div>
+  </div>
+</section>
+
+<section>
+  <figure>
+    <svg viewBox="0 0 720 168" role="img" aria-label="Pipeline: trades, millisecond times, broker ticks and the reference feed combine into markouts, then scoring, verdict and tags">
+      <defs>
+        <marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--muted)" color="var(--line)">
+        <g fill="var(--surface)" stroke="var(--line)">
+          <rect x="1" y="8" width="150" height="30" rx="3"/><rect x="1" y="45" width="150" height="30" rx="3"/>
+          <rect x="1" y="82" width="150" height="30" rx="3"/><rect x="1" y="119" width="150" height="30" rx="3"/>
+          <rect x="214" y="45" width="132" height="67" rx="3"/>
+          <rect x="409" y="45" width="132" height="67" rx="3"/>
+          <rect x="604" y="45" width="115" height="67" rx="3"/>
+        </g>
+        <text x="14" y="27" fill="var(--ink-2)">trades (6 servers)</text>
+        <text x="14" y="64" fill="var(--ink-2)">millisecond times</text>
+        <text x="14" y="101" fill="var(--ink-2)">broker tick tape</text>
+        <text x="14" y="138" fill="var(--ink-2)">reference feed</text>
+        <text x="228" y="72" fill="var(--ink)" font-size="12">markouts</text>
+        <text x="228" y="90" >7 horizons, both feeds</text>
+        <text x="423" y="72" fill="var(--ink)" font-size="12">score 0–100</text>
+        <text x="423" y="90">7 weighted components</text>
+        <text x="618" y="72" fill="var(--ink)" font-size="12">verdict + tags</text>
+        <text x="618" y="90">execution decision</text>
+        <g stroke="var(--accent)" fill="none" marker-end="url(#ar)" color="var(--accent)">
+          <path d="M151,23 C185,23 180,70 210,70"/><path d="M151,60 C180,60 185,74 210,74"/>
+          <path d="M151,97 C180,97 185,82 210,82"/><path d="M151,134 C185,134 180,88 210,88"/>
+          <path d="M346,78 L405,78"/><path d="M541,78 L600,78"/>
+        </g>
+      </g>
+    </svg>
+    <figcaption>The four data sources meet at the markout stage; everything downstream is measurement, not collection.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="eyebrow">Measurement</div>
+  <h2>Seven horizons, and one rule about quote age</h2>
+  <p>The shape of the curve carries the information, not any single number.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Horizon</th><th>What it tells us</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">100 ms</td><td>Immediate adverse selection</td></tr>
+      <tr><td class="mono">200 ms</td><td>First confirmation past the quote-throttling interval</td></tr>
+      <tr><td class="mono">300 ms</td><td>Latency-sensitive response</td></tr>
+      <tr><td class="mono">500 ms</td><td>Short execution advantage</td></tr>
+      <tr><td class="mono">1 s</td><td>Transition from pure latency to short-term information</td></tr>
+      <tr><td class="mono">5 s</td><td>Short-term directional information</td></tr>
+      <tr><td class="mono">60 s</td><td>Persistence — does the advantage survive?</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note" style="margin-top:16px"><strong>Quote throttling.</strong> Our quote feed is throttled at 200 ms, so a quote up to 200 ms old is normal behaviour and cannot count as evidence. Stale-price evidence starts only beyond 200 ms plus a 100 ms tolerance, and only on millisecond-stamped fills. The 100 ms markout stays a measurement; it is never treated as proof of a stale quote.</div>
+</section>
+
+<section>
+  <div class="eyebrow">Per trade</div>
+  <h2>Latency event, or directional trade?</h2>
+  <p>A trade has to qualify before it is judged at all: held no longer than 120 seconds and profitable by at least $1. A qualifying trade becomes a <strong>latency event</strong> when its early markout clears the threshold for its horizon <em>and</em> that advantage has faded by at least half at 60 seconds. If the advantage holds or grows instead, the trade is recorded as <strong>directional</strong> and never counts toward a latency alert.</p>
+  <div class="tiles">
+    <div class="tile"><b>1,026</b><span>latency events in the window</span></div>
+    <div class="tile"><b>44,475</b><span>directional trades, 1,744 accounts</span></div>
+    <div class="tile"><b>120</b><span>accounts whose curve fades early</span></div>
+    <div class="tile"><b>1,503</b><span>accounts whose curve persists</span></div>
+  </div>
+  <p style="margin-top:14px">Early thresholds run from <span class="mono">0.75 bps</span> at 100 ms to <span class="mono">1.9 bps</span> at 1 s — each set just above the 99th percentile of normal flow at that horizon, so ordinary market movement cannot trigger one.</p>
+</section>
+
+<section>
+  <div class="eyebrow">Per client</div>
+  <h2>Seven components make the score</h2>
+  <p>Each component is measured against the rest of the book, so "high" means high for this client base rather than against an arbitrary constant. Full marks sit at the 99th-percentile account, bounded by a fixed standard.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Component</th><th class="n">Weight</th><th>Full marks at</th></tr></thead>
+    <tbody>
+      <tr><td>Early markout above normal flow</td><td class="n">20</td><td class="mono">0.39 bps</td></tr>
+      <tr><td>Stale broker quotes, past the throttle</td><td class="n">20</td><td class="mono">10% of fills</td></tr>
+      <tr><td>Early hit rate above normal flow</td><td class="n">15</td><td class="mono">+27.6 pts</td></tr>
+      <tr><td>Advantage fades by 60 s</td><td class="n">15</td><td class="mono">consistent fade</td></tr>
+      <tr><td>Repeated latency events</td><td class="n">10</td><td class="mono">10 events</td></tr>
+      <tr><td>Profit concentrated in those events</td><td class="n">10</td><td class="mono">50% of gross profit</td></tr>
+      <tr><td>Confirmed by the reference market</td><td class="n">10</td><td class="mono">all events confirmed</td></tr>
+    </tbody>
+  </table></div>
+  <p style="margin-top:14px"><strong>Confidence is reported separately</strong>, never folded into the score: sample size and statistical significance, data quality, repetition across days, and independent corroboration. A high score on thin evidence stays visible as exactly that.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Band</th><th class="n">Score</th><th>Verdict</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chip crit">Critical</span></td><td class="n">85–100</td><td>Escalate</td><td>Strongest evidence, every gate passed</td></tr>
+      <tr><td><span class="chip warn">High</span></td><td class="n">70–84</td><td>Restrict</td><td>Acts, with review</td></tr>
+      <tr><td><span class="chip">Moderate</span></td><td class="n">50–69</td><td>Monitor</td><td>Watchlist</td></tr>
+      <tr><td><span class="chip">Emerging</span></td><td class="n">25–49</td><td>Monitor</td><td>Worth watching, not acting</td></tr>
+      <tr><td><span class="chip ok">Normal</span></td><td class="n">0–24</td><td>Clear</td><td>No actionable latency risk</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="eyebrow">Safeguards</div>
+  <h2>When the engine holds itself back</h2>
+  <p>A verdict is capped at Monitor — never escalated automatically — when any of these apply:</p>
+  <ul>
+    <li><strong>Low confidence</strong>, or a minimum the desk has set (hit rate, event success, profit concentration) is not met.</li>
+    <li><strong>The pattern repeats across unrelated accounts</strong> at the same price moment. 81 such moments in this window: several clients profiting on the same gold price within two seconds. That points at pricing, not at clients.</li>
+    <li><strong>The client's events sit inside a flagged feed condition</strong> — our own feed created the opportunity.</li>
+  </ul>
+  <div class="note caution" style="margin-top:14px"><strong>Feed before client.</strong> The engine measures our own aggregated feed against the reference: how often our price sat behind it, how often that turned into a client gain, how many clients, and the P&amp;L involved. In this window 17 feed-and-symbol combinations show any stale fills — gold on MT4 is the largest at 165 fills, 0.3% of executions — and <em>none</em> reaches the level where the feed is treated as the cause. If one did, the fix would be the feed, not the client.</div>
+</section>
+
+<section>
+  <div class="eyebrow">Output</div>
+  <h2>Tags the automation layer acts on</h2>
+  <p>Every scanned client carries a set of stable codes. They never change meaning, which is what makes them safe to wire to execution treatment.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Group</th><th>Examples</th><th>Use</th></tr></thead>
+    <tbody>
+      <tr><td>Verdict</td><td class="mono">LA_VERDICT_ESCALATE · _RESTRICT · _MONITOR · _CLEAR</td><td>Drives treatment; CLEAR also removes it</td></tr>
+      <tr><td>Band</td><td class="mono">LA_BAND_CRITICAL … _NORMAL</td><td>Severity</td></tr>
+      <tr><td>Cap</td><td class="mono">LA_CAP_REPLICATED · _MARKET_DATA_CONDITION · _LOW_CONFIDENCE</td><td><strong>Never act automatically</strong>; route to review</td></tr>
+      <tr><td>Behaviour</td><td class="mono">LA_L1_STALE_PRICE_CAPTURE · L2 · L3 · L4 · L5 · L7 · L8 · L9 · L10</td><td>What the client actually does</td></tr>
+      <tr><td>Evidence</td><td class="mono">LA_EVIDENCE_REFERENCE_CONFIRMED · _STALE_QUOTES · _DIRECTIONAL_FLOW</td><td>Strength and kind of proof</td></tr>
+      <tr><td>Data</td><td class="mono">LA_DATA_SECOND_PRECISION · _NO_REFERENCE</td><td>Evidence is weaker than it looks</td></tr>
+      <tr><td>Feed</td><td class="mono">LA_FEED_ARCHITECTURE_RISK · _STALE_TOB · _REPLICATED_MOMENT</td><td>Pricing issues, not client issues</td></tr>
+    </tbody>
+  </table></div>
+  <p style="margin-top:14px">The proposed ladder, for the desk to set: <span class="chip">Monitor → watchlist</span> <span class="chip">Restrict → speed bump + wider spread on the flagged symbol</span> <span class="chip warn">Escalate → forced slippage / last look</span> <span class="chip crit">A-Book → only with reference confirmation or an analyst's sign-off</span>. Any cap tag stops the ladder.</p>
+</section>
+
+<section>
+  <div class="eyebrow">Evidence</div>
+  <h2>What we can put in front of a client</h2>
+  <p>Any flagged order opens a one-page evidence pack: the trade as booked to the millisecond, our bid and ask against the reference bid and ask at the fill and at each horizon, the markout in basis points and dollars, which thresholds it cleared, the quote age, entry and exit marked on the curve, and the classification in plain words. Sources and method are printed on it, and it exports to PDF or CSV.</p>
+</section>
+
+<section>
+  <div class="eyebrow">Where we stand</div>
+  <h2>The current picture</h2>
+  <div class="tiles">
+    <div class="tile"><b>11</b><span>clients flagged, all Emerging (27–47)</span></div>
+    <div class="tile"><b>0</b><span>reaching Restrict or Escalate</span></div>
+    <div class="tile"><b>0%</b><span>median reference confirmation</span></div>
+    <div class="tile"><b>0</b><span>feed conditions flagged as cause</span></div>
+  </div>
+  <p style="margin-top:16px">The honest reading: <strong>no proven latency arbitrage in the current book.</strong> The clients on the list trade fast and win early more often than normal flow, usually on one symbol, but their fills are not on stale prices, the independent market does not confirm them as latency, and the money involved is small. Most of their edge persists past 60 seconds, which makes it directional flow — a real risk, but one for the toxic-flow treatment rather than this engine.</p>
+  <p>That result is worth presenting as a finding in itself: it says our pricing is not being picked off, and it is backed by an independent venue rather than by our own feed.</p>
+</section>
+
+<section>
+  <div class="eyebrow">Operations &amp; limits</div>
+  <h2>What runs, and what we still cannot see</h2>
+  <ul>
+    <li><strong>Data top-up every 15 minutes</strong>, full rescan every 20 minutes; the tab shows when the last scan ran and when the next is due.</li>
+    <li><strong>Shadow mode is on.</strong> Every verdict is logged, nothing is applied to a client automatically.</li>
+    <li><strong>One reference venue.</strong> A second would harden L1 and L4 considerably.</li>
+    <li><strong>No constituent feed IDs.</strong> Our tick data names one aggregated feed, so we can say <em>our price</em> was behind the reference, but not <em>which</em> liquidity provider caused it. Getting per-feed data would complete the spec's root-cause layer and the L6 and L8 profiles.</li>
+    <li><strong>Alert minimums are still at zero</strong> pending calibration; confidence is the only gate currently enforced.</li>
+  </ul>
+</section>
+
+<footer>Latency Arbitrage Engine · figures from the scan of 16 Sep 2026, 09:27 UTC · thresholds, weights and gates are configurable per the specification.</footer>
+</div>
+</body>
+</html>

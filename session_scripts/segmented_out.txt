@@ -1,0 +1,38 @@
+﻿
+gold trades 29,056,491 | bars 1,722 [85s]
+classified 510,798 account-days:
+client_class
+PERSISTENT_EDGE     146382
+CHRONIC_LOSER       130788
+NEUTRAL             113624
+SCALPER              79494
+HIGH_MAGNITUDE       30639
+MARTINGALE_LOSER      9871
+Traceback (most recent call last):
+  File "C:\Users\ROYVIV~1\AppData\Local\Temp\claude\c--Users-RoyVivasi-Documents-notebook\9951e7b4-740a-496a-a92d-68997
+2573193\scratchpad\test_segmented_gold.py", line 91, in <module>
+    positioning = segmented_positioning(trades, classes)
+  File "C:\Users\RoyVivasi\Documents\notebook\trading_data\segmented_flow.py", line 91, in segmented_positioning
+    frame = trades.merge(classes, on=["account_key", "day"], how="left")
+  File "C:\Users\RoyVivasi\Documents\notebook\.venv\Lib\site-packages\pandas\core\frame.py", line 12902, in merge
+    return merge(
+        self,
+    ...<10 lines>...
+        validate=validate,
+    )
+  File "C:\Users\RoyVivasi\Documents\notebook\.venv\Lib\site-packages\pandas\core\reshape\merge.py", line 385, in merge
+    op = _MergeOperation(
+        left_df,
+    ...<10 lines>...
+        validate=validate,
+    )
+  File "C:\Users\RoyVivasi\Documents\notebook\.venv\Lib\site-packages\pandas\core\reshape\merge.py", line 1031, in 
+__init__
+    self._maybe_coerce_merge_keys()
+  File "C:\Users\RoyVivasi\Documents\notebook\.venv\Lib\site-packages\pandas\core\reshape\merge.py", line 1845, in 
+_maybe_coerce_merge_keys
+    raise ValueError(msg)
+ValueError: You are trying to merge on datetime64[us, UTC] and datetime64[us] columns for key 'day'. If you wish to 
+proceed you should use pd.concat
+
+

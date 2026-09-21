@@ -1,0 +1,18 @@
+{
+  "subject": "oms-mt4.events.trades-value",
+  "schema_id": 225,
+  "version": 4,
+  "package": "oms_mt4",
+  "proto": "proto/oms_mt4_events_trades.proto",
+  "references": [],
+  "messages": {
+    "0": "Trade",
+    "1": "OrderCreated",
+    "2": "OrderUpdated",
+    "3": "OrderClosedBy",
+    "4": "TradeRecord"
+  }
+}DealRecord",
+    "5": "DealModifyFlags"
+  }
+}

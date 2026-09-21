@@ -1,0 +1,1172 @@
+﻿python.exe : C:\Users\RoyVivasi\Documents\notebook\.venv\Lib\site-packages\google\auth\_default.py:113: UserWarning: 
+Your application has authenticated using end user credentials from Google Cloud SDK without a quota project. You might 
+receive a "quota exceeded" or "API not enabled" error. See the following page for troubleshooting: 
+https://cloud.google.com/docs/authentication/adc-troubleshooting/user-creds. 
+At line:1 char:302
++ ... tch {} } }; & "C:\Users\RoyVivasi\Documents\notebook\.venv\Scripts\py ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\RoyViv...ng/user-creds. :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  warnings.warn(_CLOUD_SDK_CREDENTIALS_WARNING)
+==========================================================================================
+TABLE: zfx-dwh-prod.operational_data_store.dubai_traze_mt5_dubai_live01_deals
+  type: TABLE  rows: 180055  size_bytes: 123224657
+  created: 2026-08-27 18:22:19.880000+00:00  modified: 2026-08-27 18:22:19.881000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (49 fields):
+   - deal NUMERIC NULLABLE
+   - external_id STRING NULLABLE
+   - login NUMERIC NULLABLE
+   - dealer NUMERIC NULLABLE
+   - order NUMERIC NULLABLE
+   - action INTEGER NULLABLE
+   - entry INTEGER NULLABLE
+   - digits INTEGER NULLABLE
+   - digits_currency INTEGER NULLABLE
+   - contract_size NUMERIC NULLABLE
+   - time TIMESTAMP NULLABLE
+   - symbol STRING NULLABLE
+   - price NUMERIC NULLABLE
+   - volume NUMERIC NULLABLE
+   - profit NUMERIC NULLABLE
+   - storage NUMERIC NULLABLE
+   - commission NUMERIC NULLABLE
+   - rate_profit NUMERIC NULLABLE
+   - rate_margin NUMERIC NULLABLE
+   - expert_id NUMERIC NULLABLE
+   - position_id NUMERIC NULLABLE
+   - comment STRING NULLABLE
+   - profit_raw NUMERIC NULLABLE
+   - price_position NUMERIC NULLABLE
+   - volume_closed NUMERIC NULLABLE
+   - tick_value NUMERIC NULLABLE
+   - tick_size NUMERIC NULLABLE
+   - flags INTEGER NULLABLE
+   - last_ts TIMESTAMP NULLABLE
+   - time_msc TIMESTAMP NULLABLE
+   - reason INTEGER NULLABLE
+   - gateway STRING NULLABLE
+   - price_gateway NUMERIC NULLABLE
+   - price_sl NUMERIC NULLABLE
+   - price_tp NUMERIC NULLABLE
+   - volume_ext NUMERIC NULLABLE
+   - volume_closed_ext NUMERIC NULLABLE
+   - fee NUMERIC NULLABLE
+   - value NUMERIC NULLABLE
+   - market_bid NUMERIC NULLABLE
+   - market_ask NUMERIC NULLABLE
+   - market_last NUMERIC NULLABLE
+   - modification_flags INTEGER NULLABLE
+   - group STRING NULLABLE
+   - spread_diff INTEGER NULLABLE
+   - spread_diff_balance INTEGER NULLABLE
+   - currency STRING NULLABLE
+   - _dlt_load_id STRING NULLABLE
+   - _dlt_id STRING NULLABLE
+==========================================================================================
+TABLE: zfx-dwh-prod.operational_data_store.dubai_traze_mt5_dubai_live01_dealrecord
+  type: TABLE  rows: 180056  size_bytes: 130427536
+  created: 2026-08-27 18:22:18.634000+00:00  modified: 2026-08-27 18:22:18.635000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (52 fields):
+   - id NUMERIC NULLABLE
+   - sequence NUMERIC NULLABLE
+   - ts TIMESTAMP NULLABLE
+   - opcode INTEGER NULLABLE
+   - deal NUMERIC NULLABLE
+   - external_id STRING NULLABLE
+   - login NUMERIC NULLABLE
+   - dealer NUMERIC NULLABLE
+   - order NUMERIC NULLABLE
+   - action INTEGER NULLABLE
+   - entry INTEGER NULLABLE
+   - digits INTEGER NULLABLE
+   - digits_currency INTEGER NULLABLE
+   - contract_size NUMERIC NULLABLE
+   - time TIMESTAMP NULLABLE
+   - symbol STRING NULLABLE
+   - price NUMERIC NULLABLE
+   - volume NUMERIC NULLABLE
+   - profit NUMERIC NULLABLE
+   - storage NUMERIC NULLABLE
+   - commission NUMERIC NULLABLE
+   - rate_profit NUMERIC NULLABLE
+   - rate_margin NUMERIC NULLABLE
+   - expert_id NUMERIC NULLABLE
+   - position_id NUMERIC NULLABLE
+   - comment STRING NULLABLE
+   - profit_raw NUMERIC NULLABLE
+   - price_position NUMERIC NULLABLE
+   - volume_closed NUMERIC NULLABLE
+   - tick_value NUMERIC NULLABLE
+   - tick_size NUMERIC NULLABLE
+   - flags INTEGER NULLABLE
+   - time_msc TIMESTAMP NULLABLE
+   - reason INTEGER NULLABLE
+   - gateway STRING NULLABLE
+   - price_gateway NUMERIC NULLABLE
+   - price_sl NUMERIC NULLABLE
+   - price_tp NUMERIC NULLABLE
+   - volume_ext NUMERIC NULLABLE
+   - volume_closed_ext NUMERIC NULLABLE
+   - fee NUMERIC NULLABLE
+   - value NUMERIC NULLABLE
+   - market_bid NUMERIC NULLABLE
+   - market_ask NUMERIC NULLABLE
+   - market_last NUMERIC NULLABLE
+   - modification_flags INTEGER NULLABLE
+   - group STRING NULLABLE
+   - spread_diff INTEGER NULLABLE
+   - spread_diff_balance INTEGER NULLABLE
+   - currency STRING NULLABLE
+   - _dlt_load_id STRING NULLABLE
+   - _dlt_id STRING NULLABLE
+==========================================================================================
+TABLE: zfx-dwh-prod.operational_data_store.dubai_traze_mt5_dubai_live01_orders
+  type: TABLE  rows: 169988  size_bytes: 82132923
+  created: 2026-08-27 18:22:23.339000+00:00  modified: 2026-08-27 18:22:23.340000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (41 fields):
+   - order NUMERIC NULLABLE
+   - external_id STRING NULLABLE
+   - login NUMERIC NULLABLE
+   - dealer NUMERIC NULLABLE
+   - symbol STRING NULLABLE
+   - digits INTEGER NULLABLE
+   - digits_currency INTEGER NULLABLE
+   - contract_size NUMERIC NULLABLE
+   - state INTEGER NULLABLE
+   - reason INTEGER NULLABLE
+   - time_setup TIMESTAMP NULLABLE
+   - time_expiration TIMESTAMP NULLABLE
+   - time_done TIMESTAMP NULLABLE
+   - type INTEGER NULLABLE
+   - type_fill INTEGER NULLABLE
+   - type_time INTEGER NULLABLE
+   - price_order NUMERIC NULLABLE
+   - price_trigger NUMERIC NULLABLE
+   - price_current NUMERIC NULLABLE
+   - price_sl NUMERIC NULLABLE
+   - price_tp NUMERIC NULLABLE
+   - volume_initial NUMERIC NULLABLE
+   - volume_current NUMERIC NULLABLE
+   - expert_id NUMERIC NULLABLE
+   - position_id NUMERIC NULLABLE
+   - comment STRING NULLABLE
+   - activation_mode INTEGER NULLABLE
+   - activation_time TIMESTAMP NULLABLE
+   - activation_price NUMERIC NULLABLE
+   - activation_flags INTEGER NULLABLE
+   - reconciliation_status INTEGER NULLABLE
+   - last_ts TIMESTAMP NULLABLE
+   - time_setup_msc TIMESTAMP NULLABLE
+   - time_done_msc TIMESTAMP NULLABLE
+   - rate_margin NUMERIC NULLABLE
+   - position_by_id NUMERIC NULLABLE
+   - modification_flags INTEGER NULLABLE
+   - volume_initial_ext NUMERIC NULLABLE
+   - volume_current_ext NUMERIC NULLABLE
+   - _dlt_load_id STRING NULLABLE
+   - _dlt_id STRING NULLABLE
+==========================================================================================
+TABLE: zfx-dwh-prod.operational_data_store.dubai_traze_mt5_dubai_live01_orderrecord
+  type: TABLE  rows: 878175  size_bytes: 438114882
+  created: 2026-08-27 18:22:30.383000+00:00  modified: 2026-08-27 18:22:30.384000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (43 fields):
+   - id NUMERIC NULLABLE
+   - sequence NUMERIC NULLABLE
+   - ts TIMESTAMP NULLABLE
+   - opcode INTEGER NULLABLE
+   - order NUMERIC NULLABLE
+   - external_id STRING NULLABLE
+   - login NUMERIC NULLABLE
+   - dealer NUMERIC NULLABLE
+   - symbol STRING NULLABLE
+   - digits INTEGER NULLABLE
+   - digits_currency INTEGER NULLABLE
+   - contract_size NUMERIC NULLABLE
+   - state INTEGER NULLABLE
+   - reason INTEGER NULLABLE
+   - time_setup TIMESTAMP NULLABLE
+   - time_expiration TIMESTAMP NULLABLE
+   - time_done TIMESTAMP NULLABLE
+   - type INTEGER NULLABLE
+   - type_fill INTEGER NULLABLE
+   - type_time INTEGER NULLABLE
+   - price_order NUMERIC NULLABLE
+   - price_trigger NUMERIC NULLABLE
+   - price_current NUMERIC NULLABLE
+   - price_sl NUMERIC NULLABLE
+   - price_tp NUMERIC NULLABLE
+   - volume_initial NUMERIC NULLABLE
+   - volume_current NUMERIC NULLABLE
+   - expert_id NUMERIC NULLABLE
+   - position_id NUMERIC NULLABLE
+   - comment STRING NULLABLE
+   - activation_mode INTEGER NULLABLE
+   - activation_time TIMESTAMP NULLABLE
+   - activation_price NUMERIC NULLABLE
+   - activation_flags INTEGER NULLABLE
+   - time_setup_msc TIMESTAMP NULLABLE
+   - time_done_msc TIMESTAMP NULLABLE
+   - rate_margin NUMERIC NULLABLE
+   - position_by_id NUMERIC NULLABLE
+   - modification_flags INTEGER NULLABLE
+   - volume_initial_ext NUMERIC NULLABLE
+   - volume_current_ext NUMERIC NULLABLE
+   - _dlt_load_id STRING NULLABLE
+   - _dlt_id STRING NULLABLE
+==========================================================================================
+TABLE: zfx-dwh-prod.operational_data_store.dubai_traze_mt5_dubai_live01_positions
+  type: TABLE  rows: 194  size_bytes: 81080
+  created: 2026-08-27 18:22:22.090000+00:00  modified: 2026-08-27 18:22:22.091000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (34 fields):
+   - login NUMERIC NULLABLE
+   - symbol STRING NULLABLE
+   - action INTEGER NULLABLE
+   - digits INTEGER NULLABLE
+   - digits_currency INTEGER NULLABLE
+   - contract_size NUMERIC NULLABLE
+   - time_create TIMESTAMP NULLABLE
+   - time_update TIMESTAMP NULLABLE
+   - price_open NUMERIC NULLABLE
+   - price_current NUMERIC NULLABLE
+   - price_sl NUMERIC NULLABLE
+   - price_tp NUMERIC NULLABLE
+   - volume NUMERIC NULLABLE
+   - profit NUMERIC NULLABLE
+   - storage NUMERIC NULLABLE
+   - rate_profit NUMERIC NULLABLE
+   - rate_margin NUMERIC NULLABLE
+   - expert_id NUMERIC NULLABLE
+   - expert_position_id NUMERIC NULLABLE
+   - comment STRING NULLABLE
+   - activation_mode INTEGER NULLABLE
+   - activation_time TIMESTAMP NULLABLE
+   - activation_price NUMERIC NULLABLE
+   - activation_flags INTEGER NULLABLE
+   - time_create_msc TIMESTAMP NULLABLE
+   - time_update_msc TIMESTAMP NULLABLE
+   - dealer NUMERIC NULLABLE
+   - position NUMERIC NULLABLE
+   - external_id STRING NULLABLE
+   - modification_flags INTEGER NULLABLE
+   - reason INTEGER NULLABLE
+   - volume_ext NUMERIC NULLABLE
+   - _dlt_load_id STRING NULLABLE
+   - _dlt_id STRING NULLABLE
+==========================================================================================
+TABLE: zfx-dwh-prod.operational_data_store.dubai_traze_mt5_dubai_live01_positionrecord
+  type: TABLE  rows: 241507  size_bytes: 112468254
+  created: 2026-08-27 18:22:25.870000+00:00  modified: 2026-08-27 18:22:25.871000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (38 fields):
+   - id NUMERIC NULLABLE
+   - sequence NUMERIC NULLABLE
+   - ts TIMESTAMP NULLABLE
+   - opcode INTEGER NULLABLE
+   - login NUMERIC NULLABLE
+   - symbol STRING NULLABLE
+   - action INTEGER NULLABLE
+   - digits INTEGER NULLABLE
+   - digits_currency INTEGER NULLABLE
+   - contract_size NUMERIC NULLABLE
+   - time_create TIMESTAMP NULLABLE
+   - time_update TIMESTAMP NULLABLE
+   - price_open NUMERIC NULLABLE
+   - price_current NUMERIC NULLABLE
+   - price_sl NUMERIC NULLABLE
+   - price_tp NUMERIC NULLABLE
+   - volume NUMERIC NULLABLE
+   - profit NUMERIC NULLABLE
+   - storage NUMERIC NULLABLE
+   - rate_profit NUMERIC NULLABLE
+   - rate_margin NUMERIC NULLABLE
+   - expert_id NUMERIC NULLABLE
+   - expert_position_id NUMERIC NULLABLE
+   - comment STRING NULLABLE
+   - activation_mode INTEGER NULLABLE
+   - activation_time TIMESTAMP NULLABLE
+   - activation_price NUMERIC NULLABLE
+   - activation_flags INTEGER NULLABLE
+   - time_create_msc TIMESTAMP NULLABLE
+   - time_update_msc TIMESTAMP NULLABLE
+   - dealer NUMERIC NULLABLE
+   - position NUMERIC NULLABLE
+   - external_id STRING NULLABLE
+   - modification_flags INTEGER NULLABLE
+   - reason INTEGER NULLABLE
+   - volume_ext NUMERIC NULLABLE
+   - _dlt_load_id STRING NULLABLE
+   - _dlt_id STRING NULLABLE
+==========================================================================================
+TABLE: zfx-dwh-prod.operational_data_store.dubai_traze_mt5_dubai_live01_userrecord
+  type: TABLE  rows: 789488  size_bytes: 863003385
+  created: 2025-07-14 12:12:30.680000+00:00  modified: 2026-08-27 18:22:27.176000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (56 fields):
+   - id BIGNUMERIC NULLABLE
+   - ts TIMESTAMP NULLABLE
+   - opcode BIGNUMERIC NULLABLE
+   - login BIGNUMERIC NULLABLE
+   - group STRING NULLABLE
+   - cert_serial_number BIGNUMERIC NULLABLE
+   - rights BIGNUMERIC NULLABLE
+   - registration TIMESTAMP NULLABLE
+   - last_access TIMESTAMP NULLABLE
+   - last_ip STRING NULLABLE
+   - name STRING NULLABLE
+   - company STRING NULLABLE
+   - account STRING NULLABLE
+   - country STRING NULLABLE
+   - language BIGNUMERIC NULLABLE
+   - city STRING NULLABLE
+   - state STRING NULLABLE
+   - zip_code STRING NULLABLE
+   - address STRING NULLABLE
+   - phone STRING NULLABLE
+   - email STRING NULLABLE
+   - idx STRING NULLABLE
+   - status STRING NULLABLE
+   - comment STRING NULLABLE
+   - color BIGNUMERIC NULLABLE
+   - phone_password STRING NULLABLE
+   - leverage BIGNUMERIC NULLABLE
+   - agent BIGNUMERIC NULLABLE
+   - balance BIGNUMERIC NULLABLE
+   - credit BIGNUMERIC NULLABLE
+   - interest_rate BIGNUMERIC NULLABLE
+   - commission_daily BIGNUMERIC NULLABLE
+   - commission_monthly BIGNUMERIC NULLABLE
+   - commission_agent_daily BIGNUMERIC NULLABLE
+   - commission_agent_monthly BIGNUMERIC NULLABLE
+   - balance_prev_day BIGNUMERIC NULLABLE
+   - balance_prev_month BIGNUMERIC NULLABLE
+   - equity_prev_day BIGNUMERIC NULLABLE
+   - equity_prev_month BIGNUMERIC NULLABLE
+   - external_account_total BIGNUMERIC NULLABLE
+   - last_pass_change BIGNUMERIC NULLABLE
+   - registration_utc TIMESTAMP NULLABLE
+   - last_access_utc TIMESTAMP NULLABLE
+   - last_pass_change_utc TIMESTAMP NULLABLE
+   - mqid STRING NULLABLE
+   - lead_source STRING NULLABLE
+   - lead_campaign STRING NULLABLE
+   - client_id BIGNUMERIC NULLABLE
+   - first_name STRING NULLABLE
+   - last_name STRING NULLABLE
+   - middle_name STRING NULLABLE
+   - otp_secret STRING NULLABLE
+   - limit_orders BIGNUMERIC NULLABLE
+   - limit_position_value BIGNUMERIC NULLABLE
+   - _dlt_load_id STRING NULLABLE
+   - _dlt_id STRING NULLABLE
+==========================================================================================
+TABLE: zfx-dwh-prod.operational_data_store.dubai_traze_mt5_dubai_live01_accounts
+  type: TABLE  rows: 961  size_bytes: 566476
+  created: 2026-08-27 18:22:15.243000+00:00  modified: 2026-08-27 18:22:15.244000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (53 fields):
+   - login NUMERIC NULLABLE
+   - group STRING NULLABLE
+   - cert_serial_number NUMERIC NULLABLE
+   - rights NUMERIC NULLABLE
+   - registration TIMESTAMP NULLABLE
+   - last_access TIMESTAMP NULLABLE
+   - last_ip STRING NULLABLE
+   - name STRING NULLABLE
+   - company STRING NULLABLE
+   - account STRING NULLABLE
+   - country STRING NULLABLE
+   - language INTEGER NULLABLE
+   - city STRING NULLABLE
+   - state STRING NULLABLE
+   - zip_code STRING NULLABLE
+   - address STRING NULLABLE
+   - phone STRING NULLABLE
+   - email STRING NULLABLE
+   - idx STRING NULLABLE
+   - status STRING NULLABLE
+   - comment STRING NULLABLE
+   - color INTEGER NULLABLE
+   - phone_password STRING NULLABLE
+   - leverage INTEGER NULLABLE
+   - agent NUMERIC NULLABLE
+   - balance NUMERIC NULLABLE
+   - credit NUMERIC NULLABLE
+   - interest_rate NUMERIC NULLABLE
+   - commission_daily NUMERIC NULLABLE
+   - commission_monthly NUMERIC NULLABLE
+   - commission_agent_daily NUMERIC NULLABLE
+   - commission_agent_monthly NUMERIC NULLABLE
+   - balance_prev_day NUMERIC NULLABLE
+   - balance_prev_month NUMERIC NULLABLE
+   - equity_prev_day NUMERIC NULLABLE
+   - equity_prev_month NUMERIC NULLABLE
+   - external_account_total INTEGER NULLABLE
+   - last_pass_change NUMERIC NULLABLE
+   - registration_utc TIMESTAMP NULLABLE
+   - last_access_utc TIMESTAMP NULLABLE
+   - last_pass_change_utc TIMESTAMP NULLABLE
+   - mqid STRING NULLABLE
+   - lead_source STRING NULLABLE
+   - lead_campaign STRING NULLABLE
+   - client_id NUMERIC NULLABLE
+   - first_name STRING NULLABLE
+   - last_name STRING NULLABLE
+   - middle_name STRING NULLABLE
+   - otp_secret STRING NULLABLE
+   - limit_orders INTEGER NULLABLE
+   - limit_position_value NUMERIC NULLABLE
+   - _dlt_load_id STRING NULLABLE
+   - _dlt_id STRING NULLABLE
+==========================================================================================
+TABLE: zfx-dwh-prod.operational_data_store.dubai_traze_mt5_dubai_live01_groups
+  type: TABLE  rows: 74  size_bytes: 34081
+  created: 2026-08-27 18:22:18.279000+00:00  modified: 2026-08-27 18:22:18.280000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (43 fields):
+   - group STRING NULLABLE
+   - server NUMERIC NULLABLE
+   - permissions_flags NUMERIC NULLABLE
+   - auth_mode INTEGER NULLABLE
+   - auth_password_min INTEGER NULLABLE
+   - company STRING NULLABLE
+   - company_page STRING NULLABLE
+   - company_email STRING NULLABLE
+   - company_support_page STRING NULLABLE
+   - company_support_email STRING NULLABLE
+   - company_catalog STRING NULLABLE
+   - currency STRING NULLABLE
+   - currency_digits INTEGER NULLABLE
+   - reports_mode INTEGER NULLABLE
+   - reports_flags NUMERIC NULLABLE
+   - reports_smtp STRING NULLABLE
+   - reports_smtp_login STRING NULLABLE
+   - reports_smtp_pass STRING NULLABLE
+   - news_mode INTEGER NULLABLE
+   - news_category STRING NULLABLE
+   - news_lang_total INTEGER NULLABLE
+   - mail_mode INTEGER NULLABLE
+   - trade_flags NUMERIC NULLABLE
+   - trade_interestrate NUMERIC NULLABLE
+   - trade_virtual_credit NUMERIC NULLABLE
+   - margin_free_mode INTEGER NULLABLE
+   - marginso_mode INTEGER NULLABLE
+   - margin_call NUMERIC NULLABLE
+   - margin_stop_out NUMERIC NULLABLE
+   - demo_leverage INTEGER NULLABLE
+   - demo_deposit NUMERIC NULLABLE
+   - limit_history INTEGER NULLABLE
+   - limit_orders INTEGER NULLABLE
+   - limit_symbols INTEGER NULLABLE
+   - commission_total INTEGER NULLABLE
+   - symbol_total INTEGER NULLABLE
+   - margin_free_profit_mode INTEGER NULLABLE
+   - margin_mode INTEGER NULLABLE
+   - auth_otp_mode INTEGER NULLABLE
+   - trade_transfer_mode INTEGER NULLABLE
+   - margin_flags NUMERIC NULLABLE
+   - _dlt_load_id STRING NULLABLE
+   - _dlt_id STRING NULLABLE
+==========================================================================================
+TABLE: zfx-dwh-prod.operational_data_store.dubai_traze_mt5_dubai_live01_symbols
+  type: TABLE  rows: 438  size_bytes: 407966
+  created: 2026-08-27 18:22:23.679000+00:00  modified: 2026-08-27 18:22:23.680000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (85 fields):
+   - symbol STRING NULLABLE
+   - path STRING NULLABLE
+   - isin STRING NULLABLE
+   - description STRING NULLABLE
+   - international STRING NULLABLE
+   - basis STRING NULLABLE
+   - source STRING NULLABLE
+   - page STRING NULLABLE
+   - currency_base STRING NULLABLE
+   - currency_base_digits INTEGER NULLABLE
+   - currency_profit STRING NULLABLE
+   - currency_profit_digits INTEGER NULLABLE
+   - currency_margin STRING NULLABLE
+   - currency_margin_digits INTEGER NULLABLE
+   - color INTEGER NULLABLE
+   - color_background INTEGER NULLABLE
+   - digits INTEGER NULLABLE
+   - point NUMERIC NULLABLE
+   - multiply NUMERIC NULLABLE
+   - tick_flags NUMERIC NULLABLE
+   - tick_book_depth INTEGER NULLABLE
+   - filter_soft INTEGER NULLABLE
+   - filter_soft_ticks INTEGER NULLABLE
+   - filter_hard INTEGER NULLABLE
+   - filter_hard_ticks INTEGER NULLABLE
+   - filter_discard INTEGER NULLABLE
+   - filter_spread_max INTEGER NULLABLE
+   - filter_spread_min INTEGER NULLABLE
+   - trade_mode INTEGER NULLABLE
+   - calc_mode INTEGER NULLABLE
+   - exec_mode INTEGER NULLABLE
+   - gtc_mode INTEGER NULLABLE
+   - fill_flags INTEGER NULLABLE
+   - expir_flags INTEGER NULLABLE
+   - spread INTEGER NULLABLE
+   - spread_balance INTEGER NULLABLE
+   - spread_diff INTEGER NULLABLE
+   - spread_diff_balance INTEGER NULLABLE
+   - tick_value NUMERIC NULLABLE
+   - tick_size NUMERIC NULLABLE
+   - contract_size NUMERIC NULLABLE
+   - stops_level INTEGER NULLABLE
+   - freeze_level INTEGER NULLABLE
+   - quotes_timeout INTEGER NULLABLE
+   - volume_min NUMERIC NULLABLE
+   - volume_max NUMERIC NULLABLE
+   - volume_step NUMERIC NULLABLE
+   - volume_limit NUMERIC NULLABLE
+   - margin_flags INTEGER NULLABLE
+   - margin_initial NUMERIC NULLABLE
+   - margin_maintenance NUMERIC NULLABLE
+   - margin_long NUMERIC NULLABLE
+   - margin_short NUMERIC NULLABLE
+   - margin_limit NUMERIC NULLABLE
+   - margin_stop NUMERIC NULLABLE
+   - margin_stop_limit NUMERIC NULLABLE
+   - swap_mode INTEGER NULLABLE
+   - swap_long NUMERIC NULLABLE
+   - swap_short NUMERIC NULLABLE
+   - swap_3day INTEGER NULLABLE
+   - time_start TIMESTAMP NULLABLE
+   - time_expiration TIMESTAMP NULLABLE
+   - re_flags INTEGER NULLABLE
+   - re_timeout INTEGER NULLABLE
+   - ie_check_mode INTEGER NULLABLE
+   - ie_timeout INTEGER NULLABLE
+   - ie_split_profit INTEGER NULLABLE
+   - ie_slip_losing INTEGER NULLABLE
+   - ie_volume_max NUMERIC NULLABLE
+   - price_settle NUMERIC NULLABLE
+   - price_limit_max NUMERIC NULLABLE
+   - price_limit_min NUMERIC NULLABLE
+   - trade_flags NUMERIC NULLABLE
+   - order_flags INTEGER NULLABLE
+   - options_mode INTEGER NULLABLE
+   - price_strike NUMERIC NULLABLE
+   - margin_rate_liquidity NUMERIC NULLABLE
+   - face_value NUMERIC NULLABLE
+   - accrued_interest NUMERIC NULLABLE
+   - splice_type INTEGER NULLABLE
+   - splice_time_type INTEGER NULLABLE
+   - splice_time_days INTEGER NULLABLE
+   - margin_hedged NUMERIC NULLABLE
+   - _dlt_load_id STRING NULLABLE
+   - _dlt_id STRING NULLABLE
+==========================================================================================
+TABLE: zfx-dwh-prod.operational_data_store.dubai_traze_mt5_dubai_live01_loginrecord
+  type: TABLE  rows: 1110010  size_bytes: 252786979
+  created: 2026-08-27 18:22:21.852000+00:00  modified: 2026-08-27 18:22:21.853000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (14 fields):
+   - id NUMERIC NULLABLE
+   - sequence NUMERIC NULLABLE
+   - ts TIMESTAMP NULLABLE
+   - login NUMERIC NULLABLE
+   - ip STRING NULLABLE
+   - type INTEGER NULLABLE
+   - session_id NUMERIC NULLABLE
+   - group STRING NULLABLE
+   - build INTEGER NULLABLE
+   - time TIMESTAMP NULLABLE
+   - computer_id STRING NULLABLE
+   - is_connected INTEGER NULLABLE
+   - _dlt_load_id STRING NULLABLE
+   - _dlt_id STRING NULLABLE
+
+#### COMPARISON: mt5_live01 raw tables (confirmed-good baseline) ####
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.deals
+  type: TABLE  rows: 41984847  size_bytes: 46158834027
+  created: 2026-07-29 11:17:23.320000+00:00  modified: 2026-08-27 18:08:02.409000+00:00
+  partitioning: TimePartitioning(field='time',type_='DAY') None
+  clustering_fields: ['position_id', 'entry']
+  schema (48 fields):
+   - deal BIGNUMERIC NULLABLE
+   - external_id STRING NULLABLE
+   - login BIGNUMERIC NULLABLE
+   - dealer BIGNUMERIC NULLABLE
+   - order BIGNUMERIC NULLABLE
+   - action INTEGER NULLABLE
+   - entry INTEGER NULLABLE
+   - digits INTEGER NULLABLE
+   - digits_currency INTEGER NULLABLE
+   - contract_size BIGNUMERIC NULLABLE
+   - time TIMESTAMP NULLABLE
+   - symbol STRING NULLABLE
+   - price BIGNUMERIC NULLABLE
+   - volume BIGNUMERIC NULLABLE
+   - profit BIGNUMERIC NULLABLE
+   - storage BIGNUMERIC NULLABLE
+   - commission BIGNUMERIC NULLABLE
+   - rate_profit BIGNUMERIC NULLABLE
+   - rate_margin BIGNUMERIC NULLABLE
+   - expert_id BIGNUMERIC NULLABLE
+   - position_id BIGNUMERIC NULLABLE
+   - comment STRING NULLABLE
+   - profit_raw BIGNUMERIC NULLABLE
+   - price_position BIGNUMERIC NULLABLE
+   - volume_closed BIGNUMERIC NULLABLE
+   - tick_value BIGNUMERIC NULLABLE
+   - tick_size BIGNUMERIC NULLABLE
+   - flags INTEGER NULLABLE
+   - last_ts TIMESTAMP NULLABLE
+   - time_msc TIMESTAMP NULLABLE
+   - reason INTEGER NULLABLE
+   - gateway STRING NULLABLE
+   - price_gateway BIGNUMERIC NULLABLE
+   - price_sl BIGNUMERIC NULLABLE
+   - price_tp BIGNUMERIC NULLABLE
+   - volume_ext BIGNUMERIC NULLABLE
+   - volume_closed_ext BIGNUMERIC NULLABLE
+   - fee BIGNUMERIC NULLABLE
+   - value BIGNUMERIC NULLABLE
+   - market_bid BIGNUMERIC NULLABLE
+   - market_ask BIGNUMERIC NULLABLE
+   - market_last BIGNUMERIC NULLABLE
+   - modification_flags INTEGER NULLABLE
+   - group STRING NULLABLE
+   - spread_diff INTEGER NULLABLE
+   - spread_diff_balance INTEGER NULLABLE
+   - currency STRING NULLABLE
+   - load_time TIMESTAMP NULLABLE
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.dealrecord
+  type: TABLE  rows: 23751562  size_bytes: 27782683952
+  created: 2025-06-24 16:42:25.214000+00:00  modified: 2026-05-13 11:06:13.854000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (51 fields):
+   - id BIGNUMERIC REQUIRED
+   - sequence BIGNUMERIC NULLABLE
+   - ts TIMESTAMP REQUIRED
+   - opcode INTEGER REQUIRED
+   - deal BIGNUMERIC REQUIRED
+   - external_id STRING REQUIRED
+   - login BIGNUMERIC REQUIRED
+   - dealer BIGNUMERIC REQUIRED
+   - order BIGNUMERIC REQUIRED
+   - action INTEGER REQUIRED
+   - entry INTEGER REQUIRED
+   - digits INTEGER REQUIRED
+   - digits_currency INTEGER REQUIRED
+   - contract_size BIGNUMERIC REQUIRED
+   - time TIMESTAMP REQUIRED
+   - symbol STRING REQUIRED
+   - price BIGNUMERIC REQUIRED
+   - volume BIGNUMERIC REQUIRED
+   - profit BIGNUMERIC REQUIRED
+   - storage BIGNUMERIC REQUIRED
+   - commission BIGNUMERIC REQUIRED
+   - rate_profit BIGNUMERIC REQUIRED
+   - rate_margin BIGNUMERIC REQUIRED
+   - expert_id BIGNUMERIC REQUIRED
+   - position_id BIGNUMERIC REQUIRED
+   - comment STRING REQUIRED
+   - profit_raw BIGNUMERIC REQUIRED
+   - price_position BIGNUMERIC REQUIRED
+   - volume_closed BIGNUMERIC REQUIRED
+   - tick_value BIGNUMERIC REQUIRED
+   - tick_size BIGNUMERIC REQUIRED
+   - flags INTEGER REQUIRED
+   - time_msc TIMESTAMP REQUIRED
+   - reason INTEGER REQUIRED
+   - gateway STRING REQUIRED
+   - price_gateway BIGNUMERIC REQUIRED
+   - price_sl BIGNUMERIC REQUIRED
+   - price_tp BIGNUMERIC REQUIRED
+   - volume_ext BIGNUMERIC REQUIRED
+   - volume_closed_ext BIGNUMERIC REQUIRED
+   - fee BIGNUMERIC REQUIRED
+   - value BIGNUMERIC REQUIRED
+   - market_bid BIGNUMERIC REQUIRED
+   - market_ask BIGNUMERIC REQUIRED
+   - market_last BIGNUMERIC REQUIRED
+   - modification_flags INTEGER REQUIRED
+   - group STRING REQUIRED
+   - spread_diff INTEGER REQUIRED
+   - spread_diff_balance INTEGER REQUIRED
+   - currency STRING REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.orders
+  type: TABLE  rows: 41555610  size_bytes: 30445572484
+  created: 2025-04-30 08:15:42.869000+00:00  modified: 2026-08-27 18:08:04.104000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (40 fields):
+   - order BIGNUMERIC REQUIRED
+   - external_id STRING REQUIRED
+   - login BIGNUMERIC REQUIRED
+   - dealer BIGNUMERIC REQUIRED
+   - symbol STRING REQUIRED
+   - digits INTEGER REQUIRED
+   - digits_currency INTEGER REQUIRED
+   - contract_size BIGNUMERIC REQUIRED
+   - state INTEGER REQUIRED
+   - reason INTEGER REQUIRED
+   - time_setup TIMESTAMP REQUIRED
+   - time_expiration TIMESTAMP NULLABLE
+   - time_done TIMESTAMP NULLABLE
+   - type INTEGER REQUIRED
+   - type_fill INTEGER REQUIRED
+   - type_time INTEGER REQUIRED
+   - price_order BIGNUMERIC REQUIRED
+   - price_trigger BIGNUMERIC REQUIRED
+   - price_current BIGNUMERIC REQUIRED
+   - price_sl BIGNUMERIC REQUIRED
+   - price_tp BIGNUMERIC REQUIRED
+   - volume_initial BIGNUMERIC REQUIRED
+   - volume_current BIGNUMERIC REQUIRED
+   - expert_id BIGNUMERIC REQUIRED
+   - position_id BIGNUMERIC REQUIRED
+   - comment STRING REQUIRED
+   - activation_mode INTEGER REQUIRED
+   - activation_time TIMESTAMP NULLABLE
+   - activation_price BIGNUMERIC REQUIRED
+   - activation_flags INTEGER REQUIRED
+   - reconciliation_status INTEGER REQUIRED
+   - last_ts TIMESTAMP REQUIRED
+   - time_setup_msc TIMESTAMP REQUIRED
+   - time_done_msc TIMESTAMP NULLABLE
+   - rate_margin BIGNUMERIC REQUIRED
+   - position_by_id BIGNUMERIC REQUIRED
+   - modification_flags INTEGER REQUIRED
+   - volume_initial_ext BIGNUMERIC REQUIRED
+   - volume_current_ext BIGNUMERIC REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.orderrecord
+  type: TABLE  rows: 175025288  size_bytes: 137932165664
+  created: 2025-06-24 16:15:34.045000+00:00  modified: 2026-08-27 18:08:59.041000+00:00
+  partitioning: TimePartitioning(field='ts',type_='DAY') None
+  clustering_fields: ['login']
+  schema (42 fields):
+   - id BIGNUMERIC REQUIRED
+   - sequence BIGNUMERIC NULLABLE
+   - ts TIMESTAMP REQUIRED
+   - opcode INTEGER REQUIRED
+   - order BIGNUMERIC REQUIRED
+   - external_id STRING REQUIRED
+   - login BIGNUMERIC REQUIRED
+   - dealer BIGNUMERIC REQUIRED
+   - symbol STRING REQUIRED
+   - digits INTEGER REQUIRED
+   - digits_currency INTEGER REQUIRED
+   - contract_size BIGNUMERIC REQUIRED
+   - state INTEGER REQUIRED
+   - reason INTEGER REQUIRED
+   - time_setup TIMESTAMP REQUIRED
+   - time_expiration TIMESTAMP NULLABLE
+   - time_done TIMESTAMP NULLABLE
+   - type INTEGER REQUIRED
+   - type_fill INTEGER REQUIRED
+   - type_time INTEGER REQUIRED
+   - price_order BIGNUMERIC REQUIRED
+   - price_trigger BIGNUMERIC REQUIRED
+   - price_current BIGNUMERIC REQUIRED
+   - price_sl BIGNUMERIC REQUIRED
+   - price_tp BIGNUMERIC REQUIRED
+   - volume_initial BIGNUMERIC REQUIRED
+   - volume_current BIGNUMERIC REQUIRED
+   - expert_id BIGNUMERIC REQUIRED
+   - position_id BIGNUMERIC REQUIRED
+   - comment STRING REQUIRED
+   - activation_mode INTEGER REQUIRED
+   - activation_time TIMESTAMP NULLABLE
+   - activation_price BIGNUMERIC REQUIRED
+   - activation_flags INTEGER REQUIRED
+   - time_setup_msc TIMESTAMP REQUIRED
+   - time_done_msc TIMESTAMP NULLABLE
+   - rate_margin BIGNUMERIC REQUIRED
+   - position_by_id BIGNUMERIC REQUIRED
+   - modification_flags INTEGER REQUIRED
+   - volume_initial_ext BIGNUMERIC REQUIRED
+   - volume_current_ext BIGNUMERIC REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.positions
+  type: TABLE  rows: 10993  size_bytes: 7312334
+  created: 2024-08-30 11:28:51.957000+00:00  modified: 2026-08-27 18:15:44.314000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (33 fields):
+   - login BIGNUMERIC REQUIRED
+   - symbol STRING REQUIRED
+   - action INTEGER REQUIRED
+   - digits INTEGER REQUIRED
+   - digits_currency INTEGER REQUIRED
+   - contract_size BIGNUMERIC REQUIRED
+   - time_create TIMESTAMP REQUIRED
+   - time_update TIMESTAMP REQUIRED
+   - price_open BIGNUMERIC REQUIRED
+   - price_current BIGNUMERIC REQUIRED
+   - price_sl BIGNUMERIC REQUIRED
+   - price_tp BIGNUMERIC REQUIRED
+   - volume BIGNUMERIC REQUIRED
+   - profit BIGNUMERIC REQUIRED
+   - storage BIGNUMERIC REQUIRED
+   - rate_profit BIGNUMERIC REQUIRED
+   - rate_margin BIGNUMERIC REQUIRED
+   - expert_id BIGNUMERIC REQUIRED
+   - expert_position_id BIGNUMERIC REQUIRED
+   - comment STRING REQUIRED
+   - activation_mode INTEGER REQUIRED
+   - activation_time TIMESTAMP REQUIRED
+   - activation_price BIGNUMERIC REQUIRED
+   - activation_flags INTEGER REQUIRED
+   - time_create_msc TIMESTAMP REQUIRED
+   - time_update_msc TIMESTAMP REQUIRED
+   - dealer BIGNUMERIC REQUIRED
+   - position BIGNUMERIC REQUIRED
+   - external_id STRING REQUIRED
+   - modification_flags INTEGER REQUIRED
+   - reason INTEGER REQUIRED
+   - volume_ext BIGNUMERIC REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.positionrecord
+  type: TABLE  rows: 65072252  size_bytes: 48360062623
+  created: 2025-06-12 11:18:19.474000+00:00  modified: 2026-08-27 18:07:34.044000+00:00
+  partitioning: TimePartitioning(field='ts',type_='DAY') None
+  clustering_fields: ['login']
+  schema (37 fields):
+   - id BIGNUMERIC REQUIRED
+   - sequence BIGNUMERIC NULLABLE
+   - ts TIMESTAMP REQUIRED
+   - opcode INTEGER REQUIRED
+   - login BIGNUMERIC REQUIRED
+   - symbol STRING REQUIRED
+   - action INTEGER REQUIRED
+   - digits INTEGER REQUIRED
+   - digits_currency INTEGER REQUIRED
+   - contract_size BIGNUMERIC REQUIRED
+   - time_create TIMESTAMP REQUIRED
+   - time_update TIMESTAMP REQUIRED
+   - price_open BIGNUMERIC REQUIRED
+   - price_current BIGNUMERIC REQUIRED
+   - price_sl BIGNUMERIC REQUIRED
+   - price_tp BIGNUMERIC REQUIRED
+   - volume BIGNUMERIC REQUIRED
+   - profit BIGNUMERIC REQUIRED
+   - storage BIGNUMERIC REQUIRED
+   - rate_profit BIGNUMERIC REQUIRED
+   - rate_margin BIGNUMERIC REQUIRED
+   - expert_id BIGNUMERIC REQUIRED
+   - expert_position_id BIGNUMERIC REQUIRED
+   - comment STRING REQUIRED
+   - activation_mode INTEGER REQUIRED
+   - activation_time TIMESTAMP REQUIRED
+   - activation_price BIGNUMERIC REQUIRED
+   - activation_flags INTEGER REQUIRED
+   - time_create_msc TIMESTAMP REQUIRED
+   - time_update_msc TIMESTAMP REQUIRED
+   - dealer BIGNUMERIC REQUIRED
+   - position BIGNUMERIC REQUIRED
+   - external_id STRING REQUIRED
+   - modification_flags INTEGER REQUIRED
+   - reason INTEGER REQUIRED
+   - volume_ext BIGNUMERIC REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.userrecord
+  type: TABLE  rows: 55106214  size_bytes: 48309785649
+  created: 2026-06-15 05:25:39.794000+00:00  modified: 2026-08-27 18:41:17.518000+00:00
+  partitioning: TimePartitioning(field='ts',type_='DAY') None
+  clustering_fields: ['login']
+  schema (55 fields):
+   - id BIGNUMERIC REQUIRED
+   - ts TIMESTAMP REQUIRED
+   - opcode INTEGER REQUIRED
+   - login BIGNUMERIC REQUIRED
+   - group STRING REQUIRED
+   - cert_serial_number BIGNUMERIC REQUIRED
+   - rights BIGNUMERIC REQUIRED
+   - registration TIMESTAMP REQUIRED
+   - last_access TIMESTAMP REQUIRED
+   - last_ip STRING REQUIRED
+   - name STRING REQUIRED
+   - company STRING REQUIRED
+   - account STRING REQUIRED
+   - country STRING REQUIRED
+   - language INTEGER REQUIRED
+   - city STRING REQUIRED
+   - state STRING REQUIRED
+   - zip_code STRING REQUIRED
+   - address STRING REQUIRED
+   - phone STRING REQUIRED
+   - email STRING REQUIRED
+   - id_ STRING REQUIRED
+   - status STRING REQUIRED
+   - comment STRING REQUIRED
+   - color INTEGER REQUIRED
+   - phone_password STRING REQUIRED
+   - leverage INTEGER REQUIRED
+   - agent BIGNUMERIC REQUIRED
+   - balance BIGNUMERIC REQUIRED
+   - credit BIGNUMERIC REQUIRED
+   - interest_rate BIGNUMERIC REQUIRED
+   - commission_daily BIGNUMERIC REQUIRED
+   - commission_monthly BIGNUMERIC REQUIRED
+   - commission_agent_daily BIGNUMERIC REQUIRED
+   - commission_agent_monthly BIGNUMERIC REQUIRED
+   - balance_prev_day BIGNUMERIC REQUIRED
+   - balance_prev_month BIGNUMERIC REQUIRED
+   - equity_prev_day BIGNUMERIC REQUIRED
+   - equity_prev_month BIGNUMERIC REQUIRED
+   - external_account_total INTEGER REQUIRED
+   - last_pass_change BIGNUMERIC REQUIRED
+   - registration_utc TIMESTAMP REQUIRED
+   - last_access_utc TIMESTAMP REQUIRED
+   - last_pass_change_utc TIMESTAMP REQUIRED
+   - mqid STRING REQUIRED
+   - lead_source STRING NULLABLE
+   - lead_campaign STRING NULLABLE
+   - client_id BIGNUMERIC REQUIRED
+   - first_name STRING NULLABLE
+   - last_name STRING NULLABLE
+   - middle_name STRING NULLABLE
+   - otp_secret STRING NULLABLE
+   - limit_orders INTEGER REQUIRED
+   - limit_position_value BIGNUMERIC NULLABLE
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.accounts
+  type: TABLE  rows: 36587  size_bytes: 30082438
+  created: 2024-08-29 07:58:50.201000+00:00  modified: 2026-08-27 18:12:21.208000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (52 fields):
+   - login BIGNUMERIC REQUIRED
+   - group STRING REQUIRED
+   - cert_serial_number BIGNUMERIC REQUIRED
+   - rights BIGNUMERIC REQUIRED
+   - registration TIMESTAMP REQUIRED
+   - last_access TIMESTAMP REQUIRED
+   - last_ip STRING REQUIRED
+   - name STRING REQUIRED
+   - company STRING REQUIRED
+   - account STRING REQUIRED
+   - country STRING REQUIRED
+   - language INTEGER REQUIRED
+   - city STRING REQUIRED
+   - state STRING REQUIRED
+   - zip_code STRING REQUIRED
+   - address STRING REQUIRED
+   - phone STRING REQUIRED
+   - email STRING REQUIRED
+   - id_ STRING REQUIRED
+   - status STRING REQUIRED
+   - comment STRING REQUIRED
+   - color INTEGER REQUIRED
+   - phone_password STRING REQUIRED
+   - leverage INTEGER REQUIRED
+   - agent BIGNUMERIC REQUIRED
+   - balance BIGNUMERIC REQUIRED
+   - credit BIGNUMERIC REQUIRED
+   - interest_rate BIGNUMERIC REQUIRED
+   - commission_daily BIGNUMERIC REQUIRED
+   - commission_monthly BIGNUMERIC REQUIRED
+   - commission_agent_daily BIGNUMERIC REQUIRED
+   - commission_agent_monthly BIGNUMERIC REQUIRED
+   - balance_prev_day BIGNUMERIC REQUIRED
+   - balance_prev_month BIGNUMERIC REQUIRED
+   - equity_prev_day BIGNUMERIC REQUIRED
+   - equity_prev_month BIGNUMERIC REQUIRED
+   - external_account_total INTEGER REQUIRED
+   - last_pass_change BIGNUMERIC REQUIRED
+   - registration_utc TIMESTAMP REQUIRED
+   - last_access_utc TIMESTAMP REQUIRED
+   - last_pass_change_utc TIMESTAMP REQUIRED
+   - mqid STRING REQUIRED
+   - lead_source STRING REQUIRED
+   - lead_campaign STRING NULLABLE
+   - client_id BIGNUMERIC REQUIRED
+   - first_name STRING NULLABLE
+   - last_name STRING NULLABLE
+   - middle_name STRING NULLABLE
+   - otp_secret STRING NULLABLE
+   - limit_orders INTEGER REQUIRED
+   - limit_position_value BIGNUMERIC NULLABLE
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.groups
+  type: TABLE  rows: 448  size_bytes: 262388
+  created: 2024-08-29 07:58:53.214000+00:00  modified: 2026-08-27 18:11:20.628000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (42 fields):
+   - group STRING REQUIRED
+   - server BIGNUMERIC REQUIRED
+   - permissions_flags BIGNUMERIC REQUIRED
+   - auth_mode INTEGER REQUIRED
+   - auth_password_min INTEGER REQUIRED
+   - company STRING REQUIRED
+   - company_page STRING REQUIRED
+   - company_email STRING REQUIRED
+   - company_support_page STRING REQUIRED
+   - company_support_email STRING REQUIRED
+   - company_catalog STRING REQUIRED
+   - currency STRING REQUIRED
+   - currency_digits INTEGER REQUIRED
+   - reports_mode INTEGER REQUIRED
+   - reports_flags BIGNUMERIC REQUIRED
+   - reports_smtp STRING REQUIRED
+   - reports_smtp_login STRING REQUIRED
+   - reports_smtp_pass STRING REQUIRED
+   - news_mode INTEGER REQUIRED
+   - news_category STRING REQUIRED
+   - news_lang_total INTEGER REQUIRED
+   - mail_mode INTEGER REQUIRED
+   - trade_flags BIGNUMERIC REQUIRED
+   - trade_interestrate BIGNUMERIC REQUIRED
+   - trade_virtual_credit BIGNUMERIC REQUIRED
+   - margin_free_mode INTEGER REQUIRED
+   - marginso_mode INTEGER REQUIRED
+   - margin_call BIGNUMERIC REQUIRED
+   - margin_stop_out BIGNUMERIC REQUIRED
+   - demo_leverage INTEGER REQUIRED
+   - demo_deposit BIGNUMERIC REQUIRED
+   - limit_history INTEGER REQUIRED
+   - limit_orders INTEGER REQUIRED
+   - limit_symbols INTEGER REQUIRED
+   - commission_total INTEGER REQUIRED
+   - symbol_total INTEGER REQUIRED
+   - margin_free_profit_mode INTEGER REQUIRED
+   - margin_mode INTEGER REQUIRED
+   - auth_otp_mode INTEGER REQUIRED
+   - trade_transfer_mode INTEGER REQUIRED
+   - margin_flags BIGNUMERIC REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.symbols
+  type: TABLE  rows: 375  size_bytes: 512421
+  created: 2024-08-29 07:58:49.859000+00:00  modified: 2026-08-27 18:12:18.438000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (84 fields):
+   - symbol STRING REQUIRED
+   - path STRING REQUIRED
+   - isin STRING REQUIRED
+   - description STRING REQUIRED
+   - international STRING REQUIRED
+   - basis STRING REQUIRED
+   - source STRING REQUIRED
+   - page STRING REQUIRED
+   - currency_base STRING REQUIRED
+   - currency_base_digits INTEGER REQUIRED
+   - currency_profit STRING REQUIRED
+   - currency_profit_digits INTEGER REQUIRED
+   - currency_margin STRING REQUIRED
+   - currency_margin_digits INTEGER REQUIRED
+   - color INTEGER REQUIRED
+   - color_background INTEGER REQUIRED
+   - digits INTEGER REQUIRED
+   - point BIGNUMERIC REQUIRED
+   - multiply BIGNUMERIC REQUIRED
+   - tick_flags BIGNUMERIC REQUIRED
+   - tick_book_depth INTEGER REQUIRED
+   - filter_soft INTEGER REQUIRED
+   - filter_soft_ticks INTEGER REQUIRED
+   - filter_hard INTEGER REQUIRED
+   - filter_hard_ticks INTEGER REQUIRED
+   - filter_discard INTEGER REQUIRED
+   - filter_spread_max INTEGER REQUIRED
+   - filter_spread_min INTEGER REQUIRED
+   - trade_mode INTEGER REQUIRED
+   - calc_mode INTEGER REQUIRED
+   - exec_mode INTEGER REQUIRED
+   - gtc_mode INTEGER REQUIRED
+   - fill_flags INTEGER REQUIRED
+   - expir_flags INTEGER REQUIRED
+   - spread INTEGER REQUIRED
+   - spread_balance INTEGER REQUIRED
+   - spread_diff INTEGER REQUIRED
+   - spread_diff_balance INTEGER REQUIRED
+   - tick_value BIGNUMERIC REQUIRED
+   - tick_size BIGNUMERIC REQUIRED
+   - contract_size BIGNUMERIC REQUIRED
+   - stops_level INTEGER REQUIRED
+   - freeze_level INTEGER REQUIRED
+   - quotes_timeout INTEGER REQUIRED
+   - volume_min BIGNUMERIC REQUIRED
+   - volume_max BIGNUMERIC REQUIRED
+   - volume_step BIGNUMERIC REQUIRED
+   - volume_limit BIGNUMERIC REQUIRED
+   - margin_flags INTEGER REQUIRED
+   - margin_initial BIGNUMERIC REQUIRED
+   - margin_maintenance BIGNUMERIC REQUIRED
+   - margin_long BIGNUMERIC REQUIRED
+   - margin_short BIGNUMERIC REQUIRED
+   - margin_limit BIGNUMERIC REQUIRED
+   - margin_stop BIGNUMERIC REQUIRED
+   - margin_stop_limit BIGNUMERIC REQUIRED
+   - swap_mode INTEGER REQUIRED
+   - swap_long BIGNUMERIC REQUIRED
+   - swap_short BIGNUMERIC REQUIRED
+   - swap_3day INTEGER REQUIRED
+   - time_start TIMESTAMP REQUIRED
+   - time_expiration TIMESTAMP REQUIRED
+   - re_flags INTEGER REQUIRED
+   - re_timeout INTEGER REQUIRED
+   - ie_check_mode INTEGER REQUIRED
+   - ie_timeout INTEGER REQUIRED
+   - ie_split_profit INTEGER REQUIRED
+   - ie_slip_losing INTEGER REQUIRED
+   - ie_volume_max BIGNUMERIC REQUIRED
+   - price_settle BIGNUMERIC REQUIRED
+   - price_limit_max BIGNUMERIC REQUIRED
+   - price_limit_min BIGNUMERIC REQUIRED
+   - trade_flags BIGNUMERIC REQUIRED
+   - order_flags INTEGER REQUIRED
+   - options_mode INTEGER REQUIRED
+   - price_strike BIGNUMERIC REQUIRED
+   - margin_rate_liquidity BIGNUMERIC REQUIRED
+   - face_value BIGNUMERIC REQUIRED
+   - accrued_interest BIGNUMERIC REQUIRED
+   - splice_type INTEGER REQUIRED
+   - splice_time_type INTEGER REQUIRED
+   - splice_time_days INTEGER REQUIRED
+   - margin_hedged BIGNUMERIC REQUIRED
+   - load_time TIMESTAMP REQUIRED
+==========================================================================================
+TABLE: zfx-dwh-prod.mt5_live01.loginrecord
+  type: TABLE  rows: 40604329  size_bytes: 10819418220
+  created: 2025-06-24 16:12:11.934000+00:00  modified: 2026-08-27 18:09:03.289000+00:00
+  partitioning: None None
+  clustering_fields: None
+  schema (13 fields):
+   - id BIGNUMERIC REQUIRED
+   - sequence BIGNUMERIC NULLABLE
+   - ts TIMESTAMP REQUIRED
+   - login BIGNUMERIC REQUIRED
+   - ip STRING REQUIRED
+   - type INTEGER REQUIRED
+   - session_id BIGNUMERIC NULLABLE
+   - group STRING NULLABLE
+   - build INTEGER NULLABLE
+   - time TIMESTAMP NULLABLE
+   - computer_id STRING NULLABLE
+   - is_connected INTEGER NULLABLE
+   - load_time TIMESTAMP REQUIRED

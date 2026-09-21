@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+{% block title %}ZFX Command Hub{% endblock %}
+{% block content %}
+<style>
+  /* ---------- command hub: the flywheel ---------- */
+  .hub-stage { position: relative; min-height: calc(100vh - 120px);
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; overflow: hidden; }
+  /* drifting particle field */
+  .hub-stage::before { content: ""; position: absolute; inset: -50%;
+    background-image:
+      radial-gradient(2px 2px at 20% 30%, rgba(34,211,238,.35), transparent 40%),
+      radial-gradient(1.5px 1.5px at 70% 60%, rgba(124,140,255,.3), transparent 40%),
+      radial-gradient(1px 1px at 40% 80%, rgba(46,230,168,.3), transparent 40%),
+      radial-gradient(1.5px 1.5px at 85% 25%, rgba(34,211,238,.25), transparent 40%),
+      radial-gradient(1px 1px at 10% 65%, rgba(124,140,255,.25), transparent 40%),
+      radial-gradient(2px 2px at 55% 15%, rgba(46,230,168,.2), transparent 40%);
+    animation: hubDrift 90s linear infinite; pointer-events: none; }
+  @keyframes hubDrift { from { transform: translate3d(0,0,0) }
+    to { transform: translate3d(-6%, -4%, 0) } }
+
+  .flywheel { position: relative; width: min(640px, 92vw);
+    aspect-ratio: 1; margin: 8px auto; }
+
+  /* rotating rings */
+  .fw-ring { position: absolute; inset: 0; border-radius: 50%;
+    border: 1px dashed rgba(34,211,238,.25);
+    animation: fwSpin 80s linear infinite; }
+  .fw-ring.r2 { inset: 12%; border-color: rgba(124,140,255,.22);
+    animation-duration: 55s; animation-direction: reverse; }
+  .fw-ring.r3 { inset: 24%; border-style: solid;
+    border-color: rgba(34,211,238,.1); animation-duration: 120s; }
+  @keyframes fwSpin { to { transform: rotate(360deg) } }
+
+  /* pulsing core */
+  .fw-core { position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%); width: 27%; aspect-ratio: 1;
+    border-radius: 50%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: radial-gradient(circle at 38% 32%, #14203a, #0a0e18 70%);
+    border: 1px solid var(--border-bright);
+    box-shadow: 0 0 60px rgba(34,211,238,.15), inset 0 0 30px rgba(34,211,238,.07);
+    animation: corePulse 4.5s ease-in-out infinite; z-index: 3; }
+  @keyframes corePulse {
+    0%, 100% { box-shadow: 0 0 45px rgba(34,211,238,.12), inset 0 0 26px rgba(34,211,238,.06) }
+    50% { box-shadow: 0 0 85px rgba(34,211,238,.28), inset 0 0 40px rgba(34,211,238,.12) } }
+  .fw-core b { font-size: clamp(20px, 3.4vw, 30px); letter-spacing: .08em; }
+  .fw-core small { color: var(--ink-dim); font-size: clamp(9px, 1.3vw, 12px);
+    letter-spacing: .22em; text-transform: uppercase; margin-top: 3px; }
+  .fw-core .lamp { margin-top: 8px; font-family: var(--mono);
+    font-size: clamp(9px, 1.2vw, 11px); color: var(--ink-faint); }
+  .lamp .dot { display: inline-block; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--ink-faint); margin-right: 5px;
+    vertical-align: 1px; }
+  .lamp.live .dot { background: var(--pos); box-shadow: 0 0 8px var(--pos);
+    animation: lampBlink 2s ease-in-out infinite; }
+  @keyframes lampBlink { 50% { opacity: .45 } }
+
+  /* orbiting section nodes: container spins, inner counter-spins upright */
+  .fw-orbit { position: absolute; inset: 0;
+    animation: fwSpin 150s linear infinite; }
+  .hub-stage:hover .fw-orbit,
+  .hub-stage:hover .fw-ring { animation-play-state: paused; }
+  .fw-node { position: absolute; left: 50%; top: 50%;
+    width: clamp(96px, 18%, 128px); margin-left: calc(clamp(96px,18%,128px) / -2); }
+  .fw-node-inner { animation: fwSpinRev 150s linear infinite;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    text-decoration: none; text-align: center;
+    padding: 12px 8px 10px; border-radius: 14px;
+    background: rgba(13,18,32,.82); backdrop-filter: blur(6px);
+    border: 1px solid var(--border);
+    transition: transform .25s cubic-bezier(.2,.9,.3,1.4),
+                border-color .25s, box-shadow .25s; }
+  .hub-stage:hover .fw-node-inner { animation-play-state: paused; }
+  @keyframes fwSpinRev { to { transform: rotate(-360deg) } }
+  .fw-node-inner:hover { transform: scale(1.13); text-decoration: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 34px rgba(34,211,238,.28); z-index: 5; }
+  .fw-node-inner .glyph { width: 34px; height: 34px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    background: linear-gradient(135deg, rgba(34,211,238,.16), rgba(124,140,255,.12));
+    border: 1px solid var(--border-bright); }
+  .fw-node-inner b { color: var(--ink); font-size: 12.5px; }
+  .fw-node-inner small { color: var(--ink-faint); font-size: 9.5px;
+    line-height: 1.25; }
+  .fw-node-inner.locked { opacity: .38; filter: saturate(.4);
+    pointer-events: none; }
+
+  /* live status strip under the wheel */
+  .hub-strip { display: flex; gap: 14px; flex-wrap: wrap;
+    justify-content: center; margin-top: 6px; z-index: 3; }
+  .hub-stat { background: rgba(13,18,32,.8); border: 1px solid var(--border);
+    border-radius: 999px; padding: 7px 16px; font-family: var(--mono);
+    font-size: 12px; color: var(--ink-dim);
+    animation: stripIn .6s ease both; }
+  .hub-stat b { color: var(--ink); }
+  .hub-stat:nth-child(2) { animation-delay: .08s }
+  .hub-stat:nth-child(3) { animation-delay: .16s }
+  .hub-stat:nth-child(4) { animation-delay: .24s }
+  @keyframes stripIn { from { opacity: 0; transform: translateY(10px) } }
+
+  @media (max-width: 640px) {
+    .fw-node-inner small { display: none }
+  }
+</style>
+
+<div class="hub-stage">
+  <div class="flywheel">
+    <div class="fw-ring"></div>
+    <div class="fw-ring r2"></div>
+    <div class="fw-ring r3"></div>
+
+    <div class="fw-core">
+      <b>ZFX</b>
+      <small>Risk Intelligence</small>
+      <span class="lamp" id="hub-lamp"><span class="dot"></span><span id="hub-lamp-text">connecting&hellip;</span></span>
+    </div>
+
+    <div class="fw-orbit" id="fw-orbit">
+      {# nodes are positioned by JS on a circle so any count spaces evenly #}
+      <a class="fw-node-inner fw-node" data-idx="0" href="/executive">
+        <span class="glyph">◈</span><b>Executive</b>
+        <small>The one-page brief</small></a>
+      <a class="fw-node-inner fw-node {{ '' if user.may_see('trading') else 'locked' }}"
+         data-idx="1" href="/trading/summary">
+        <span class="glyph">⚖</span><b>Trading Risk</b>
+        <small>Book, exposure, clients</small></a>
+      <a class="fw-node-inner fw-node {{ '' if user.may_see('quant') else 'locked' }}"
+         data-idx="2" href="/quant/summary">
+        <span class="glyph">∑</span><b>Quant</b>
+        <small>Per-trade model &amp; signals</small></a>
+      <a class="fw-node-inner fw-node {{ '' if user.is_admin else 'locked' }}"
+         data-idx="3" href="/vantage">
+        <span class="glyph">⚡</span><b>Vantage</b>
+        <small>Live copy-trader engine</small></a>
+      <a class="fw-node-inner fw-node {{ '' if user.may_see('trading') else 'locked' }}"
+         data-idx="4" href="/trading/antifraud">
+        <span class="glyph">🛡</span><b>AntiFraud</b>
+        <small>Profiling &amp; screening</small></a>
+      <a class="fw-node-inner fw-node {{ '' if user.may_see('trading') else 'locked' }}"
+         data-idx="8" href="/replay">
+        <span class="glyph">►</span><b>Replay</b>
+        <small>Biggest &amp; suspicious wins</small></a>
+      <a class="fw-node-inner fw-node" data-idx="5" href="/data">
+        <span class="glyph">▦</span><b>Warehouse</b>
+        <small>Data coverage &amp; loads</small></a>
+      <a class="fw-node-inner fw-node {{ '' if user.is_admin else 'locked' }}"
+         data-idx="6" href="/admin">
+        <span class="glyph">⚙</span><b>Admin</b>
+        <small>Users &amp; approvals</small></a>
+      <a class="fw-node-inner fw-node" data-idx="7" href="/settings">
+        <span class="glyph">≋</span><b>Data Source</b>
+        <small>Feeds &amp; connections</small></a>
+    </div>
+  </div>
+
+  <div class="hub-strip" id="hub-strip">
+    <span class="hub-stat">engine <b id="hs-engine">&mdash;</b></span>
+    <span class="hub-stat">equity <b id="hs-equity">&mdash;</b></span>
+    <span class="hub-stat">feed lag <b id="hs-lag">&mdash;</b></span>
+    <span class="hub-stat">open positions <b id="hs-pos">&mdash;</b></span>
+  </div>
+
+  {# ---------- client zoom: jump straight into any account's detail ---------- #}
+  <div class="hub-zoom">
+    <button type="button" class="zoom-btn" id="zoom-open">
+      <span class="glyph">🔍</span> Client Zoom</button>
+    <div class="zoom-pop" id="zoom-pop" hidden>
+      <input id="zoom-input" type="text" autocomplete="off" spellcheck="false"
+             placeholder="account — e.g. mt5_live01:105036806" list="zoom-recent"/>
+      <datalist id="zoom-recent"></datalist>
+      <button type="button" class="zoom-go" id="zoom-go">Open →</button>
+      <p class="zoom-hint" id="zoom-hint">Full key <code>server:login</code>, or a bare
+        login to search every server. Loads the live account detail — trades, exposure,
+        markouts — even for accounts that started trading today.</p>
+      <div class="zoom-chips" id="zoom-chips"></div>
+    </div>
+  </div>
+
+  {# ---------- trade zoom: replay ONE trade by its ticket ---------- #}
+  <div class="hub-zoom">
+    <button type="button" class="zoom-btn" id="tz-open">
+      <span class="glyph">🎬</span> Trade Zoom</button>
+    <div class="zoom-pop" id="tz-pop" hidden>
+      <input id="tz-input" type="text" autocomplete="off" spellcheck="false"
+             inputmode="numeric" placeholder="trade ticket — e.g. 1964717379"/>
+      <button type="button" class="zoom-go" id="tz-go">Replay →</button>
+      <p class="zoom-hint">Our MT5 position ticket or a raw source order/position
+        ticket. Opens the tick-by-tick replay zoomed to that single trade — entry,
+        exit and the price path around it.</p>
+    </div>
+  </div>
+</div>
+
+<style>
+  .hub-zoom { margin-top: 14px; z-index: 4; display: flex;
+    flex-direction: column; align-items: center; gap: 10px; }
+  .zoom-btn { display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 13px; letter-spacing: .04em;
+    color: var(--ink); cursor: pointer; padding: 9px 20px; border-radius: 999px;
+    background: linear-gradient(135deg, rgba(34,211,238,.16), rgba(124,140,255,.14));
+    border: 1px solid var(--border-bright);
+    box-shadow: 0 0 26px rgba(34,211,238,.14);
+    transition: transform .2s, box-shadow .2s, border-color .2s; }
+  .zoom-btn:hover { transform: translateY(-1px);
+    border-color: var(--accent); box-shadow: 0 0 40px rgba(34,211,238,.3); }
+  .zoom-btn .glyph { font-size: 15px; }
+  .zoom-pop { width: min(560px, 92vw);
+    background: rgba(13,18,32,.94); backdrop-filter: blur(8px);
+    border: 1px solid var(--border-bright); border-radius: 16px;
+    padding: 16px; display: grid; grid-template-columns: 1fr auto; gap: 10px;
+    box-shadow: 0 22px 60px rgba(0,0,0,.5); animation: stripIn .3s ease both; }
+  .zoom-pop input { grid-column: 1; font-family: var(--mono); font-size: 13px;
+    padding: 11px 14px; border-radius: 10px; color: var(--ink);
+    background: rgba(8,12,22,.9); border: 1px solid var(--border);
+    outline: none; }
+  .zoom-pop input:focus { border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(34,211,238,.12); }
+  .zoom-go { grid-column: 2; font-family: var(--mono); font-size: 13px;
+    padding: 0 18px; border-radius: 10px; cursor: pointer; color: #06121a;
+    background: var(--accent); border: none; font-weight: 600; }
+  .zoom-hint { grid-column: 1 / -1; margin: 0; color: var(--ink-faint);
+    font-size: 11px; line-height: 1.4; }
+  .zoom-hint code { color: var(--ink-dim);
+    background: rgba(34,211,238,.08); padding: 1px 5px; border-radius: 4px; }
+  .zoom-chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+  .zoom-chips a { font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+    text-decoration: none; padding: 5px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: rgba(8,12,22,.7);
+    transition: border-color .2s, color .2s; }
+  .zoom-chips a:hover { border-color: var(--accent); color: var(--ink); }
+  .zoom-chips a b { color: var(--pos); }
+  .zoom-chips a.neg b { color: var(--neg); }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Place the N nodes evenly on the orbit circle.
+(function () {
+  const nodes = document.querySelectorAll('#fw-orbit .fw-node');
+  const n = nodes.length, radius = 45;             // % -- 50 collided with the strip
+  nodes.forEach((el, i) => {
+    const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
+    el.style.top = (50 + radius * Math.sin(angle)) + '%';
+    el.style.left = (50 + radius * Math.cos(angle)) + '%';
+    el.style.marginTop = '-34px';
+  });
+})();
+
+// Live pulse for the core + strip. Degrades silently for non-admins.
+async function hubPoll() {
+  try {
+    const r = await fetch('/api/vantage/status');
+    const j = await r.json();
+    if (j.error) throw 0;
+    const lamp = document.getElementById('hub-lamp');
+    const running = j.engine && j.engine.running;
+    lamp.className = 'lamp' + (running ? ' live' : '');
+    document.getElementById('hub-lamp-text').textContent =
+      running ? 'ENGINE LIVE' : 'engine idle';
+    const rep = j.report || {};
+    if (rep.snapshot && rep.snapshot.available)
+      document.getElementById('hs-equity').textContent =
+        '$' + Number(rep.snapshot.equity).toLocaleString(undefined, {maximumFractionDigits: 0});
+    document.getElementById('hs-engine').textContent = running ? 'LIVE' : 'idle';
+    document.getElementById('hs-pos').textContent = (rep.positions || []).length;
+    const sig = (j.signals || [])[0];
+    if (sig && sig.traded) {
+      const lag = Math.max(0, (Date.now() - new Date(sig.traded)) / 1000);
+      document.getElementById('hs-lag').textContent = lag.toFixed(1) + 's';
+    }
+  } catch (e) {
+    document.getElementById('hub-lamp-text').textContent = 'operations console';
+    document.getElementById('hub-strip').style.display = 'none';
+  }
+}
+hubPoll(); setInterval(hubPoll, 7000);
+
+// ---------- client zoom ----------
+(function () {
+  const openBtn = document.getElementById('zoom-open');
+  const pop = document.getElementById('zoom-pop');
+  const input = document.getElementById('zoom-input');
+  const hint = document.getElementById('zoom-hint');
+  if (!openBtn) return;
+
+  openBtn.addEventListener('click', () => {
+    pop.hidden = !pop.hidden;
+    if (!pop.hidden) { input.focus(); loadMovers(); }
+  });
+
+  async function go() {
+    const q = input.value.trim();
+    if (!q) return;
+    if (q.includes(':')) { location.href = '/trading/account?account=' + encodeURIComponent(q); return; }
+    hint.textContent = 'Resolving login ' + q + ' across servers…';
+    try {
+      const r = await fetch('/api/account/resolve?q=' + encodeURIComponent(q));
+      const j = await r.json();
+      if (j.account_key) { location.href = '/trading/account?account=' + encodeURIComponent(j.account_key); }
+      else if (j.candidates && j.candidates.length) {
+        hint.innerHTML = 'Which server? ' + j.candidates.map(k =>
+          `<a href="/trading/account?account=${encodeURIComponent(k)}">${k}</a>`).join(' &nbsp; ');
+      } else { hint.textContent = 'No account found for “' + q + '”.'; }
+    } catch (e) { hint.textContent = 'Lookup failed — try the full server:login key.'; }
+  }
+  document.getElementById('zoom-go').addEventListener('click', go);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+
+  async function loadMovers() {
+    const chips = document.getElementById('zoom-chips');
+    const list = document.getElementById('zoom-recent');
+    if (chips.dataset.loaded) return;
+    chips.innerHTML = '<span style="color:var(--ink-faint);font-size:11px">loading recent movers…</span>';
+    try {
+      const r = await fetch('/api/hub/movers');
+      const j = await r.json();
+      const movers = j.movers || [];
+      chips.innerHTML = ''; list.innerHTML = '';
+      movers.forEach(m => {
+        const a = document.createElement('a');
+        a.href = '/trading/account?account=' + encodeURIComponent(m.account_key);
+        if (m.pnl < 0) a.className = 'neg';
+        a.innerHTML = `${m.symbol} <b>${m.pnl >= 0 ? '+' : ''}$${Math.round(m.pnl).toLocaleString()}</b>`;
+        a.title = m.account_key;
+        chips.appendChild(a);
+        const o = document.createElement('option'); o.value = m.account_key; list.appendChild(o);
+      });
+      if (!movers.length) chips.innerHTML = '<span style="color:var(--ink-faint);font-size:11px">no recent closed trades in window</span>';
+      chips.dataset.loaded = '1';
+    } catch (e) {
+      chips.innerHTML = '<span style="color:var(--ink-faint);font-size:11px">movers unavailable</span>';
+    }
+  }
+})();
+
+// Trade Zoom: ticket -> the single-trade replay (trade zoom, not client zoom)
+(function () {
+  const openBtn = document.getElementById('tz-open');
+  const pop = document.getElementById('tz-pop');
+  const input = document.getElementById('tz-input');
+  if (!openBtn) return;
+  openBtn.addEventListener('click', () => {
+    pop.hidden = !pop.hidden; if (!pop.hidden) input.focus();
+  });
+  function go() {
+    const tk = input.value.trim();
+    if (!/^\d+$/.test(tk)) { input.focus(); return; }
+    location.href = '/replay?ticket=' + encodeURIComponent(tk);
+  }
+  document.getElementById('tz-go').addEventListener('click', go);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+})();
+</script>
+{% endblock %}

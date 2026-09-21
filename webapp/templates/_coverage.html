@@ -1,0 +1,33 @@
+{# Population provenance. The two views report different flat-B-book baselines
+   ($117.4M Trading vs $71.1M Quant) almost entirely because they cover
+   different servers; stating that on each screen stops it reading as a
+   discrepancy. #}
+{% if coverage and coverage.servers %}
+<div class="panel" style="margin-bottom:14px">
+  <h2>Population covered</h2>
+  <p class="hint" style="margin-bottom:10px">
+    {{ '{:,}'.format(coverage.accounts) }} accounts across
+    {{ coverage.servers|length }} server{{ 's' if coverage.servers|length != 1 }},
+    {{ coverage.first_day }} to {{ coverage.last_day }}.
+    The first {{ config.min_train_days }} days are walk-forward warm-up and carry no scores,
+    so this baseline is smaller than the raw source total.
+  </p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    {% for server in coverage.servers %}
+      <span class="chip on" style="cursor:default">
+        {{ server }} &middot; ${{ '{:,.0f}'.format(coverage.firm_pnl_by_server[server]) }}
+      </span>
+    {% endfor %}
+  </div>
+  {% if coverage.mt5_excluded %}
+  <div class="alert alert-info" style="margin:0;font-size:12px">
+    <b>MT5 servers are not included in this model.</b> MT5 records deals rather than
+    round-trip trades &mdash; entry and exit arrive as separate rows and every closed row
+    has a null open time, so there is no entry timestamp to decide on. Pairing deals by
+    order id would bring <code>mt5_live01</code> (${{ '39.6M' }} of firm P&amp;L) into scope;
+    until then the Trading view covers it and this one does not, which is why the two
+    baselines differ.
+  </div>
+  {% endif %}
+</div>
+{% endif %}

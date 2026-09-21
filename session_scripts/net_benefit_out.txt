@@ -1,0 +1,18 @@
+﻿
+scored 399,436 rows [906s]
+
+If the firm B-booked EVERYTHING in this window it would net $117,399,760 from these accounts.
+(so hedging the whole book would forgo that -- the question is whether a SUBSET beats it)
+
+ranking                           top 5%       top 10%       top 20%       top 30%
+                            net $ hedged  net $ hedged  net $ hedged  net $ hedged
+  expected net benefit      -59,126,696  -72,336,184  -84,234,592  -86,886,384
+  P(win) x E[size|win]      -74,720,520  -92,741,144 -105,716,608 -110,145,344
+  size alone                -70,770,144  -93,862,768 -105,902,464 -111,217,112
+  P(win) alone               -7,018,911  -15,776,204  -37,886,920  -56,823,456
+  random                     -3,514,892   -8,379,192  -16,920,320  -27,280,648
+
+Positive = hedging that subset SAVED the firm money (clients won).
+Negative = hedging it COST the firm money (those clients would have lost).
+
+

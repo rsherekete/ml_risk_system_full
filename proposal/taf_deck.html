@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AntiFraud Solution — AI-Driven Intelligence · Zeal Group</title>
+<style>
+  :root{
+    --navy:#0E2A47; --navy2:#123356; --ink:#16202E; --muted:#68758A;
+    --gold:#C9A24B; --gold-l:#E7C877; --teal:#1E8F8F; --line:#E4E9F0;
+    --pos:#1F9D6B; --neg:#C0392B; --panel:#F5F8FC; --white:#fff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{font-family:"Segoe UI",Inter,Arial,sans-serif;color:var(--ink);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .slide{position:relative;width:1280px;height:720px;background:var(--white);
+    overflow:hidden;page-break-after:always;padding:54px 64px}
+  .slide:last-child{page-break-after:auto}
+  .kicker{font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);font-weight:700}
+  h1{font-size:44px;line-height:1.08;color:var(--navy);font-weight:800;letter-spacing:-.01em}
+  h2{font-size:34px;line-height:1.1;color:var(--navy);font-weight:800;letter-spacing:-.01em}
+  h3{font-size:19px;color:var(--navy);font-weight:700}
+  p,li{font-size:17px;line-height:1.5;color:#25313f}
+  .lead{font-size:21px;line-height:1.45;color:#2c3a4a}
+  .foot{position:absolute;left:64px;right:64px;bottom:24px;display:flex;justify-content:space-between;
+    font-size:11px;color:var(--muted);letter-spacing:.04em;border-top:1px solid var(--line);padding-top:8px}
+  .foot b{color:var(--navy)}
+  .tophair{position:absolute;top:0;left:0;height:6px;width:100%;
+    background:linear-gradient(90deg,var(--navy) 0%,var(--navy) 62%,var(--gold) 62%,var(--gold) 100%)}
+  .num{font-variant-numeric:tabular-nums}
+  .grid{display:grid;gap:16px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--gold);
+    border-radius:10px;padding:18px 20px}
+  .stat .big{font-size:38px;font-weight:800;color:var(--navy);line-height:1}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:6px;letter-spacing:.02em}
+  .pill{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--navy);background:#F0E6CC;border:1px solid var(--gold);border-radius:999px;padding:4px 12px}
+  table{border-collapse:collapse;width:100%;font-size:15px}
+  th{text-align:left;color:var(--muted);font-weight:700;font-size:12px;letter-spacing:.06em;
+    text-transform:uppercase;padding:9px 12px;border-bottom:2px solid var(--navy)}
+  td{padding:10px 12px;border-bottom:1px solid var(--line);color:#25313f}
+  td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+  .bar{height:11px;border-radius:6px;background:linear-gradient(90deg,var(--gold),var(--gold-l))}
+  .chip{display:inline-flex;align-items:center;gap:7px;font-size:14px;color:var(--navy);font-weight:600}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--gold)}
+  .flow{display:flex;align-items:stretch;gap:0}
+  .step{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 15px;position:relative}
+  .step h4{color:var(--navy);font-size:15px;margin-bottom:5px}
+  .step p{font-size:13px;color:#3a4757;line-height:1.4}
+  .arrow{display:flex;align-items:center;color:var(--gold);font-size:26px;font-weight:800;padding:0 6px}
+  .callout{background:var(--navy);color:#eaf1fa;border-radius:12px;padding:22px 26px}
+  .callout b{color:var(--gold-l)}
+  .venn{position:relative;height:230px}
+  .setc{position:absolute;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-weight:800;text-align:center}
+  ul.tick{list-style:none} ul.tick li{position:relative;padding-left:26px;margin:10px 0}
+  ul.tick li:before{content:"";position:absolute;left:0;top:7px;width:12px;height:12px;border-radius:3px;
+    background:var(--gold)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:34px}
+  .smartrow td:first-child{font-weight:700;color:var(--navy)}
+  .accent{color:var(--gold)} .navytx{color:var(--navy)}
+</style>
+</head>
+<body>
+
+<!-- 1. COVER -->
+<section class="slide" style="background:linear-gradient(135deg,#0E2A47,#0a1f36 60%,#0b2136)">
+  <div style="position:absolute;top:0;left:0;height:6px;width:100%;background:linear-gradient(90deg,var(--gold),var(--gold-l))"></div>
+  <div style="position:absolute;top:52px;left:64px;color:#9db4d0;font-size:15px;letter-spacing:.28em;font-weight:700">ZEAL&nbsp;GROUP&nbsp;&nbsp;·&nbsp;&nbsp;RISK &amp; INTELLIGENCE</div>
+  <div style="position:absolute;top:230px;left:64px;right:64px">
+    <div class="kicker" style="color:var(--gold-l)">Alignment Proposal · Office of the CEO</div>
+    <div style="font-size:66px;font-weight:800;color:#fff;line-height:1.0;margin-top:14px;letter-spacing:-.015em">
+      AntiFraud Solution</div>
+    <div style="font-size:34px;font-weight:700;color:var(--gold-l);margin-top:8px;letter-spacing:.01em">
+      AI-Driven Intelligence</div>
+    <div style="font-size:21px;color:#b9cbe2;margin-top:22px;max-width:920px;line-height:1.4">
+      Predict, five days in advance, which accounts will cost the B-book money — and act before they do.
+      A configurable, explainable, self-correcting framework <span style="color:#8fa6c2">(the TAF engine).</span></div>
+  </div>
+  <div style="position:absolute;bottom:52px;left:64px;right:64px;display:flex;justify-content:space-between;
+    color:#8fa6c2;font-size:14px;border-top:1px solid #23405f;padding-top:14px">
+    <span>Prepared for the Office of the CEO</span><span>September 2026 · Confidential</span>
+  </div>
+</section>
+
+<!-- 2. THE BRIEF, ANSWERED (the three points) -->
+<section class="slide">
+  <div class="tophair"></div>
+  <div class="kicker">The brief, answered — three questions, made SMART</div>
+  <h2 style="margin-top:8px">Everything the CEO asked for, on one page.</h2>
+  <div style="display:flex;flex-direction:column;gap:14px;margin-top:22px">
+    <!-- 1 -->
+    <div style="display:flex;gap:20px;align-items:stretch">
+      <div style="width:56px;flex:none;background:var(--navy);color:var(--gold-l);border-radius:10px;
+        display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800">1</div>
+      <div style="flex:1;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:10px;padding:13px 18px">
+        <div style="font-size:18px;font-weight:800;color:var(--navy)">Core metrics &amp; the target</div>
+        <div style="font-size:15px;color:#25313f;margin-top:3px;line-height:1.4">
+          Metric = <b>Abuse-USD caught in advance</b> — money Toxic/Arbitrage accounts extract, flagged before they take it.
+          Baseline is measured, not guessed: <b class="accent">$454,136/day</b> at stake (perfect-oracle upper bound). <b>Target: detect ≥ 75% out-of-sample.</b></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:5px"><b>Specific</b> metric · <b>Measurable</b> in USD &amp; AUC · <b>Target</b> set</div>
+      </div>
+    </div>
+    <!-- 2 -->
+    <div style="display:flex;gap:20px;align-items:stretch">
+      <div style="width:56px;flex:none;background:var(--navy);color:var(--gold-l);border-radius:10px;
+        display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800">2</div>
+      <div style="flex:1;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:10px;padding:13px 18px">
+        <div style="font-size:18px;font-weight:800;color:var(--navy)">The logic of the system</div>
+        <div style="font-size:15px;color:#25313f;margin-top:3px;line-height:1.4">
+          <b>Observe → Classify → Predict → Act → Learn.</b> Transparent rules place each account in measurable classes;
+          an explainable model per class predicts who turns to Abuse in 5 days; the class picks the action.
+          <b>Every flag traces to a metric &amp; threshold — no black box.</b></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:5px">Explainable end-to-end — the logic can be walked through, step by step</div>
+      </div>
+    </div>
+    <!-- 3 -->
+    <div style="display:flex;gap:20px;align-items:stretch">
+      <div style="width:56px;flex:none;background:var(--navy);color:var(--gold-l);border-radius:10px;
+        display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800">3</div>
+      <div style="flex:1;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:10px;padding:13px 18px">
+        <div style="font-size:18px;font-weight:800;color:var(--navy)">The result in 2–3 weeks, vs the target</div>
+        <div style="font-size:15px;color:#25313f;margin-top:3px;line-height:1.4">
+          A <b>2-week live pilot</b>, predicted-vs-actual <b>audited daily</b> against ground truth. At target it recovers
+          <b class="accent">≥ $341k/day (~$86M/yr)</b> of B-book P&amp;L. <b>Clear go / no-go.</b></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:5px"><b>Achievable</b> (models already 0.85 AUC) · <b>Relevant</b> (core P&amp;L) · <b>Time-bound</b> (2 weeks)</div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span><b>TAF</b> · engine · every figure from Zeal live data (36,005 accts · 99 days)</span><span>Each point is expanded in the pages that follow</span></div>
+</section>
+
+<!-- 3. THE PROBLEM QUANTIFIED -->
+<section class="slide">
+  <div class="tophair"></div>
+  <div class="kicker">The problem, quantified</div>
+  <h2 style="margin-top:10px">The B-book leak has a precise size — and a precise source.</h2>
+  <div class="two" style="margin-top:30px;align-items:center">
+    <div>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <div class="stat"><div class="big num">$454.1k</div><div class="lbl">Addressable abuse per trading day (perfect oracle)</div></div>
+        <div class="stat"><div class="big num">~$3.0M</div><div class="lbl">Per week · ~$114M annualised</div></div>
+        <div class="stat" style="border-left-color:var(--teal)"><div class="big num" style="color:var(--teal)">98%</div><div class="lbl">of all client winnings flow to Toxic/Arbitrage accounts</div></div>
+        <div class="stat" style="border-left-color:var(--teal)"><div class="big num" style="color:var(--teal)">15,598</div><div class="lbl">accounts turn abusive in ≥1 week (of 36,005)</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="callout" style="background:var(--panel);color:var(--ink);border:1px solid var(--line)">
+        <p style="font-size:19px;line-height:1.5">The accounts that <b class="navytx">win</b> are almost
+        exactly the accounts that are <b class="navytx">toxic or arbitraging</b> by definition.</p>
+        <p style="font-size:16px;margin-top:12px;color:#3a4757">This is not a coincidence — it is the thesis.
+        If we can identify <i>who wins next week</i>, we have identified <i>the cost</i>, in advance,
+        with time to act.</p>
+      </div>
+      <div style="margin-top:18px;font-size:14px;color:var(--muted)">
+        Cost basis: abuse is a <b>weekly state</b>. The upper bound is a perfect oracle that
+        A-books an account exactly for the weeks it is about to be profitably toxic — the sum of
+        every profitable Toxic/Arbitrage week (cent- and contract-normalised USD).</div>
+    </div>
+  </div>
+  <div class="foot"><span><b>TAF</b> · Toxic Account Forecasting</span><span>Source: Zeal account-day corpus, 29 May–4 Sep 2026</span></div>
+</section>
+
+<!-- 4. FIRST PRINCIPLES: THE UNIVERSE -->
+<section class="slide">
+  <div class="tophair"></div>
+  <div class="kicker">From first principles — 1 of 2</div>
+  <h2 style="margin-top:10px">Start with the whole universe, and split it honestly.</h2>
+  <div class="two" style="margin-top:26px;align-items:center">
+    <div class="venn">
+      <div class="setc" style="left:0;top:10px;width:210px;height:210px;background:#EAF0F7;border:2px solid var(--navy);color:var(--navy);font-size:20px">
+        B — B-Book<br><span style="font-size:13px;font-weight:600">left unhedged<br>(correctly)</span></div>
+      <div class="setc" style="left:150px;top:10px;width:210px;height:210px;background:rgba(201,162,75,.16);border:2px solid var(--gold);color:#8a6d1f;font-size:20px">
+        <span style="margin-left:60px">C — Toxic /<br>Arbitrage</span></div>
+      <div class="setc" style="left:205px;top:70px;width:100px;height:100px;background:var(--navy);color:#fff;font-size:17px;border:2px solid #fff">
+        A<br><span style="font-size:11px">Abuse</span></div>
+    </div>
+    <div>
+      <ul class="tick">
+        <li><b>U = B ∪ C.</b> Every account, every day, is one or the other.</li>
+        <li><b>C (Toxic / Arbitrage)</b> — accounts whose <i>behaviour</i> matches one of a
+          configurable, extensible set of <i>measurable</i> classes.</li>
+        <li><b>B</b> — everyone else, correctly retained in the B-book: they are not costing us.</li>
+        <li><b>A ⊂ C</b> — the subset that actually costs money. Defined next.</li>
+      </ul>
+      <div style="margin-top:14px;font-size:15px;color:var(--muted)">
+        The class definitions are inputs, not hard-coded. Any operator can add, edit or
+        re-weight them — the framework optimises around whatever is agreed.</div>
+    </div>
+  </div>
+  <div class="foot"><span><b>TAF</b> · Toxic Account Forecasting</span><span>Zeal Group · Confidential</span></div>
+</section>
+
+<!-- 5. FIRST PRINCIPLES: THE DECISIVE MOVE -->
+<section class="slide">
+  <div class="tophair"></div>
+  <div class="kicker">From first principles — 2 of 2</div>
+  <h2 style="margin-top:10px">Abuse = Toxic behaviour <span class="accent">∩</span> money made in the next <span class="accent">n</span> days.</h2>
+  <div style="margin-top:22px" class="lead">
+    Being in C is a behaviour. It only becomes a <b>cost</b> when it makes money at our expense.
+    So we intersect C with future profitability:</div>
+  <div class="callout" style="margin-top:22px;text-align:center;font-size:26px">
+    <b>A</b> = C &nbsp;∩&nbsp; { account gains equity over the next <b>n = 5</b> days }
+    &nbsp;&nbsp;<span style="font-size:16px;color:#9db4d0">(n configurable &amp; optimised)</span></div>
+  <div class="two" style="margin-top:26px">
+    <div>
+      <h3>Why this is the right definition</h3>
+      <ul class="tick">
+        <li><b>Abuse is a weekly state</b> — an account abusive this week can be harmless the next.
+          So we evaluate it every window, not once for life.</li>
+        <li>We act only on <b>A</b>, never all of C — harmless "toxic-looking" flow stays in the B-book
+          earning revenue. False positives are expensive too.</li>
+        <li>The benchmark is a <b>perfect oracle</b> that A-books an account exactly for its profitable
+          toxic weeks — the natural 100% upper bound we measure against.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Why balance &amp; deposits don't enter</h3>
+      <p style="margin-top:8px">A client could withdraw the gain at the end of day&nbsp;5. Only
+      <b>money made after the qualifying behaviour</b> is the adverse cost — so the measure is a
+      clean equity delta, consistent across cent accounts and contract specs.</p>
+    </div>
+  </div>
+  <div class="foot"><span><b>TAF</b> · Toxic Account Forecasting</span><span>Zeal Group · Confidential</span></div>
+</section>
+
+<!-- 6. THE CLASSES & THEIR COST (Point 1: metrics) -->
+<section class="slide">
+  <div class="tophair"></div>
+  <div class="kicker">Core metric #1 — cost by class · tackled in impact order</div>
+  <h2 style="margin-top:10px">Six classes today, ranked by the money at stake.</h2>
+  <table style="margin-top:22px">
+    <thead><tr><th>Toxic / Arbitrage class</th><th class="n">Abuse accounts (A)</th><th class="n">Abuse-weeks</th>
+      <th class="n">Cost / day (USD)</th><th class="n">Model AUC</th><th style="width:170px">Relative impact</th></tr></thead>
+    <tbody>
+      <tr><td>Persistent edge</td><td class="n">12,853</td><td class="n">46,383</td><td class="n">$384,657</td><td class="n accent">0.891</td><td><div class="bar" style="width:100%"></div></td></tr>
+      <tr><td>High magnitude</td><td class="n">3,996</td><td class="n">8,901</td><td class="n">$374,660</td><td class="n accent">0.865</td><td><div class="bar" style="width:97%"></div></td></tr>
+      <tr><td>Scalper</td><td class="n">10,517</td><td class="n">32,111</td><td class="n">$292,688</td><td class="n accent">0.751</td><td><div class="bar" style="width:76%"></div></td></tr>
+      <tr><td>High-exposure / recovery</td><td class="n">781</td><td class="n">1,511</td><td class="n">$179,337</td><td class="n accent">0.952</td><td><div class="bar" style="width:47%"></div></td></tr>
+      <tr><td>News / volatility</td><td class="n">4,829</td><td class="n">13,317</td><td class="n">$89,210</td><td class="n accent">0.843</td><td><div class="bar" style="width:23%"></div></td></tr>
+      <tr><td>Martingale</td><td class="n">5,125</td><td class="n">10,970</td><td class="n">$82,230</td><td class="n accent">0.796</td><td><div class="bar" style="width:21%"></div></td></tr>
+    </tbody>
+  </table>
+  <div style="margin-top:18px;display:flex;gap:16px;align-items:center">
+    <span class="pill">Configurable</span>
+    <span style="font-size:15px;color:#3a4757">Each class is a measurable rule the desk can edit; new
+    classes are added the same way. We attack the highest-impact classes first — every class carries a
+    different % of members that turn into Abuse.</span>
+  </div>
+  <div class="foot"><span><b>TAF</b> · Toxic Account Forecasting</span><span>Per-class costs overlap; universe total is de-duplicated ($454.1k/day)</span></div>
+</section>
+
+<!-- 7. HOW IT WORKS UNDER THE HOOD (Point 2: logic) -->
+<section class="slide">
+  <div class="tophair"></div>
+  <div class="kicker">Core requirement #2 — the logic under the hood</div>
+  <h2 style="margin-top:10px">Five steps, every one explainable to a first-year analyst.</h2>
+  <div class="flow" style="margin-top:34px">
+    <div class="step"><h4>1 · Observe</h4><p>Every trade + tick, from all servers (sub-2s). Compute
+      behavioural metrics: markout (adverse selection), hold-time, martingale rate, notional, overnight share.</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>2 · Classify</h4><p>Transparent rules place each account-day in its Toxic/Arbitrage
+      classes. Every flag traces to a metric and a threshold. No black box.</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>3 · Predict</h4><p>An explainable model per class (random forest) turns today's
+      behaviour into <b>P(becomes Abuse within 5 days)</b> — foresight, with feature importances.</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>4 · Act</h4><p>The predicted class picks the optimal response: route to A-book,
+      widen spread, restrict, or monitor — sized to the expected cost.</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>5 · Learn</h4><p>Tomorrow's ground truth scores today's prediction. The models
+      re-fit walk-forward with transfer learning — a closed feedback loop.</p></div>
+  </div>
+  <div class="callout" style="margin-top:34px">
+    The intelligence is powerful <b>because</b> it is simple: a chain of measurable definitions, a
+    transparent classifier, and a model whose every driver can be named. If it flags an account, we can
+    always say <b>exactly why</b>.</div>
+  <div class="foot"><span><b>TAF</b> · Toxic Account Forecasting</span><span>Zeal Group · Confidential</span></div>
+</section>
+
+<!-- 8. THE MODELS WORK -->
+<section class="slide">
+  <div class="tophair"></div>
+  <div class="kicker">The models already work</div>
+  <h2 style="margin-top:10px">Foresight, measured out-of-sample.</h2>
+  <div class="two" style="margin-top:26px;align-items:center">
+    <div>
+      <table>
+        <thead><tr><th>Class model</th><th class="n">Holdout AUC</th><th style="width:150px">Skill</th></tr></thead>
+        <tbody>
+          <tr><td>High-exposure / recovery</td><td class="n">0.952</td><td><div class="bar" style="width:95%"></div></td></tr>
+          <tr><td>Persistent edge</td><td class="n">0.891</td><td><div class="bar" style="width:89%"></div></td></tr>
+          <tr><td>High magnitude</td><td class="n">0.865</td><td><div class="bar" style="width:87%"></div></td></tr>
+          <tr><td>News / volatility</td><td class="n">0.843</td><td><div class="bar" style="width:84%"></div></td></tr>
+          <tr><td>Martingale</td><td class="n">0.796</td><td><div class="bar" style="width:80%"></div></td></tr>
+          <tr><td>Scalper</td><td class="n">0.751</td><td><div class="bar" style="width:75%"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <div class="stat" style="border-left-color:var(--teal)"><div class="big num" style="color:var(--teal)">0.85</div>
+        <div class="lbl">Mean out-of-sample AUC across classes</div></div>
+      <p style="margin-top:20px;font-size:17px;line-height:1.55">AUC is the probability the model ranks a
+      true future-Abuser above a non-Abuser. <b>0.85 means it is right ~85% of the time</b> at telling
+      tomorrow's cost from tomorrow's noise — today.</p>
+      <p style="margin-top:14px;font-size:15px;color:var(--muted)">Every model is a random forest:
+      inspectable, reproducible, and it names its own top drivers. No opaque deep-net.</p>
+    </div>
+  </div>
+  <div class="foot"><span><b>TAF</b> · Toxic Account Forecasting</span><span>Time-ordered holdout, per-class walk-forward</span></div>
+</section>
+
+<!-- 9. THE RESULT & SMART TARGET (Point 3) -->
+<section class="slide">
+  <div class="tophair"></div>
+  <div class="kicker">Core requirement #3 — the result, against a SMART target</div>
+  <h2 style="margin-top:10px">One objective, made SMART.</h2>
+  <div class="callout" style="margin-top:20px;font-size:20px;line-height:1.45">
+    <b>Within two weeks</b>, detect <b>≥ 75%</b> of next-week Abuse-USD in advance (out-of-sample) across the
+    top-six classes, recovering <b>≥ $341k/day (~$86M/yr)</b> of B-book P&amp;L — measured daily against realised
+    ground truth.</div>
+  <table style="margin-top:24px" class="smartrow">
+    <thead><tr><th style="width:130px">SMART</th><th>How this objective satisfies it</th></tr></thead>
+    <tbody>
+      <tr><td>Specific</td><td>Detect the accounts that will become Abuse (A) within 5 days, per class, and act.</td></tr>
+      <tr><td>Measurable</td><td>Out-of-sample detection of Abuse-USD (recall) + precision; USD recovered/day vs the walk-forward baseline.</td></tr>
+      <tr><td>Achievable</td><td>Models already average 0.85 AUC — comfortably above the 0.75 bar — on Zeal's own history.</td></tr>
+      <tr><td>Relevant</td><td>Directly protects the B-book's core P&amp;L: $454k/day is at stake today.</td></tr>
+      <tr><td>Time-bound</td><td>A 2-week live test with a clear go / no-go, reported daily.</td></tr>
+    </tbody>
+  </table>
+  <div class="foot"><span><b>TAF</b> · Toxic Account Forecasting</span><span>Recoverable = target detection rate × measured daily abuse cost</span></div>
+</section>
+
+<!-- 10. FEEDBACK LOOP + DASHBOARD -->
+<section class="slide">
+  <div class="tophair"></div>
+  <div class="kicker">A system that grades itself</div>
+  <h2 style="margin-top:10px">Predicted vs actual, every day — a closed loop.</h2>
+  <div class="flow" style="margin-top:36px">
+    <div class="step"><h4>Predict (day D)</h4><p>Score every non-member: P(becomes Abuse by D+5). Publish the watchlist &amp; recommended actions.</p></div>
+    <div class="arrow">↻</div>
+    <div class="step"><h4>Observe (day D+5)</h4><p>New ground truth arrives: who actually became Abuse, and the USD they took.</p></div>
+    <div class="arrow">↻</div>
+    <div class="step"><h4>Score</h4><p>Precision, recall and USD-captured land on a live dashboard — the target is audited continuously.</p></div>
+    <div class="arrow">↻</div>
+    <div class="step"><h4>Re-fit</h4><p>Walk-forward transfer learning folds the new truth back in. The system compounds accuracy over time.</p></div>
+  </div>
+  <div class="two" style="margin-top:34px">
+    <div class="stat"><div class="big" style="font-size:26px">Self-correcting</div><div class="lbl">Definitions stay fixed; the models adapt to drift automatically.</div></div>
+    <div class="stat"><div class="big" style="font-size:26px">Fully auditable</div><div class="lbl">Every prediction is later checked against what really happened.</div></div>
+  </div>
+  <div class="foot"><span><b>TAF</b> · Toxic Account Forecasting</span><span>Zeal Group · Confidential</span></div>
+</section>
+
+<!-- 11. THE FRONTIER: AUTO-DISCOVERY -->
+<section class="slide">
+  <div class="tophair"></div>
+  <div class="kicker">The frontier — discovering abuse we haven't named yet</div>
+  <h2 style="margin-top:10px">Turn the lens around: find the profit we can't yet explain.</h2>
+  <div class="two" style="margin-top:28px">
+    <div>
+      <ul class="tick">
+        <li>Search for accounts that are <b>profitable over the 5-day window</b> and
+          <b>predictable in advance</b> — yet fit <i>no</i> existing class.</li>
+        <li>These are candidate <b>new abuse classes</b>, surfaced automatically by mining every source:
+          trades, ticks, funding, markout, exposure.</li>
+        <li>If the AI can explain the pattern → we <b>name a new class</b> and add it.</li>
+        <li>If it cannot yet → we can still <b>act on the evidence</b> (predictable adverse profitability)
+          before the explanation matures, when the logic and the money justify it.</li>
+      </ul>
+    </div>
+    <div class="callout" style="align-self:center">
+      <p style="font-size:19px;line-height:1.5">The framework doesn't just police the abuse we know.
+      It is a <b>discovery engine</b> for the abuse we don't — the difference between reacting to last
+      quarter's arbitrage and getting ahead of next quarter's.</p>
+    </div>
+  </div>
+  <div class="foot"><span><b>TAF</b> · Toxic Account Forecasting</span><span>Zeal Group · Confidential</span></div>
+</section>
+
+<!-- 12. SAAS FRAMEWORK -->
+<section class="slide">
+  <div class="tophair"></div>
+  <div class="kicker">Built as a framework, not a fixed model</div>
+  <h2 style="margin-top:10px">Vendor-agnostic by design — configure, then run.</h2>
+  <div class="flow" style="margin-top:34px">
+    <div class="step"><h4>1 · Define universe</h4><p>Agree the Toxic/Arbitrage classes and their metrics. Add your own.</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>2 · Set n &amp; cost</h4><p>Choose the horizon and cost basis. The system optimises the rest.</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>3 · Derive settings</h4><p>Thresholds, actions and priorities are fit to your agreed universe automatically.</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>4 · Run &amp; test</h4><p>Watchlists, actions and the predicted-vs-actual dashboard, live — plus ad-hoc tests for new classes.</p></div>
+  </div>
+  <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:34px">
+    <div class="stat"><div class="big" style="font-size:24px">Any operator</div><div class="lbl">Different ingredients &amp; definitions plug into the same sound framework.</div></div>
+    <div class="stat"><div class="big" style="font-size:24px">Immediate</div><div class="lbl">A short wizard, then results — no bespoke build per client.</div></div>
+    <div class="stat"><div class="big" style="font-size:24px">Ad-hoc</div><div class="lbl">Test a new abuse class or a definition change on demand.</div></div>
+  </div>
+  <div class="foot"><span><b>TAF</b> · Toxic Account Forecasting</span><span>Zeal Group · Confidential</span></div>
+</section>
+
+<!-- 13. THE ASK -->
+<section class="slide" style="background:linear-gradient(135deg,#0E2A47,#0a1f36 60%,#0b2136)">
+  <div style="position:absolute;top:0;left:0;height:6px;width:100%;background:linear-gradient(90deg,var(--gold),var(--gold-l))"></div>
+  <div class="kicker" style="color:var(--gold-l)">The ask</div>
+  <h1 style="color:#fff;margin-top:14px;max-width:1000px">A two-week live pilot on the top-six classes.</h1>
+  <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:44px">
+    <div style="background:#13355a;border:1px solid #23405f;border-radius:12px;padding:22px">
+      <div style="color:var(--gold-l);font-weight:800;font-size:15px;letter-spacing:.06em">TARGET</div>
+      <div style="color:#fff;font-size:22px;font-weight:800;margin-top:8px">≥ 75% detection</div>
+      <div style="color:#a9c0dc;font-size:14px;margin-top:6px">of next-5-day Abuse-USD, out-of-sample</div></div>
+    <div style="background:#13355a;border:1px solid #23405f;border-radius:12px;padding:22px">
+      <div style="color:var(--gold-l);font-weight:800;font-size:15px;letter-spacing:.06em">PRIZE</div>
+      <div style="color:#fff;font-size:22px;font-weight:800;margin-top:8px">~$86M / year</div>
+      <div style="color:#a9c0dc;font-size:14px;margin-top:6px">B-book P&amp;L recovered at target</div></div>
+    <div style="background:#13355a;border:1px solid #23405f;border-radius:12px;padding:22px">
+      <div style="color:var(--gold-l);font-weight:800;font-size:15px;letter-spacing:.06em">PROOF</div>
+      <div style="color:#fff;font-size:22px;font-weight:800;margin-top:8px">Daily, audited</div>
+      <div style="color:#a9c0dc;font-size:14px;margin-top:6px">predicted vs actual, clear go / no-go</div></div>
+  </div>
+  <div style="margin-top:44px;color:#cdddf0;font-size:20px;max-width:1000px;line-height:1.5">
+    The cost is measured. The models are built and out-of-sample. The logic is explainable end-to-end.
+    <b style="color:#fff">The only decision left is to switch it on.</b></div>
+  <div style="position:absolute;bottom:52px;left:64px;right:64px;display:flex;justify-content:space-between;
+    color:#8fa6c2;font-size:13px;border-top:1px solid #23405f;padding-top:14px">
+    <span><b style="color:#fff">TAF</b> · Toxic Account Forecasting</span><span>Zeal Group · Confidential · September 2026</span>
+  </div>
+</section>
+
+</body>
+</html>

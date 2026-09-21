@@ -1,0 +1,73 @@
+{
+  "n_days": 99,
+  "horizon": 5,
+  "by_class": [
+    {
+      "class": "persistent_edge",
+      "C_accounts": 15890,
+      "A_accounts": 5790,
+      "A_share": 0.364,
+      "cost_total": 13907359.0636,
+      "cost_per_day": 140478.37437979798
+    },
+    {
+      "class": "high_magnitude",
+      "C_accounts": 7037,
+      "A_accounts": 1635,
+      "A_share": 0.232,
+      "cost_total": 13544147.692499999,
+      "cost_per_day": 136809.57265151513
+    },
+    {
+      "class": "news_vol",
+      "C_accounts": 7488,
+      "A_accounts": 2339,
+      "A_share": 0.312,
+      "cost_total": 10093114.846,
+      "cost_per_day": 101950.65501010102
+    },
+    {
+      "class": "high_exposure_recovery",
+      "C_accounts": 1283,
+      "A_accounts": 359,
+      "A_share": 0.28,
+      "cost_total": 8807865.9989,
+      "cost_per_day": 88968.34342323232
+    },
+    {
+      "class": "scalper",
+      "C_accounts": 14015,
+      "A_accounts": 4110,
+      "A_share": 0.293,
+      "cost_total": 8726216.9703,
+      "cost_per_day": 88143.60576060606
+    },
+    {
+      "class": "martingale",
+      "C_accounts": 8938,
+      "A_accounts": 2470,
+      "A_share": 0.276,
+      "cost_total": 6652875.1783,
+      "cost_per_day": 67200.75937676767
+    }
+  ],
+  "universe_accounts": 36005,
+  "C_accounts": 20911,
+  "A_accounts": 6704,
+  "total_cost": 15517667.469,
+  "cost_per_day": 156744.11584848486,
+  "abuse_share_of_winnings": 0.9901670761643822,
+  "accuracies": {
+    "persistent_edge": 0.891,
+    "scalper": 0.751,
+    "martingale": 0.796,
+    "high_magnitude": 0.865,
+    "news_vol": 0.843,
+    "high_exposure_recovery": 0.952
+  },
+  "mean_auc": 0.8496666666666667,
+  "target_acc": 0.75,
+  "recoverable_per_day": 117558.08688636364,
+  "date_min": "2026-05-29",
+  "date_max": "2026-09-04"
+}

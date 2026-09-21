@@ -1,0 +1,14 @@
+# Copy this file to symbol_map.yaml to add venue-specific raw-symbol ->
+# canonical-symbol overrides without a code change. Optional: absent entirely,
+# the mapping still works from the built-in table in trading_data/research.py.
+#
+# Keys and values are upper-cased on load and layered on top of (and take
+# priority over) the built-in SYMBOL_ALIASES table. Use this for a raw name
+# the automatic decorator-stripping in `canonical_symbol` cannot safely infer
+# -- a house alias, or an unusual glued suffix -- rather than extending the
+# stripping heuristics themselves, which risk merging two different
+# instruments into one canonical bucket if made too aggressive.
+#
+# EURUSD.XYZ: EURUSD
+# MYWEIRDGOLD: XAUUSD
+# US30INDEX: US30

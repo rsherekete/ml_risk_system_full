@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Exposure - ZFX{% endblock %}
+{% block content %}
+{% include "_exposure_body.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+let excluded = new Set();
+let liveRows = [];
+
+const money = v => {
+  const n = Number(v || 0);
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (abs >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (abs >= 1e3) return (n / 1e3).toFixed(0) + 'k';
+  return n.toFixed(0);
+};
+const dollars = v => '$' + money(v);
+
+async function loadLive() {
+  const asAt = document.getElementById('as-at').value;
+  const data = await (await fetch(
+    '/api/exposure/live' + (asAt ? '?as_at=' + encodeURIComponent(asAt) : ''))).json();
+  liveRows = data.rows || [];
+  // Say which basis produced these numbers -- live and reconstructed views can
+  // legitimately disagree, and the difference should never be a mystery.
+  const note = document.getElementById('basis-note');
+  note.innerHTML = asAt
+    ? `<b>End of day ${asAt}</b> &mdash; reconstructed from the warehouse: positions opened
+       on or before that date and not yet closed. Positions opened before the stored
+       history are not visible here.`
+    : `<b>Live</b> &mdash; read from each server's own position table, the complete book
+       including positions opened before any stored history.`;
+  document.getElementById('total-net').textContent = dollars(data.total_net);
+  document.getElementById('total-net').className =
+    'value ' + ((data.total_net || 0) >= 0 ? 'pos' : 'neg');
+  document.getElementById('total-gross').textContent = dollars(data.total_gross);
+  document.getElementById('total-symbols').textContent = liveRows.length;
+  document.getElementById('exposure-source').textContent =
+    (data.errors && data.errors.length) ? data.errors.length + ' server(s) unreachable'
+                                        : 'broker position tables';
+
+  const alerts = data.alerts || [];
+  document.getElementById('alert-count').textContent = alerts.length;
+  document.getElementById('alert-count').className =
+    'value ' + (alerts.some(a => a.severity === 'critical') ? 'neg'
+              : alerts.length ? 'warn' : 'pos');
+  if (alerts.length) {
+    document.getElementById('alerts-panel').style.display = '';
+    document.getElementById('alerts').innerHTML = alerts.map(a => `
+      <div class="alert ${a.severity === 'critical' ? 'alert-error'
+                        : a.severity === 'warning' ? 'alert-info' : 'alert-info'}"
+           style="margin-bottom:8px">
+        <b>${a.symbol}</b> &mdash; ${a.kind}: ${a.message}
+      </div>`).join('');
+  }
+
+  renderChips();
+  renderExposure();
+  renderStress(data.stress || []);
+  renderTable();
+  loadHistory();
+}
+
+function renderChips() {
+  document.getElementById('exposure-chips').innerHTML = liveRows.map(r =>
+    `<span class="chip chip-sm ${excluded.has(r.canonical_symbol) ? '' : 'on'}"
+           onclick="toggleSymbol('${r.canonical_symbol}')">${r.canonical_symbol}</span>`).join('');
+}
+function toggleSymbol(symbol) {
+  excluded.has(symbol) ? excluded.delete(symbol) : excluded.add(symbol);
+  renderChips(); renderExposure(); renderTable(); loadHistory();
+}
+
+function shown() { return liveRows.filter(r => !excluded.has(r.canonical_symbol)); }
+
+// How each instrument's USD value was obtained. A risk figure and an assumption
+// should never look identical, so anything short of a venue contract size with
+// a direct USD leg is labelled.
+function statusTag(status) {
+  if (!status || status === 'direct_usd_leg') return '';
+  const labels = {
+    cross_rate: ['tag-neutral', 'FX', 'Converted through a cross rate from the venue\'s own USD pairs.'],
+    fallback_contract_direct_usd_leg: ['tag-arb', 'est', 'Venue publishes no contract size; an asset-class convention was assumed.'],
+    fallback_contract_cross_rate: ['tag-arb', 'est', 'Assumed contract size AND a cross-rate conversion.'],
+    unconvertible: ['tag-toxic', 'n/a', 'No price or no USD route: this instrument is NOT included in the USD totals.'],
+  };
+  const [css, text, help] = labels[status] || ['tag-neutral', status, ''];
+  return ` <span class="tag ${css}" title="${help}">${text}</span>`;
+}
+
+function renderExposure() {
+  const rows = shown();
+  zfxChart(document.getElementById('exposure-chart'), {
+    backgroundColor: 'transparent',
+    grid: { left: 10, right: 30, top: 30, bottom: 8, containLabel: true },
+    legend: { data: ['Net notional', 'Gross notional'], top: 0, right: 0,
+              textStyle: { color: '#8b9ab4', fontSize: 11 }, icon: 'roundRect' },
+    tooltip: Object.assign({ trigger: 'axis', axisPointer: { type: 'shadow' },
+      valueFormatter: dollars }, zfxTheme.tooltip),
+    xAxis: Object.assign({ type: 'value',
+      axisLabel: { formatter: dollars, color: '#55637d', fontSize: 10,
+                   fontFamily: 'JetBrains Mono' } }, zfxTheme.axis),
+    yAxis: Object.assign({ type: 'category',
+      data: rows.map(r => r.canonical_symbol).reverse(),
+      axisLabel: { color: '#8b9ab4', fontSize: 10 } }, zfxTheme.axis),
+    series: [
+      // Net is signed, so it gets a sign-aware colour; gross is magnitude only.
+      { name: 'Net notional', type: 'bar',
+        data: rows.map(r => ({ value: r.net_notional,
+          itemStyle: { color: r.net_notional >= 0 ? '#2ee6a8' : '#ff4d6d' } })).reverse() },
+      { name: 'Gross notional', type: 'bar',
+        data: rows.map(r => r.gross_notional).reverse(),
+        itemStyle: { color: 'rgba(139,154,180,.45)' } }
+    ]
+  });
+}
+
+function renderTable() {
+  document.getElementById('exposure-rows').innerHTML = shown().map(r => `
+    <tr>
+      <td>${r.canonical_symbol}${statusTag(r.notional_status)}</td>
+      <td class="num">${(r.accounts || 0).toLocaleString()}</td>
+      <td class="num ${r.net_lots >= 0 ? 'pos' : 'neg'}">${Number(r.net_lots).toFixed(2)}</td>
+      <td class="num ${r.net_notional >= 0 ? 'pos' : 'neg'}">${dollars(r.net_notional)}</td>
+      <td class="num dim">${dollars(r.gross_notional)}</td>
+      <td class="num">${((r.net_share || 0) * 100).toFixed(0)}%</td>
+      <td class="num ${(r.floating_pnl || 0) >= 0 ? 'neg' : 'pos'}">${dollars(r.floating_pnl)}</td>
+    </tr>`).join('');
+}
+
+function renderStress(stress) {
+  if (!stress.length) return;
+  zfxChart(document.getElementById('stress-chart'), {
+    backgroundColor: 'transparent', grid: zfxTheme.grid,
+    tooltip: Object.assign({ trigger: 'axis', valueFormatter: dollars }, zfxTheme.tooltip),
+    xAxis: Object.assign({ type: 'category',
+      data: stress.map(s => (s.shock * 100).toFixed(0) + '%') }, zfxTheme.axis),
+    yAxis: Object.assign({ type: 'value',
+      axisLabel: { formatter: dollars, color: '#55637d', fontSize: 10,
+                   fontFamily: 'JetBrains Mono' } }, zfxTheme.axis),
+    series: [{ type: 'bar', barWidth: '58%',
+      data: stress.map(s => ({ value: s.firm_pnl,
+        itemStyle: { color: s.firm_pnl >= 0 ? '#2ee6a8' : '#ff4d6d',
+                     borderRadius: [3, 3, 0, 0] } })) }]
+  });
+  document.getElementById('stress-rows').innerHTML = stress.map(s => `
+    <tr>
+      <td>${(s.shock * 100).toFixed(0)}% move</td>
+      <td class="num ${s.firm_pnl >= 0 ? 'pos' : 'neg'}">${dollars(s.firm_pnl)}</td>
+      <td class="dim">${s.worst_symbol} (${dollars(s.worst_impact)})</td>
+    </tr>`).join('');
+}
+
+async function loadHistory() {
+  const days = document.getElementById('hist-days').value;
+  const freq = document.getElementById('hist-freq').value;
+  const include = shown().map(r => r.canonical_symbol).join(',');
+  const data = await (await fetch(
+    `/api/exposure/history?days=${days}&freq=${freq}&symbols=${encodeURIComponent(include)}`)).json();
+  const series = data.series || [];
+  if (!series.length) {
+    document.getElementById('history-chart').innerHTML =
+      `<div class="empty">${data.note || 'No historical exposure available yet.'}</div>`;
+    return;
+  }
+  zfxChart(document.getElementById('history-chart'), {
+    backgroundColor: 'transparent',
+    grid: { left: 70, right: 24, top: 34, bottom: 56 },
+    legend: { data: series.map(s => s.symbol), top: 0, right: 0, type: 'scroll',
+              textStyle: { color: '#8b9ab4', fontSize: 10 }, icon: 'roundRect' },
+    tooltip: Object.assign({ trigger: 'axis', valueFormatter: dollars }, zfxTheme.tooltip),
+    dataZoom: [{ type: 'inside' },
+               { type: 'slider', height: 16, bottom: 10, borderColor: '#26324a',
+                 fillerColor: 'rgba(34,211,238,.12)', handleStyle: { color: '#22d3ee' },
+                 textStyle: { color: '#55637d', fontSize: 10 } }],
+    xAxis: Object.assign({ type: 'category',
+      data: series[0].points.map(p => p[0]) }, zfxTheme.axis),
+    yAxis: Object.assign({ type: 'value',
+      axisLabel: { formatter: dollars, color: '#55637d', fontSize: 10,
+                   fontFamily: 'JetBrains Mono' } }, zfxTheme.axis),
+    series: series.map(s => ({
+      name: s.symbol, type: 'line', smooth: true, symbol: 'none',
+      data: s.points.map(p => p[1]), lineStyle: { width: 1.8 }
+    }))
+  });
+}
+
+// Auto-update only applies to the LIVE view; a historical end-of-day snapshot
+// does not change, so polling it would be pure waste.
+zfxLive.register('exposure', async () => {
+  if (!document.getElementById('as-at').value) await loadLive();
+}, 30000);
+loadLive();
+</script>
+{% endblock %}

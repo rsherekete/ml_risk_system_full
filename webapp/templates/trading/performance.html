@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Model Performance - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Model Performance</h1>
+  <p>Walk-forward diagnostics, model settings, and retraining.</p>
+</div>
+
+{% include "_controls.html" %}
+
+<div class="grid cols-2">
+  <div class="panel">
+    <h2>Configuration</h2>
+    <p class="hint">
+      <b>Save</b> stores settings without refitting &mdash; existing results stay on screen and
+      are flagged as produced by the previous configuration. <b>Save &amp; retrain</b> refits.
+      Nothing here refits automatically.
+    </p>
+    <form method="post" action="/trading/config">
+      <div class="grid cols-2" style="gap:12px">
+        <div class="field">
+          <label for="horizon_active_days">Forward horizon (active days)</label>
+          <input id="horizon_active_days" name="horizon_active_days" type="number" min="1" max="60"
+                 value="{{ config.horizon_active_days }}">
+        </div>
+        <div class="field">
+          <label for="sigma_threshold">Sigma threshold</label>
+          <input id="sigma_threshold" name="sigma_threshold" type="number" step="0.1" min="-2" max="3"
+                 value="{{ config.sigma_threshold }}">
+        </div>
+        <div class="field">
+          <label for="min_train_days">Minimum training days</label>
+          <input id="min_train_days" name="min_train_days" type="number" min="5" max="200"
+                 value="{{ config.min_train_days }}">
+        </div>
+        <div class="field">
+          <label for="refit_cadence_days">Refit cadence (days)</label>
+          <input id="refit_cadence_days" name="refit_cadence_days" type="number" min="1" max="60"
+                 value="{{ config.refit_cadence_days }}">
+        </div>
+        <div class="field">
+          <label for="n_estimators">Trees</label>
+          <input id="n_estimators" name="n_estimators" type="number" min="20" max="1000"
+                 value="{{ config.n_estimators }}">
+        </div>
+        <div class="field">
+          <label for="num_leaves">Leaves</label>
+          <input id="num_leaves" name="num_leaves" type="number" min="4" max="255"
+                 value="{{ config.num_leaves }}">
+        </div>
+        <div class="field">
+          <label for="learning_rate">Learning rate</label>
+          <input id="learning_rate" name="learning_rate" type="number" step="0.01" min="0.01" max="0.5"
+                 value="{{ config.learning_rate }}">
+        </div>
+        <div class="field">
+          <label for="min_child_samples">Min child samples</label>
+          <input id="min_child_samples" name="min_child_samples" type="number" min="5" max="500"
+                 value="{{ config.min_child_samples }}">
+        </div>
+        <div class="field">
+          <label for="subsample">Row subsample</label>
+          <input id="subsample" name="subsample" type="number" step="0.1" min="0.1" max="1"
+                 value="{{ config.subsample }}">
+        </div>
+        <div class="field">
+          <label for="colsample_bytree">Feature subsample</label>
+          <input id="colsample_bytree" name="colsample_bytree" type="number" step="0.1" min="0.1" max="1"
+                 value="{{ config.colsample_bytree }}">
+        </div>
+        <div class="field">
+          <label for="hedge_fraction">Hedge fraction (view only)</label>
+          <input id="hedge_fraction" name="hedge_fraction" type="number" step="0.01" min="0" max="1"
+                 value="{{ config.hedge_fraction }}">
+        </div>
+        <div class="field">
+          <label for="probability_threshold">Probability threshold (view only)</label>
+          <input id="probability_threshold" name="probability_threshold" type="number" step="0.05" min="0" max="1"
+                 value="{{ config.probability_threshold }}">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:6px">
+        <button type="submit" name="save" value="1">Save settings</button>
+        <button class="btn-primary" type="submit" name="retrain" value="1">Save &amp; retrain</button>
+      </div>
+      <p class="hint" style="margin-top:10px">
+        The two "view only" settings are applied to cached scores when a screen renders, so
+        changing them never invalidates the trained model.
+      </p>
+    </form>
+  </div>
+
+  <div>
+    {% if meta %}
+    <div class="panel" style="margin-bottom:14px">
+      <h2>Current artefact</h2>
+      <p class="hint">What produced the numbers on every other tab.</p>
+      <table>
+        <tbody>
+          <tr><td>Rows scored</td><td class="num">{{ '{:,}'.format(meta.rows) }}</td></tr>
+          <tr><td>Walk-forward ROC AUC</td>
+              <td class="num"><b>{{ '%.4f'|format(meta.metrics.roc_auc) if meta.metrics.roc_auc }}</b></td></tr>
+          <tr><td>Horizon</td><td class="num">{{ meta.config.horizon_active_days }} active days</td></tr>
+          <tr><td>Sigma threshold</td><td class="num">{{ meta.config.sigma_threshold }}</td></tr>
+          <tr><td>Refit cadence</td><td class="num">{{ meta.config.refit_cadence_days }} days</td></tr>
+          <tr><td>Fingerprint</td><td class="num dim" style="font-size:11px">{{ meta.fingerprint }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Policy frontier</h2>
+      <p class="hint">Profit against drawdown at each hedge fraction. Up and to the right is better.</p>
+      <div id="frontier" class="chart"></div>
+    </div>
+    {% else %}
+    <div class="panel"><div class="empty">
+      <strong>No model trained yet</strong>Press <b>Save &amp; retrain</b> to build the first artefact.
+    </div></div>
+    {% endif %}
+  </div>
+</div>
+
+{% if job.log %}
+<div class="panel" style="margin-top:14px">
+  <h2>Training log</h2>
+  <pre style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);margin:0;white-space:pre-wrap;max-height:220px;overflow:auto">{{ job.log|join('\n') }}</pre>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{% if meta %}
+<script>
+const flat = {{ meta.metrics.flat_bbook|tojson }};
+const rows = {{ meta.metrics.by_fraction|tojson }};
+const points = Object.entries(rows).map(([k, v]) => ({
+  name: (parseFloat(k) * 100).toFixed(0) + '%',
+  value: [Math.abs(v.max_drawdown_usd) / 1e6, v.total_pnl_usd / 1e6]
+}));
+zfxChart(document.getElementById('frontier'), {
+  backgroundColor: 'transparent',
+  grid: zfxTheme.grid,
+  tooltip: Object.assign({
+    formatter: p => `${p.data.name || 'Flat B-book'}<br/>Profit $${p.value[1].toFixed(1)}M<br/>Drawdown $${p.value[0].toFixed(2)}M`
+  }, zfxTheme.tooltip),
+  xAxis: Object.assign({ type: 'value', name: 'Max drawdown ($M)', nameLocation: 'middle',
+    nameGap: 26, nameTextStyle: { color: '#55637d', fontSize: 11 } }, zfxTheme.axis),
+  yAxis: Object.assign({ type: 'value', name: 'Profit ($M)', nameTextStyle: { color: '#55637d', fontSize: 11 } }, zfxTheme.axis),
+  series: [
+    { type: 'scatter', symbolSize: 15, data: points,
+      itemStyle: { color: '#22d3ee' },
+      label: { show: true, formatter: p => p.data.name, position: 'top',
+               color: '#8b9ab4', fontSize: 10 } },
+    { type: 'scatter', symbolSize: 17, symbol: 'diamond',
+      data: [{ name: 'Flat B-book',
+               value: [Math.abs(flat.max_drawdown_usd) / 1e6, flat.total_pnl_usd / 1e6] }],
+      itemStyle: { color: '#ff4d6d' },
+      label: { show: true, formatter: 'Flat', position: 'bottom', color: '#ff4d6d', fontSize: 10 } }
+  ]
+});
+</script>
+{% endif %}
+{% endblock %}

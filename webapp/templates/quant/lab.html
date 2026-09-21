@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+{% block title %}Strategy Lab - ZFX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Strategy Lab</h1>
+  <p>Live walk-forward results as they compute &mdash; the instrument for tuning
+     entry / signal / exit, per-class calibration, drawdown control and signal
+     arbitration. Each retrain streams its per-day policy P&amp;L and drawdown
+     here in real time.</p>
+</div>
+
+<style>
+  .lab-tiles { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin:14px 0; }
+  @media (max-width:1100px){ .lab-tiles{ grid-template-columns:repeat(2,1fr);} }
+  .lab-tile { background:rgba(18,24,38,.6); border:1px solid #1b2438; border-radius:10px; padding:12px 14px; }
+  .lab-tile .k { font-size:11px; color:#55637d; text-transform:uppercase; letter-spacing:.04em; }
+  .lab-tile .v { font-size:22px; font-weight:600; margin-top:4px; font-family:'JetBrains Mono',monospace; }
+  .lab-bar { height:8px; border-radius:6px; background:rgba(27,36,56,.7); overflow:hidden; margin-top:10px; }
+  .lab-bar > i { display:block; height:100%; width:0; background:linear-gradient(90deg,#22d3ee,#2ee6a8); transition:width .4s ease; }
+  .lab-run { background:#22d3ee; color:#06121a; border:0; border-radius:8px; padding:9px 16px; font-weight:600; cursor:pointer; }
+  .lab-run[disabled]{ opacity:.5; cursor:default; }
+  .lab-status { font-family:'JetBrains Mono',monospace; font-size:12px; color:#8a97b0; }
+  .lab-log { font-family:'JetBrains Mono',monospace; font-size:11px; color:#7f8ca6; white-space:pre-wrap;
+             max-height:210px; overflow:auto; background:rgba(8,12,20,.6); border:1px solid #1b2438;
+             border-radius:8px; padding:10px 12px; }
+  .lab-pos{ color:#2ee6a8; } .lab-neg{ color:#ff4d6d; }
+  .lab-road li{ margin:4px 0; color:#8a97b0; font-size:13px; }
+  .lab-road b{ color:#c7d2e6; }
+  .lab-table { width:100%; border-collapse:collapse; font-family:'JetBrains Mono',monospace; font-size:12px; }
+  .lab-table th { text-align:left; color:#55637d; font-weight:500; padding:6px 10px; border-bottom:1px solid #1b2438; }
+  .lab-table td { padding:7px 10px; border-bottom:1px solid rgba(27,36,56,.5); color:#c7d2e6; }
+</style>
+
+<div class="panel">
+  <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+    <button id="labRun" class="lab-run">Run walk-forward &amp; watch live</button>
+    <span id="labStatus" class="lab-status">loading&hellip;</span>
+    <span style="flex:1"></span>
+    <span class="lab-status">window <b id="labWindow">&mdash;</b>d &middot; last trained <b id="labTrained">&mdash;</b></span>
+  </div>
+  <div class="lab-bar"><i id="labProg"></i></div>
+</div>
+
+<div class="lab-tiles">
+  <div class="lab-tile"><div class="k">Cumulative policy P&amp;L</div><div class="v" id="tCum">&mdash;</div></div>
+  <div class="lab-tile"><div class="k">Max drawdown</div><div class="v lab-neg" id="tDD">&mdash;</div></div>
+  <div class="lab-tile"><div class="k">Calmar (P&amp;L / DD)</div><div class="v" id="tCalmar">&mdash;</div></div>
+  <div class="lab-tile"><div class="k">Classifier ROC-AUC</div><div class="v" id="tAuc">&mdash;</div></div>
+  <div class="lab-tile"><div class="k">Walk-forward day</div><div class="v" id="tDay">&mdash;</div></div>
+</div>
+
+<div class="grid cols-2">
+  <div class="panel">
+    <h2>Cumulative policy P&amp;L (walk-forward)</h2>
+    <p class="hint">Top-decile long minus bottom-decile short, scaled to full book, accumulated day by day.</p>
+    <div id="labCum" style="height:320px"></div>
+  </div>
+  <div class="panel">
+    <h2>Drawdown</h2>
+    <p class="hint">Running peak-to-trough of the cumulative curve &mdash; the number we are trying to shrink.</p>
+    <div id="labDD" style="height:320px"></div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Previous model vs this run</h2>
+  <p class="hint">Every run is archived to <code>artifacts/history/</code> before the next one
+    overwrites it. &ldquo;Previous&rdquo; is the most recent archived model that differs from the
+    current one; &Delta; is this run minus previous (green = better). The <b>B-book baseline</b>
+    row is the client flow with no model at all (a reference, so it barely moves between runs);
+    the <b>model routing</b> rows are the model's own policy at a 10% hedge fraction &mdash; that is
+    the model-dependent comparison. The previous run's walk-forward curve is overlaid dashed on the
+    charts above when it has one.</p>
+  <div style="overflow-x:auto">
+    <table class="lab-table" id="labCompare">
+      <thead><tr><th>Metric</th><th>Previous</th><th>This run</th><th>&Delta;</th></tr></thead>
+      <tbody><tr><td colspan="4" style="color:#55637d">&mdash; no archived run to compare yet &mdash;</td></tr></tbody>
+    </table>
+  </div>
+  <p class="hint" id="labPrevNote"></p>
+</div>
+
+<div class="panel">
+  <h2>Per-class model quality</h2>
+  <p class="hint">One booster + isotonic calibrator per class (metals / FX / index / crypto).
+    AUC is rank-based, so calibration leaves it unchanged; Brier is a reliability score,
+    so calibration should <b>lower</b> it. Populated by the first per-class retrain.</p>
+  <div style="overflow-x:auto">
+    <table class="lab-table" id="labClasses">
+      <thead><tr><th>Class</th><th>Rows</th><th>Base win-rate</th><th>AUC</th>
+        <th>Brier raw</th><th>Brier calibrated</th><th>Calibrator</th></tr></thead>
+      <tbody><tr><td colspan="7" style="color:#55637d">&mdash; no per-class run yet &mdash;</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Path &amp; edge models &mdash; holdout correlation</h2>
+  <p class="hint">Trained every run on the same frame from real minute-bar excursions:
+    <b>MAE q50</b> (typical pre-profit drawdown &rarr; entry-limit placement),
+    <b>MAE q80</b> (tail drawdown &rarr; veto + inverse sizing),
+    <b>exit FE</b> (favourable excursion q0.35 &rarr; take-profit), <b>per-lot E</b> ($/lot edge).
+    Time-ordered 80/20 holdout; per class, pooled fallback.
+    Minute-path coverage: <b id="labCoverage">&mdash;</b></p>
+  <div style="overflow-x:auto">
+    <table class="lab-table" id="labPath">
+      <thead><tr><th>Model</th><th>Pooled</th><th>metals</th><th>fx</th><th>index</th><th>crypto</th></tr></thead>
+      <tbody><tr><td colspan="6" style="color:#55637d">&mdash; no path-model run yet &mdash;</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid cols-2">
+  <div class="panel">
+    <h2>Live training log</h2>
+    <div class="lab-log" id="labLog">&mdash;</div>
+  </div>
+  <div class="panel">
+    <h2>Roadmap wired into this lab</h2>
+    <ul class="lab-road">
+      <li><b>Per-class models + calibration</b> &mdash; <span class="lab-pos">&#10003; implemented</span>: metals / FX / index / crypto, isotonic-calibrated; the engine routes by class with pooled fallback.</li>
+      <li><b>MAE drawdown model</b> &mdash; <span class="lab-pos">&#10003; trained</span> (q50 + q80 per class from real minute-bar excursions; entry/exit/per-lot rebuilt in the same pass so none can go stale). Engine wiring (veto + entry-limit + inverse-MAE sizing) in progress.</li>
+      <li><b>Signal arbitration</b> &mdash; confidence&times;volume-weighted net (default) + variants.</li>
+      <li><b>Variant comparison</b> &mdash; overlaid curves per configuration (next increment).</li>
+    </ul>
+    <p class="hint">This tab currently streams the live single-model walk-forward. Variant
+      overlays land as each lever above is implemented behind the harness.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  if (typeof echarts === 'undefined') return;
+  var T = window.zfxTheme;
+  function money(v){
+    if (v === null || v === undefined || isNaN(v)) return '—';
+    var a = Math.abs(v), s = v < 0 ? '-' : '';
+    if (a >= 1e6) return s+'$'+(a/1e6).toFixed(2)+'M';
+    if (a >= 1e3) return s+'$'+(a/1e3).toFixed(1)+'k';
+    return s+'$'+a.toFixed(0);
+  }
+  function axis(extra){ return Object.assign({}, T.axis, extra||{}); }
+
+  var legend = {data:['This run','Previous'], top:0, textStyle:{color:'#8a97b0', fontSize:11}};
+  var cumChart = window.zfxChart(document.getElementById('labCum'), {
+    grid:Object.assign({},T.grid,{top:36}), legend:legend,
+    tooltip:Object.assign({trigger:'axis'},T.tooltip),
+    xAxis:axis({type:'category', data:[]}),
+    yAxis:axis({type:'value', axisLabel:{color:'#55637d',fontSize:11,
+      formatter:function(v){return money(v);}}}),
+    series:[{type:'line', name:'This run', data:[], smooth:true, showSymbol:false,
+      lineStyle:{color:'#22d3ee',width:2},
+      areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,
+        [{offset:0,color:'rgba(34,211,238,.25)'},{offset:1,color:'rgba(34,211,238,0)'}])}},
+      {type:'line', name:'Previous', data:[], smooth:true, showSymbol:false,
+       lineStyle:{color:'#7c8cff',width:2,type:'dashed'}}]
+  });
+  var ddChart = window.zfxChart(document.getElementById('labDD'), {
+    grid:Object.assign({},T.grid,{top:36}), legend:legend,
+    tooltip:Object.assign({trigger:'axis'},T.tooltip),
+    xAxis:axis({type:'category', data:[]}),
+    yAxis:axis({type:'value', axisLabel:{color:'#55637d',fontSize:11,
+      formatter:function(v){return money(v);}}}),
+    series:[{type:'line', name:'This run', data:[], smooth:true, showSymbol:false,
+      lineStyle:{color:'#ff4d6d',width:2},
+      areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,
+        [{offset:0,color:'rgba(255,77,109,0)'},{offset:1,color:'rgba(255,77,109,.28)'}])}},
+      {type:'line', name:'Previous', data:[], smooth:true, showSymbol:false,
+       lineStyle:{color:'#7c8cff',width:2,type:'dashed'}}]
+  });
+
+  function fmtTs(t){ if(!t) return '—'; var d=new Date(t*1000);
+    return d.toLocaleDateString()+' '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+
+  function apply(data){
+    var recs = (data.live && data.live.length) ? data.live : (data.persisted || []);
+    var running = data.status === 'running';
+    document.getElementById('labStatus').textContent =
+      (running ? '● running — ' : data.status + ' — ') + (data.message || '');
+    document.getElementById('labStatus').style.color = running ? '#2ee6a8' : '#8a97b0';
+    document.getElementById('labProg').style.width = Math.round((data.progress||0)*100) + '%';
+    document.getElementById('labWindow').textContent = data.history_days || '—';
+    document.getElementById('labTrained').textContent = fmtTs(data.trained_at);
+    document.getElementById('labRun').disabled = running;
+    document.getElementById('labRun').textContent = running
+      ? 'Running…' : 'Run walk-forward & watch live';
+    document.getElementById('tAuc').textContent =
+      data.roc_auc ? data.roc_auc.toFixed(3) : '—';
+    document.getElementById('labLog').textContent =
+      (data.log && data.log.length) ? data.log.join('\n') : '—';
+
+    // per-class quality table (renders even before any curve exists)
+    var pc = data.per_class || {}, calset = data.calibrated_classes || [];
+    var tb = document.querySelector('#labClasses tbody');
+    var keys = Object.keys(pc);
+    if (tb && keys.length){
+      var order = ['metals','fx','index','crypto'];
+      keys.sort(function(a,b){ return order.indexOf(a) - order.indexOf(b); });
+      var f = function(v,d){ return (v===undefined||v===null) ? '—' : Number(v).toFixed(d); };
+      tb.innerHTML = keys.map(function(k){
+        var r = pc[k], cal = calset.indexOf(k) >= 0;
+        return '<tr><td>'+k+'</td><td>'+(r.rows||0).toLocaleString()+'</td>'
+             + '<td>'+f(r.base_rate,3)+'</td><td>'+f(r.auc,3)+'</td>'
+             + '<td>'+f(r.brier_raw,4)+'</td>'
+             + '<td'+(cal?' class="lab-pos"':'')+'>'+f(r.brier_cal,4)+'</td>'
+             + '<td>'+(cal ? '&#10003; isotonic' : 'pooled fallback')+'</td></tr>';
+      }).join('');
+    }
+
+    // path & edge model holdout table + minute-path coverage
+    var pm = data.path_models || {};
+    var cov = document.getElementById('labCoverage');
+    if (cov) cov.textContent = (data.path_coverage===null||data.path_coverage===undefined)
+      ? '—' : (data.path_coverage*100).toFixed(1)+'%';
+    var ptb = document.querySelector('#labPath tbody');
+    var pkeys = Object.keys(pm);
+    if (ptb && pkeys.length){
+      var labels = {quant_mae_q50:'MAE q50 (drawdown, median)', quant_mae_q80:'MAE q80 (drawdown, tail)',
+                    quant_exit_fe:'Exit FE q0.35', quant_perlot:'Per-lot E ($/lot)'};
+      var porder = ['quant_mae_q50','quant_mae_q80','quant_exit_fe','quant_perlot'];
+      pkeys.sort(function(a,b){ return porder.indexOf(a)-porder.indexOf(b); });
+      var fc = function(v){ return (v===undefined||v===null) ? '<span style="color:#55637d">pooled</span>' : Number(v).toFixed(3); };
+      ptb.innerHTML = pkeys.map(function(k){ var r = pm[k]||{};
+        return '<tr><td>'+(labels[k]||k)+'</td><td>'+fc(r.pooled)+'</td><td>'+fc(r.metals)+'</td>'
+             + '<td>'+fc(r.fx)+'</td><td>'+fc(r.index)+'</td><td>'+fc(r.crypto)+'</td></tr>';
+      }).join('');
+    }
+
+    // previous-model comparison: newest archived run whose trained_at differs
+    var hist = data.history || [], prev = null;
+    for (var hi = 0; hi < hist.length; hi++){
+      if (hist[hi].trained_at !== data.trained_at){ prev = hist[hi]; break; }
+    }
+    var ctb = document.querySelector('#labCompare tbody');
+    var pnote = document.getElementById('labPrevNote');
+    if (ctb){
+      if (!prev){
+        ctb.innerHTML = '<tr><td colspan="4" style="color:#55637d">— the current model is the only '
+          + 'archived one; this fills in as soon as the running retrain completes —</td></tr>';
+        if (pnote) pnote.textContent = '';
+      } else {
+        var cfb = data.current_flat_bbook || {}, pfb = prev.flat_bbook || {};
+        // model-dependent headline: the routing policy at a 10% hedge fraction
+        var cbf = (data.current_by_fraction || {})['0.10'] || {};
+        var pbf = (prev.by_fraction || {})['0.10'] || {};
+        var fmtv = function(v,kind){
+          if (v===null||v===undefined) return '—';
+          if (kind==='money') return money(v);
+          if (kind==='int') return Number(v).toLocaleString();
+          if (kind==='f4') return Number(v).toFixed(4);
+          if (kind==='f2') return Number(v).toFixed(2);
+          if (kind==='f1') return Number(v).toFixed(1);
+          return v; };
+        // [label, previous, current, larger-is-better?, format]
+        var rowsdef = [
+          ['Trained',        fmtTs(prev.trained_at), fmtTs(data.trained_at), false, null],
+          ['Window (days)',  prev.history_days, data.history_days, false, 'int'],
+          ['Rows trained',   prev.rows, data.rows, false, 'int'],
+          ['ROC-AUC (pooled OOS)', prev.roc_auc, data.roc_auc, true, 'f4'],
+          ['B-book baseline P&L (no model, reference)', pfb.total_pnl_usd, cfb.total_pnl_usd, false, 'money'],
+          ['Model routing @10% hedge — P&L',      pbf.total_pnl_usd, cbf.total_pnl_usd, true, 'money'],
+          ['Model routing @10% hedge — Max DD',   pbf.max_drawdown_usd, cbf.max_drawdown_usd, true, 'money'],
+          ['Model routing @10% hedge — Sharpe',   pbf.sharpe, cbf.sharpe, true, 'f2'],
+          ['Model routing @10% hedge — Calmar',   pbf.calmar, cbf.calmar, true, 'f1']
+        ];
+        var ppc = prev.per_class || {}, cpc = data.per_class || {};
+        ['metals','fx','index','crypto'].forEach(function(c){
+          if (ppc[c] || cpc[c]) rowsdef.push(['AUC '+c, ppc[c]?ppc[c].auc:null, cpc[c]?cpc[c].auc:null, true, 'f4']);
+        });
+        ctb.innerHTML = rowsdef.map(function(r){
+          var p=r[1], c=r[2], better=r[3], kind=r[4], dcell='—';
+          if (better && typeof p==='number' && typeof c==='number'){
+            var d = c - p;   // max drawdown is negative: larger (shallower) is better too
+            dcell = '<span class="'+(d>=0?'lab-pos':'lab-neg')+'">'+(d>0?'+':'')+fmtv(d,kind)+'</span>';
+          }
+          return '<tr><td>'+r[0]+'</td><td>'+(kind?fmtv(p,kind):p)+'</td>'
+               + '<td>'+(kind?fmtv(c,kind):c)+'</td><td>'+dcell+'</td></tr>';
+        }).join('');
+        if (pnote) pnote.textContent = prev.note ? ('Previous (' + prev.dir + '): ' + prev.note) : ('Previous: ' + prev.dir);
+      }
+    }
+
+    if (!recs.length){ return; }
+    var dates = recs.map(function(r){return r.date;});
+    var last = recs[recs.length-1];
+    var maxdd = Math.min.apply(null, recs.map(function(r){return r.dd;}));
+    // both runs share one category axis (union of dates); each series carries
+    // [date, value] pairs so the previous run's curve overlays by date.
+    var pcv = (prev && prev.walk_curve) ? prev.walk_curve : [];
+    var axisDates = dates.concat(pcv.map(function(r){return r.date;}))
+      .filter(function(d,i,a){ return a.indexOf(d)===i; }).sort();
+    cumChart.setOption({xAxis:{data:axisDates}, series:[
+      {data:recs.map(function(r){return [r.date, r.cum];})},
+      {data:pcv.map(function(r){return [r.date, r.cum];})}]});
+    ddChart.setOption({xAxis:{data:axisDates}, series:[
+      {data:recs.map(function(r){return [r.date, r.dd];})},
+      {data:pcv.map(function(r){return [r.date, r.dd];})}]});
+    var cumEl = document.getElementById('tCum');
+    cumEl.textContent = money(last.cum);
+    cumEl.className = 'v ' + (last.cum >= 0 ? 'lab-pos' : 'lab-neg');
+    document.getElementById('tDD').textContent = money(maxdd);
+    document.getElementById('tCalmar').textContent =
+      maxdd < 0 ? (last.cum / Math.abs(maxdd)).toFixed(1) : '—';
+    document.getElementById('tDay').textContent =
+      last.day + (last.total ? ' / ' + last.total : '');
+  }
+
+  var timer = null;
+  function schedule(running){
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(poll, running ? 2000 : 15000);
+  }
+  function poll(){
+    fetch('/api/quant/lab', {credentials:'same-origin'})
+      .then(function(r){return r.json();})
+      .then(function(d){ if(!d.error){ apply(d); schedule(d.status==='running'); }
+                         else { schedule(false); } })
+      .catch(function(){ schedule(false); });
+  }
+  document.getElementById('labRun').addEventListener('click', function(){
+    this.disabled = true; this.textContent = 'Starting…';
+    fetch('/api/quant/lab/run', {method:'POST', credentials:'same-origin'})
+      .then(function(r){return r.json();})
+      .then(function(){ setTimeout(poll, 800); })
+      .catch(function(){ poll(); });
+  });
+  poll();
+})();
+</script>
+{% endblock %}

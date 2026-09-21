@@ -1,0 +1,7 @@
+# Copy this file to vantage.yaml and fill in your Vantage demo details.
+# The MT5 terminal must be installed on this machine.
+login: 12345678
+password: "CHANGE-ME"
+server: "VantageInternational-Demo"
+terminal_path: ""   # optional, e.g. C:/Program Files/MetaTrader 5/terminal64.exe
+mode: "paper"

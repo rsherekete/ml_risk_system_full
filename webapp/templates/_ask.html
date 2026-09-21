@@ -1,0 +1,88 @@
+{# Question console. Available from every screen via the masthead, because the
+   question a dealer has is rarely on the tab they happen to be looking at. #}
+<div id="ask-overlay" class="ask-overlay" onclick="if(event.target===this) askClose()">
+  <div class="ask-panel">
+    <div class="ask-head">
+      <span class="ask-icon" id="ask-icon"></span>
+      <input id="ask-input" type="text" autocomplete="off"
+             placeholder="Ask about accounts, exposure, risk, the model…"
+             onkeydown="if(event.key==='Enter') askRun(); if(event.key==='Escape') askClose()">
+      <button class="icon-btn" onclick="askClose()" title="Close">&times;</button>
+    </div>
+    <div class="ask-body" id="ask-body">
+      <p class="hint" style="margin:0 0 10px">
+        Answers come from the loaded data, not a language model &mdash; every response
+        names the rows behind it. Try:
+      </p>
+      <div class="chip-group" id="ask-examples"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ASK_EXAMPLES = [
+  "top 10 accounts by profit", "biggest losers", "exposure to gold",
+  "which accounts should we A-book today", "what is VaR",
+  "worst day", "surveillance findings", "model performance",
+  "how many accounts are active",
+];
+
+function askOpen() {
+  document.getElementById('ask-overlay').classList.add('on');
+  document.getElementById('ask-input').focus();
+  document.getElementById('ask-icon').innerHTML = ICONS.search;
+  document.getElementById('ask-examples').innerHTML = ASK_EXAMPLES.map(q =>
+    `<span class="chip chip-sm" onclick="askRun('${q.replace(/'/g, "\\'")}')">${q}</span>`).join('');
+}
+function askClose() { document.getElementById('ask-overlay').classList.remove('on'); }
+
+async function askRun(preset) {
+  const input = document.getElementById('ask-input');
+  if (preset) input.value = preset;
+  const question = input.value.trim();
+  if (!question) return;
+
+  const body = document.getElementById('ask-body');
+  body.innerHTML = '<div class="skeleton skeleton-row" style="width:70%"></div>'
+                 + '<div class="skeleton skeleton-row" style="width:45%"></div>';
+
+  const form = new FormData();
+  form.append('question', question);
+  form.append('view', '{{ view or "trading" }}');
+  const data = await (await fetch('/api/ask', { method: 'POST', body: form })).json();
+
+  let html = `<div class="ask-answer">${data.text || ''}</div>`;
+  if (data.table && data.table.length) {
+    html += '<div class="table-scroll" style="max-height:340px;margin-top:12px"><table><thead><tr>'
+          + data.columns.map(c => `<th${/pnl|usd|impact|profit|drawdown|sharpe/.test(c) ? ' class="num"' : ''}>${c.replace(/_/g, ' ')}</th>`).join('')
+          + '</tr></thead><tbody>'
+          + data.table.map(row => '<tr>' + data.columns.map(c => {
+              const value = row[c];
+              const numeric = typeof value === 'number';
+              const cls = numeric ? (value < 0 ? 'num neg' : 'num pos') : '';
+              const shown = numeric ? value.toLocaleString(undefined, {maximumFractionDigits: 0})
+                                    : (value ?? '--');
+              // Account keys link straight to the drill-down.
+              const linked = /^mt[45]_/.test(String(shown))
+                ? `<a href="/trading/account?account=${shown}">${shown}</a>` : shown;
+              return `<td class="${cls}">${linked}</td>`;
+            }).join('') + '</tr>').join('')
+          + '</tbody></table></div>';
+  }
+  if (data.source) html += `<div class="ask-source">source: ${data.source}</div>`;
+  if (data.followups && data.followups.length) {
+    html += '<div class="chip-group" style="margin-top:12px">'
+          + data.followups.map(q => `<span class="chip chip-sm" onclick="askRun('${q.replace(/'/g, "\\'")}')">${q}</span>`).join('')
+          + '</div>';
+  }
+  body.innerHTML = html;
+}
+
+// Ctrl/Cmd-K from anywhere.
+document.addEventListener('keydown', (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault();
+    askOpen();
+  }
+});
+</script>

@@ -1,0 +1,608 @@
+<title>Latency Engine Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap">
+<style>
+:root{
+  --ground:#f5f7fa; --surface:#ffffff; --sunk:#eceff4;
+  --ink:#111722; --ink-2:#364052; --muted:#5a6578; --line:#dbe1ea;
+  --accent:#2c4a76; --accent-soft:#e4ebf5;
+  --warn:#9a5306; --warn-soft:#fbefdf; --crit:#a02117; --crit-soft:#fbe7e4; --ok:#1b6a47; --ok-soft:#e1f2e9;
+  --sans:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0d121b; --surface:#141b27; --sunk:#10161f;
+    --ink:#e6ebf3; --ink-2:#c2cbda; --muted:#8f9bb0; --line:#253044;
+    --accent:#86ade0; --accent-soft:#1a2740;
+    --warn:#e0a04a; --warn-soft:#2a2213; --crit:#ea8177; --crit-soft:#2e1816; --ok:#58c996; --ok-soft:#12261d;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0d121b; --surface:#141b27; --sunk:#10161f;
+  --ink:#e6ebf3; --ink-2:#c2cbda; --muted:#8f9bb0; --line:#253044;
+  --accent:#86ade0; --accent-soft:#1a2740;
+  --warn:#e0a04a; --warn-soft:#2a2213; --crit:#ea8177; --crit-soft:#2e1816; --ok:#58c996; --ok-soft:#12261d;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.6;
+  margin:0;padding-block:36px 72px;padding-left:20px;padding-right:20px;-webkit-font-smoothing:antialiased}
+.layout{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:40px}
+@media (min-width:1000px){.layout{grid-template-columns:230px minmax(0,1fr)}}
+nav.toc{font-size:13.5px}
+@media (min-width:1000px){nav.toc{position:sticky;top:calc(env(safe-area-inset-top,0px) + 24px);align-self:start;max-height:calc(100vh - 48px);overflow:auto}}
+nav.toc .label{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px}
+nav.toc ol{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:3px;color:var(--muted)}
+nav.toc a{color:var(--ink-2);text-decoration:none}
+nav.toc a:hover{color:var(--accent);text-decoration:underline}
+main{min-width:0;display:flex;flex-direction:column;gap:44px}
+header.doc{display:flex;flex-direction:column;gap:12px;border-bottom:1px solid var(--line);padding-bottom:26px}
+.eyebrow{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600}
+h1{font-family:var(--serif);font-weight:600;font-size:clamp(28px,4.2vw,38px);line-height:1.12;margin:0;text-wrap:balance}
+h2{font-family:var(--serif);font-weight:600;font-size:24px;line-height:1.25;margin:0;text-wrap:balance}
+h2 .n{font-family:var(--mono);font-size:15px;color:var(--muted);font-weight:400;margin-right:10px}
+h3{font-size:16px;font-weight:600;margin:10px 0 0}
+p,li{max-width:74ch}
+p{margin:0}
+section{display:flex;flex-direction:column;gap:14px;scroll-margin-top:20px}
+.lede{font-size:17px;color:var(--ink-2);max-width:70ch}
+.meta{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13px;color:var(--muted)}
+.meta b{color:var(--ink-2);font-weight:500}
+code,.mono{font-family:var(--mono);font-size:.88em}
+code{background:var(--sunk);padding:1px 5px;border-radius:3px;color:var(--ink);overflow-wrap:anywhere}
+pre{margin:0;background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:14px 16px;overflow-x:auto;
+  font-family:var(--mono);font-size:13px;line-height:1.55;color:var(--ink)}
+pre code{background:none;padding:0;font-size:inherit}
+ul,ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:5px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.8px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;vertical-align:top;padding:8px 12px;border-bottom:1px solid var(--line)}
+th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--sunk);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num{text-align:right;white-space:nowrap}
+td code{white-space:nowrap}
+.note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:11px 15px;border-radius:0 5px 5px 0;font-size:14.5px;max-width:78ch}
+.note.warn{border-color:var(--warn);background:var(--warn-soft)}
+.note b{font-weight:600}
+/* pipeline */
+.pipeline{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:0;counter-reset:st}
+.pipeline li{counter-increment:st;display:grid;grid-template-columns:40px minmax(0,1fr);gap:0 12px;max-width:none;position:relative;padding-bottom:12px}
+.pipeline li::before{content:counter(st);grid-row:1 / span 2;width:28px;height:28px;border-radius:50%;background:var(--surface);
+  border:1.5px solid var(--accent);color:var(--accent);font-family:var(--mono);font-size:12.5px;display:grid;place-items:center;z-index:1}
+.pipeline li::after{content:"";position:absolute;left:13.5px;top:28px;bottom:0;width:1.5px;background:var(--line)}
+.pipeline li:last-child::after{display:none}
+.pipeline .st{font-weight:600;padding-top:3px}
+.pipeline .st code{font-weight:400;margin-left:6px;color:var(--muted);background:none;padding:0}
+.pipeline .d{color:var(--ink-2);font-size:14.5px;max-width:74ch}
+.pipeline li.b::before{border-style:dashed;color:var(--muted);border-color:var(--muted)}
+.chip{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:10px;letter-spacing:.02em;white-space:nowrap}
+.chip.crit{background:var(--crit-soft);color:var(--crit)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.acc{background:var(--accent-soft);color:var(--accent)}
+.chip.mut{background:var(--sunk);color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.stats div{background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.stats .v{font-family:var(--mono);font-size:19px;font-variant-numeric:tabular-nums}
+.stats .k{font-size:12.5px;color:var(--muted)}
+.formula{font-family:var(--mono);font-size:13.5px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 16px;overflow-x:auto;white-space:pre;line-height:1.7}
+.cols2{display:grid;grid-template-columns:1fr;gap:18px}
+@media (min-width:760px){.cols2{grid-template-columns:1fr 1fr}}
+.cols2>div{display:flex;flex-direction:column;gap:8px}
+a{color:var(--accent)}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
+</style>
+
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <div class="label">Contents</div>
+  <ol>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#modules">Module map</a></li>
+    <li><a href="#data">Data sources &amp; clocks</a></li>
+    <li><a href="#pipeline">Scan pipeline</a></li>
+    <li><a href="#markouts">Markout engine</a></li>
+    <li><a href="#classify">Trade classification</a></li>
+    <li><a href="#reference">Reference feed</a></li>
+    <li><a href="#curve">Account curve profile</a></li>
+    <li><a href="#score">Latency Risk Score</a></li>
+    <li><a href="#confidence">Confidence</a></li>
+    <li><a href="#profiles">Behaviour profiles</a></li>
+    <li><a href="#gates">Gates &amp; verdict</a></li>
+    <li><a href="#rootcause">Feed root cause</a></li>
+    <li><a href="#outputs">Outputs, tags, audit</a></li>
+    <li><a href="#legacy">Legacy score &amp; ML</a></li>
+    <li><a href="#ops">Operations</a></li>
+    <li><a href="#config">Configuration</a></li>
+    <li><a href="#api">API</a></li>
+    <li><a href="#state">Current state</a></li>
+    <li><a href="#gaps">Known gaps</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="doc">
+  <div class="eyebrow">Anti-Fraud · P1 Engine A · Technical reference</div>
+  <h1>Latency Arbitrage Detection Engine</h1>
+  <p class="lede">How the engine is built: where its data comes from, how each trade is marked out and classified, how accounts are scored and gated, and what it emits for review and automation. Everything here is taken from the code in <code>notebook-webapp/webapp</code>.</p>
+  <div class="meta">
+    <span><b>Code as of</b> 16 Sep 2026</span>
+    <span><b>Mode</b> shadow (decisions logged, not executed)</span>
+    <span><b>Spec</b> P1_Risk_Detection_Formal_Specification.docx</span>
+  </div>
+  <div class="note"><b>Section numbers.</b> Comments in the code (for example “s5.3”) cite the numbering of the older <i>Latency Arbitrage Detection Engine.docx</i>, which only covers Engine A. The P1 specification is now the binding document, and its §5 is Engine B. This reference follows the code’s numbering and states it where it matters.</div>
+</header>
+
+<!-- 1 -->
+<section id="overview">
+  <h2><span class="n">01</span>Overview</h2>
+  <p>The engine looks for clients who profit from stale broker prices. The signature is a <b>fast, paid trade whose favourable markout appears within the first second and fades by 60 seconds</b>. A move that holds or keeps growing is treated as directional (informed) flow and never counted as latency arbitrage.</p>
+  <p>It runs as a periodic batch scan over the last 7 days of closed trades, inside the web app process. Each scan:</p>
+  <ul>
+    <li>marks every trade out against the broker’s own MySQL tick tape at seven horizons (100 ms to 60 s),</li>
+    <li>checks qualifying trades against an independent reference market (a Vantage Raw ECN live account),</li>
+    <li>scores each account on the spec’s seven weighted components, with confidence reported separately,</li>
+    <li>assigns a band and a verdict, capped at <i>monitor</i> when an alert gate fails,</li>
+    <li>attaches stable automation tags, writes changes to an audit log, and caches the result for the Latency tab.</li>
+  </ul>
+  <p>Engine B (Toxic Flow) runs inside the same scan and reuses its markouts, as P1 §12 requires one shared Markout Engine.</p>
+</section>
+
+<!-- 2 -->
+<section id="modules">
+  <h2><span class="n">02</span>Module map</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>File</th><th>Lines</th><th>Responsibility</th></tr></thead>
+    <tbody>
+      <tr><td><code>webapp/latency_arb.py</code></td><td class="num">2,133</td><td>Orchestration: rules, trade load, MT4 millisecond times, tick seeding, markouts, classification, aggregation, legacy score, ML detector, audit, history, KPIs, caching and the background scan.</td></tr>
+      <tr><td><code>webapp/latency_spec.py</code></td><td class="num">474</td><td>Spec scoring: exclusions, account metrics, the seven components, population calibration, bands, confidence, L-profiles and alert gates.</td></tr>
+      <tr><td><code>webapp/latency_reference.py</code></td><td class="num">463</td><td>Independent reference feed: subprocess tick fetch, parquet cache, clock and basis calibration, reference features, feed root-cause table.</td></tr>
+      <tr><td><code>webapp/latency_tags.py</code></td><td class="num">137</td><td>Automation tag catalog and per-account and per-feed tag assignment.</td></tr>
+      <tr><td><code>webapp/mt4_kafka_backfill.py</code></td><td class="num">169</td><td>Read-only Kafka consumer that backfills MT4 millisecond trade-event times to parquet.</td></tr>
+      <tr><td><code>webapp/trade_markout.py</code></td><td class="num">345</td><td>Evidence for a single order: the same markouts, broker tape and reference, for display and client-facing proof.</td></tr>
+      <tr><td><code>webapp/toxic_flow.py</code> + <code>toxic_spec.py</code></td><td class="num">—</td><td>Engine B, called from the scan with the in-memory markout frame.</td></tr>
+      <tr><td><code>webapp/main.py</code></td><td class="num">—</td><td>API routes, startup warm-up, the auto-rescan loop and the midnight refresh.</td></tr>
+      <tr><td><code>webapp/latency_rules.json</code></td><td class="num">—</td><td>Effective rule set, merged over code defaults and editable from the tab.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 3 -->
+<section id="data">
+  <h2><span class="n">03</span>Data sources and clocks</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Source</th><th>Read by</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td>Trade warehouse (monthly parquet per server)</td><td><code>data_store.read_history</code></td><td>Closed trades whose <code>close_time</code> falls in the window and whose <code>open_price</code> is above 0. Account key is <code>database:login</code>. Direction is +1 for buys and −1 for sells.</td></tr>
+      <tr><td>MySQL <code>ticks</code> tables, copied into the DuckDB <code>quotes</code> table as <code>server = 'mysql:&lt;db&gt;'</code></td><td><code>_seed_quotes_from_mysql</code>, then <code>_quote_marks</code></td><td>The broker tick tape behind every markout. MT4 reads <code>tm</code> from mt4_live01/02/04/03, in that order. MT5 (live01, dubai_live01) reads <code>datetime_msc</code> for the dominant feeder of the last day.</td></tr>
+      <tr><td>Kafka MT4 trade events (live store <code>events</code> plus <code>artifacts/mt4_event_times/*.parquet</code>)</td><td><code>_attach_mt4_ms_times</code></td><td>Millisecond open and close times for MT4 trades, taken from <code>tradeRecord.timeStamp</code>.</td></tr>
+      <tr><td>Vantage Raw ECN live account, in a separate portable MT5 terminal</td><td><code>latency_reference.fetch</code> (subprocess)</td><td>Independent reference ticks, stored as <code>artifacts/reference_ticks/&lt;SYMBOL&gt;/&lt;YYYYMMDD_HH&gt;.parquet</code>.</td></tr>
+      <tr><td>Behavioural panel (<code>antifraud.classify</code>)</td><td>scan and KPIs</td><td>Legacy fusion uplift and the detection-rate baseline.</td></tr>
+      <tr><td>Economic calendar (<code>econ_calendar.near_share</code>)</td><td>scan</td><td><code>event_share</code>: the share of flagged entries near macro releases.</td></tr>
+      <tr><td>Rule-models early-warning artifact</td><td><code>_ew_scores</code></td><td>The <code>ew</code> column, a 5-day early-warning probability.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Clock decisions (all measured on 15 Sep 2026)</h3>
+  <ul>
+    <li><b>Live Kafka quotes are excluded from markouts.</b> Their <code>event_time</code> is the broker’s publish time, about 90 ms after the tick, which would bias an entire sub-second horizon. Markouts read only <code>server LIKE 'mysql:%'</code>.</li>
+    <li><b>MT4 millisecond times.</b> <code>tradeRecord.timeStamp</code> is the execution clock: the record’s own market bid/ask equals the MT4 tape at that exact stamp for 94% of events. The match falls to about 55% at ±100 ms and about 10% at ±250 ms. An event is joined to a trade on (server, order) <i>and</i> the same second as the warehouse open or close. This handles pending-order activations and ignores SL/TP modifications.</li>
+    <li><b>Warehouse and <code>ticks.tm</code> are both UTC</b> (<code>_TICK_TZ_OFFSET = 0</code>). The old +3 h shift was off by about $12 on gold.</li>
+    <li><b>Vantage is on server time</b>: UTC+3 in summer, UTC+2 in winter. The offset is calibrated per UTC day and never hard-coded (see <a href="#reference">§07</a>).</li>
+    <li><b>Millisecond fill.</b> A fill counts as millisecond-stamped when its open time has a non-zero sub-second part. Only these fills get the 100–500 ms horizons and quote age. An exact <code>.000</code> fill loses them, about 1 in 1,000.</li>
+  </ul>
+</section>
+
+<!-- 4 -->
+<section id="pipeline">
+  <h2><span class="n">04</span>Scan pipeline</h2>
+  <p><code>scan()</code> never computes on the request thread. It serves the last result from memory or disk, and on refresh starts a single background build under <code>_SCAN_BUILD</code>. The build is <code>_scan_inner(rules)</code>. Each stage writes a heartbeat to <code>artifacts/latency_scan_progress.json</code>; the stage names are shown next to each step.</p>
+  <ol class="pipeline">
+    <li><span class="st">Load trades<code>load_trades</code></span><span class="d">7-day window. An empty window still returns a full-shaped result (KPIs and mode) so the tab renders.</span></li>
+    <li><span class="st">Exclusions (s5.1)<code>excluded</code></span><span class="d">Case-insensitive fnmatch patterns on the raw or canonical symbol and on the platform account group (<code>client_profile</code>). Row ids are renumbered afterwards.</span></li>
+    <li><span class="st">MT4 millisecond times<code>mt4_ms_times</code></span><span class="d">If the Kafka backfill is more than 6 h old, a detached refresh is started for the next scan; this scan doesn’t wait for it. On failure, MT4 keeps its 1 s + 5 s fallback window.</span></li>
+    <li><span class="st">Seed tick tape<code>seed_ticks</code></span><span class="d">For every (feed, canonical, hour) that holds a fast, paid trade and isn’t yet in <code>quotes_seeded_feed</code>, MySQL ticks are copied into DuckDB. Consecutive hours are fetched in runs of up to 6 h, with a cap of 6 M rows per scan. A failure here falls back to whatever tape exists.</span></li>
+    <li><span class="st">Markouts<code>quote_marks</code></span><span class="d">DuckDB ASOF joins (<a href="#markouts">§05</a>). The store has a single writer, so a failure is retried up to 3 times, 20 s apart. If all attempts fail, markouts are set to NaN, <code>tape_error</code> is set, and the disk cache isn’t overwritten.</span></li>
+    <li><span class="st">Classify trades<code>reference</code></span><span class="d">Stale entry, illiquid entry, latency flag, directional (<a href="#classify">§06</a>).</span></li>
+    <li><span class="st">Reference feed<code>reference_fetch</code> → <code>reference_features</code></span><span class="d">Fetch any missing (symbol, hour) files, calibrate, compute dislocation, lead/lag, validated and confirmed flags (<a href="#reference">§07</a>). Skipped when <code>tape_error</code> is set.</span></li>
+    <li><span class="st">Feed root cause (s5.5)</span><span class="d">Per (feed, symbol) stale-top-of-book table and each account’s share of events in architecture-risk conditions (<a href="#rootcause">§13</a>).</span></li>
+    <li><span class="st">Aggregate<code>aggregate</code></span><span class="d">One vectorised <code>groupby.agg</code> per account (it replaced per-group lambdas that took about 45 min). Also writes <code>latency_markouts.json</code> (mk_short, mk_trades) for every account, which the registry’s toxic-flow fields read.</span></li>
+    <li><span class="st">Curve profiles</span><span class="d">neutral, fast_transient, persistent or no_ticks, for every scanned account (<a href="#curve">§08</a>).</span></li>
+    <li><span class="st">Spec scoring<code>spec_scoring</code></span><span class="d"><code>latency_spec.account_metrics</code>: metrics, score, band, confidence, profiles and gates (<a href="#score">§09–12</a>).</span></li>
+    <li class="b"><span class="st">Engine B<code>toxic_flow</code></span><span class="d"><code>toxic_flow.build</code> on the same trade frame. Its errors are captured and never break Engine A.</span></li>
+    <li><span class="st">Table filter</span><span class="d">Only accounts with <code>flagged ≥ min_flagged_trades</code> (5) continue. Event share, behavioural fusion, ML and EW are added for the legacy score (<a href="#legacy">§15</a>).</span></li>
+    <li><span class="st">Verdict</span><span class="d"><code>risk = spec_score</code>, <code>confidence = spec_confidence / 100</code>, <code>verdict = spec_verdict</code>. <i>Clear</i> rows are dropped, and the rest are sorted by risk.</span></li>
+    <li><span class="st">Recommended actions<code>recommended_actions</code></span><span class="d">For up to 40 accounts on escalate or restrict, <code>antifraud.action_test</code> sweeps the action universe and keeps the gentlest intervention that reaches breakeven (MIN) and the best one within implementable caps (MAX). Results are cached on disk for 24 h.</span></li>
+    <li><span class="st">Tags and audit</span><span class="d">Tags per row. On a live scan, a change of verdict or tag set writes an <code>auto</code> audit row, and accounts that dropped out get a <i>clear</i> row (“remove treatment”).</span></li>
+    <li><span class="st">Near misses, history, cache<code>done</code></span><span class="d">The 15 closest accounts below the table and what holds each back; the day’s <code>latency_history</code> is replaced; the result is saved to <code>artifacts/latency_scan.json</code>.</span></li>
+  </ol>
+</section>
+
+<!-- 5 -->
+<section id="markouts">
+  <h2><span class="n">05</span>Markout engine</h2>
+  <p>For each trade and horizon <i>h</i>, the engine takes the last broker quote at or before <code>open_time + h</code> on the trade’s own feed (DuckDB <code>ASOF LEFT JOIN</code> on feed and canonical symbol). The markout is signed so that positive means in the client’s favour:</p>
+  <div class="formula">markout_h (bps) = direction × (mid(open_time + h) − open_price) / open_price × 10⁴</div>
+  <ul>
+    <li><b>Feed mapping</b> (<code>_feed_of</code>): servers containing <i>dubai</i> map to <code>mt5_dubai_live01</code>, <i>indonesia</i> to <code>mt5_indonesia</code>, other <code>mt5*</code> servers to themselves, and every MT4 server to one shared <code>mt4</code> tape. If the own feed has no quotes for the symbol, the MT4 tape is used first, then any other feed.</li>
+    <li><b>Marking against open_price</b>, not the entry mid, so the half-spread cost is inside the markout. That is why the population benchmark sits around −0.4 bps.</li>
+    <li><b>Freshness</b>: a matched quote older than <code>open_time − 5 s</code> is a coverage gap, and the markout is set to NaN rather than invented.</li>
+    <li><b>Sub-second horizons</b> (&lt;1 s) are kept only for millisecond fills. A fill truncated to the second can be up to 999 ms early.</li>
+    <li><b>Quote age</b> = open_time − time of the last quote, recorded for millisecond fills only.</li>
+    <li><b>Spread ratio</b> = the relative spread at entry divided by the symbol’s median relative spread over the window.</li>
+    <li><b>Tick coverage</b> = the trade has a 60 s markout.</li>
+    <li>ASOF targets are precomputed plain columns (<code>t_0</code>…<code>t_6</code>). Expressions on the inequality side matched unreliably.</li>
+  </ul>
+  <div class="tbl"><table>
+    <thead><tr><th>Horizon</th><th>Column</th><th>Flag threshold</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td>100 ms</td><td><code>markout_100ms_bps</code></td><td class="num">0.75 bps</td><td>Early window (millisecond fills)</td></tr>
+      <tr><td>200 ms</td><td><code>markout_200ms_bps</code></td><td class="num">1.00 bps</td><td>Early window (millisecond fills)</td></tr>
+      <tr><td>300 ms</td><td><code>markout_300ms_bps</code></td><td class="num">1.25 bps</td><td>Early window (millisecond fills)</td></tr>
+      <tr><td>500 ms</td><td><code>markout_500ms_bps</code></td><td class="num">1.50 bps</td><td>Early window (millisecond fills)</td></tr>
+      <tr><td>1 s</td><td><code>markout_1s_bps</code></td><td class="num">1.90 bps</td><td>Early window for both classes. Added to the millisecond window on 15 Sep 2026, which kept every 100–500 ms flag and added 81 trades across 4 accounts.</td></tr>
+      <tr><td>5 s</td><td><code>markout_5s_bps</code></td><td class="num">2.00 bps</td><td>Fallback early window (second-stamped fills)</td></tr>
+      <tr><td>60 s</td><td><code>markout_60s_bps</code></td><td class="num">—</td><td>Persistence horizon: decay and directional tests</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 6 -->
+<section id="classify">
+  <h2><span class="n">06</span>Trade classification</h2>
+  <p><code>_classify_trades</code> applies the rules below. <i>Early window</i> means 100 ms–1 s for millisecond fills and 1 s + 5 s for second-stamped fills.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Field</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td><code>fast</code></td><td><code>hold_seconds ≤ 120</code></td></tr>
+      <tr><td>paid</td><td><code>net_profit ≥ $1</code></td></tr>
+      <tr><td><code>early_peak_bps</code></td><td>Maximum markout over the early window that applies to the fill</td></tr>
+      <tr><td><code>early_hit_any</code></td><td>Any early-window markout ≥ its horizon threshold</td></tr>
+      <tr><td>decayed</td><td><code>markout_60s ≤ (1 − 50%) × early_peak</code></td></tr>
+      <tr><td><b><code>flagged</code></b> (latency event)</td><td><b>early hit ∧ decayed ∧ fast ∧ paid</b></td></tr>
+      <tr><td><code>directional</code></td><td><code>markout_60s ≥ 3.0 bps</code> ∧ not decayed ∧ fast ∧ paid. Reported, never counted as latency.</td></tr>
+      <tr><td><code>stale_entry</code></td><td>300 ms &lt; quote age ≤ 60 s (200 ms broker throttle + 100 ms tolerance) ∧ fast ∧ profitable. Gaps over 60 s are store holes, not venue staleness.</td></tr>
+      <tr><td><code>illiquid_entry</code></td><td><code>spread_ratio ≥ 1.5</code> ∧ fast</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">The earlier rule flagged on <i>any</i> horizon, including a 30 s leg. That scored persistent moves, which are the directional signature, as latency arbitrage. The decay requirement is what separates the two.</div>
+</section>
+
+<!-- 7 -->
+<section id="reference">
+  <h2><span class="n">07</span>Independent reference feed</h2>
+  <div class="cols2">
+    <div>
+      <h3>Fetching</h3>
+      <ul>
+        <li>Credentials are in the git-ignored <code>vantage_reference.yaml</code> (login, password, server, terminal_path). The terminal is a separate portable install at <code>C:\Users\ReginaldSherekete\MT5_VantageReference</code>.</li>
+        <li><b>Never use the copier’s terminal.</b> An MT5 terminal holds one login, so logging in the reference account there would take the live copier offline.</li>
+        <li>The fetch runs as a subprocess, <code>python -m webapp.latency_reference fetch &lt;request.json&gt;</code>, because MetaTrader5 IPC calls block the interpreter and would stall the copier. It is read-only: <code>copy_ticks_range(…, COPY_TICKS_INFO)</code>, no order functions.</li>
+        <li>Pairs needed are (canonical, UTC hour) for every hour holding a fast, paid trade, plus the next hour when the 60 s horizon crosses into it.</li>
+        <li>Hours within the last 2 are always refetched. At most 2,000 pairs per call, newest first, with a 30 min timeout. Symbols the venue lacks are skipped for 24 h (<code>_no_symbol.json</code>).</li>
+        <li>Symbol resolution prefers tradeable symbols, then the shortest name, then aliases (for example <code>USOIL → USOUSD/XTIUSD/…</code>). Futures months map to the cash instrument, and the basis absorbs the premium.</li>
+        <li>Each hour file covers server time [H+2, H+4) so both possible offsets are included.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Calibration</h3>
+      <ul>
+        <li><b>Clock</b>: for each UTC day, each candidate offset (2 h, 3 h) is tested on the day’s busiest symbol. Broker ticks (a 40k sample) are ASOF-joined to reference mids, and the offset with the lowest median absolute deviation wins. Days with no result use the most common offset.</li>
+        <li><b>Basis</b>: per (symbol, day), the median of broker mid − reference mid is added to reference bid, ask and mid. Dislocation then measures a temporary gap, not a permanent difference in price level (gold was about $0.01).</li>
+        <li>Residual alignment after the offset was best at 0 to +150 ms on gold.</li>
+      </ul>
+    </div>
+  </div>
+  <h3>Per-trade reference features (fast, paid trades only)</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Feature</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td><code>ref_covered</code></td><td>A reference quote exists within 5 s before the fill</td></tr>
+      <tr><td><code>ref_exec_&lt;h&gt;_bps</code></td><td>Markout against the <b>executable opposite side</b> (s2.1): a buy exits at the reference bid, a sell at the reference ask</td></tr>
+      <tr><td><code>ref_mid_&lt;h&gt;_bps</code></td><td>The same against the reference mid, labelled separately</td></tr>
+      <tr><td><code>ref_div_bps</code></td><td>direction × (reference mid − broker mid) at the fill: how far the broker price lags the reference in the client’s favour</td></tr>
+      <tr><td><code>ref_lead_bps</code> / <code>broker_lead_bps</code></td><td>How far each price moved in the client’s direction over the 500 ms before the fill</td></tr>
+      <tr><td><code>ref_dislocation</code></td><td><code>ref_div_bps ≥ 1.0</code></td></tr>
+      <tr><td><code>ref_leadlag</code></td><td><code>ref_lead_bps ≥ 1.0</code> ∧ <code>broker_lead_bps ≤ 0.25 × ref_lead_bps</code></td></tr>
+      <tr><td><code>ref_validated</code></td><td>The early-window <code>ref_exec</code> markout also clears its threshold. The move was real market movement. <b>Feeds confidence only.</b></td></tr>
+      <tr><td><code>ref_confirm</code></td><td>Dislocation ∨ lead/lag: latency-specific confirmation. <b>Feeds the score’s reference component.</b></td></tr>
+    </tbody>
+  </table></div>
+  <div class="note warn"><b>Why validated and confirmed are kept apart.</b> On 15 Sep 2026, counting validated moves as confirmation added 5–8 points to accounts with no dislocation at all. It was scoring ordinary fast moves.</div>
+</section>
+
+<!-- 8 -->
+<section id="curve">
+  <h2><span class="n">08</span>Account curve profile</h2>
+  <p>Built from <b>all</b> of an account’s tick-covered trades, not just fast or paid ones. Conditioning on short holds selects winners, because quick profits get closed while losers are held, and that inflates the long-horizon markout.</p>
+  <ul>
+    <li>Per horizon: mean markout <code>mo_&lt;h&gt;_bps</code> and hit rate <code>hit_&lt;h&gt;</code> (share &gt; 0).</li>
+    <li>Early peak is taken over the millisecond window if at least half of the account’s covered fills are millisecond fills, otherwise over the fallback window. <code>decay_pct = (1 − mo_60s / peak) × 100</code>, clipped to [−500, 100].</li>
+    <li><span class="chip crit">fast_transient</span> peak ≥ 0.5 bps and mo_60s ≤ 50% of the peak.</li>
+    <li><span class="chip warn">persistent</span> not fast, and some horizon of 1 s or more has a mean ≥ 0.5 bps.</li>
+    <li><span class="chip mut">neutral</span> otherwise. <span class="chip mut">no_ticks</span> means the account has no coverage.</li>
+  </ul>
+</section>
+
+<!-- 9 -->
+<section id="score">
+  <h2><span class="n">09</span>Latency Risk Score (s5.3)</h2>
+  <p>Computed per account over tick-covered trades. The early markout and early hit are each measured against a <b>population benchmark for the same precision class</b> (millisecond or second), because every fill starts about half a spread behind. Each component is scaled to [0, 1]:</p>
+  <div class="formula">spec_score = 100 × Σ weightₖ × componentₖ     (clipped to 0–100)</div>
+  <div class="tbl"><table>
+    <thead><tr><th>Component</th><th class="num">Weight</th><th>Raw measure</th><th>Full marks at</th></tr></thead>
+    <tbody>
+      <tr><td>Early markout</td><td class="num">20%</td><td>Mean early markout minus the benchmark (bps)</td><td>Calibrated. Capped at the mean early threshold (weighted by millisecond share), floor 0.25 bps.</td></tr>
+      <tr><td>Early hit rate</td><td class="num">15%</td><td>Share of early markouts &gt; 0, minus the benchmark</td><td>Calibrated. Cap 0.40, floor 0.10.</td></tr>
+      <tr><td>Price age</td><td class="num">20%</td><td>Stale-quote share of millisecond fills minus the population share. Millisecond fills only; accounts with none score 0.</td><td>Calibrated. Cap 0.10, floor 0.02.</td></tr>
+      <tr><td>Decay consistency</td><td class="num">15%</td><td>(early hits that were also flagged ÷ early hits) × min(early hits ÷ 5, 1)</td><td>Already a 0–1 share, not rescaled</td></tr>
+      <tr><td>Event count</td><td class="num">10%</td><td>Number of latency events</td><td>Calibrated. Cap 20, floor 5.</td></tr>
+      <tr><td>Profit concentration</td><td class="num">10%</td><td>Latency-event PnL ÷ gross profit</td><td>Calibrated. Cap 0.50, floor 0.05.</td></tr>
+      <tr><td>Reference</td><td class="num">10%</td><td>Share of reference-confirmed events × min(reference-covered events ÷ 5, 1). Scores 0 with no reference.</td><td>Already a 0–1 share</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Population calibration</h3>
+  <p>With <code>score_calibration.mode = "population"</code> (user decision, 15 Sep 2026), each magnitude component reaches full marks at the <b>99th-percentile account</b> of the current book. The population is accounts with at least 20 covered trades, or at least 1 event for the event-count and concentration components. The result is bounded below by <code>score_floor</code>, so noise never earns full marks, and above by the fixed <code>score_scale</code>, so the engine never demands more than the standard. <code>mode = "fixed"</code> uses the scale alone. The values used are reported in <code>spec.score_scale</code>.</p>
+  <h3>Bands</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Band</th><th>Score</th><th>Verdict before gates</th><th>Configured action (shadow)</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chip crit">critical</span></td><td class="num">85–100</td><td>escalate</td><td>SOR: pin to B-book off + feed delay · 250 ms · requote 1.0 bps · review</td></tr>
+      <tr><td><span class="chip warn">high</span></td><td class="num">70–84</td><td>restrict</td><td>SOR: feed delay on quotes · 120 ms · requote 0.5 bps</td></tr>
+      <tr><td><span class="chip acc">moderate</span></td><td class="num">50–69</td><td>monitor</td><td>Watchlist only</td></tr>
+      <tr><td><span class="chip acc">emerging</span></td><td class="num">25–49</td><td>monitor</td><td>Watchlist only</td></tr>
+      <tr><td><span class="chip ok">normal</span></td><td class="num">0–24</td><td>clear</td><td>None (row dropped)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 10 -->
+<section id="confidence">
+  <h2><span class="n">10</span>Confidence</h2>
+  <p>Reported separately from the score, on a 0–100 scale:</p>
+  <div class="formula">spec_confidence = 100 × ( 0.35 × sample·significance
+                      + 0.25 × data quality
+                      + 0.25 × persistence
+                      + 0.15 × corroboration )</div>
+  <ul>
+    <li><b>Sample</b> = min(covered trades ÷ 50, 1). <b>Significance</b> = Φ(z), where z compares the account’s event count with a binomial at the book’s base flag rate.</li>
+    <li><b>Data quality</b> = tick coverage × (0.5 + 0.5 × millisecond share).</li>
+    <li><b>Persistence</b> = min(days with a flag ÷ 3, 1).</li>
+    <li><b>Corroboration</b> = the reference-<i>validated</i> share of flagged, reference-covered events.</li>
+  </ul>
+</section>
+
+<!-- 11 -->
+<section id="profiles">
+  <h2><span class="n">11</span>Behaviour profiles (s5.4)</h2>
+  <p>“Enough events” means at least 5 latency events. Profiles are descriptive, except L9, which also acts as a gate.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Profile</th><th>Rule</th></tr></thead>
+    <tbody>
+      <tr><td><b>L1</b> Stale-price capture</td><td>With reference coverage: ≥ 5 dislocation fills that also hit early ∧ dislocation share ≥ 25%. Without it, falls back to enough events ∧ price-age component ≥ 0.5 ∧ excess markout &gt; 0. The basis used is recorded in <code>l1_basis</code>.</td></tr>
+      <tr><td><b>L2</b> Fast positive markout</td><td>Early-markout component ≥ 0.5 ∧ early-hit component ≥ 0.5</td></tr>
+      <tr><td><b>L3</b> Decaying advantage</td><td>Enough events ∧ decay consistency ≥ 0.6</td></tr>
+      <tr><td><b>L4</b> Reference lead/lag</td><td>≥ 5 lead/lag fills that also hit early ∧ lead/lag share ≥ 25%</td></tr>
+      <tr><td><b>L5</b> Short-hold extraction</td><td>Enough events ∧ median hold of flagged trades ≤ 60 s ∧ profit concentration ≥ 0.3</td></tr>
+      <tr><td><b>L6</b> Timing after feed gaps</td><td><span class="chip mut">not measurable</span> Needs constituent-feed update data</td></tr>
+      <tr><td><b>L7</b> Clustered events</td><td>Enough events ∧ ≥ 50% of events fall in bursts of ≥ 3 with gaps of ≤ 300 s</td></tr>
+      <tr><td><b>L8</b> Symbol concentration</td><td>Enough events ∧ top symbol’s share of events ≥ 80%. Symbols only, because feed IDs aren’t recorded.</td></tr>
+      <tr><td><b>L9</b> Cross-account replication</td><td>Enough events ∧ ≥ 50% of events share (symbol, direction, 2 s bucket) with ≥ 3 distinct accounts</td></tr>
+      <tr><td><b>L10</b> Profit-concentrated</td><td>Enough events ∧ profit concentration ≥ 0.5</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 12 -->
+<section id="gates">
+  <h2><span class="n">12</span>Alert gates and verdict</h2>
+  <p>If any gate fails, an <i>escalate</i> or <i>restrict</i> verdict is capped at <b>monitor</b>. Failed gates are listed in <code>gates_failed</code> and become <code>LA_CAP_*</code> tags, which tell automation not to act adversely on the account.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Gate</th><th>Passes when</th><th>Current setting</th></tr></thead>
+    <tbody>
+      <tr><td><code>realized_pnl</code></td><td>Account PnL ≥ minimum (only when enabled)</td><td>disabled</td></tr>
+      <tr><td><code>early_hit_rate</code></td><td>Early hit rate ≥ minimum %</td><td>0 (open)</td></tr>
+      <tr><td><code>event_success_rate</code></td><td>Qualifying trades with a positive early markout ≥ minimum %</td><td>0 (open)</td></tr>
+      <tr><td><code>profit_concentration</code></td><td>≥ minimum %</td><td>0 (open)</td></tr>
+      <tr><td><code>confidence</code></td><td><code>spec_confidence ≥ min_confidence</code></td><td>40</td></tr>
+      <tr><td><code>not_replicated</code></td><td>L9 not set (s5.5.4: a replicated pattern points to pricing first)</td><td>always on</td></tr>
+      <tr><td><code>market_data_condition</code></td><td>&lt; 50% of the account’s events sit in an architecture-risk feed condition</td><td>always on</td></tr>
+    </tbody>
+  </table></div>
+  <p>The scan reports <code>spec.spec_distributions</code> (quartiles and p90 for accounts with ≥ 5 events) as the basis for calibrating the three open gates.</p>
+</section>
+
+<!-- 13 -->
+<section id="rootcause">
+  <h2><span class="n">13</span>Feed root cause (s5.5)</h2>
+  <p><code>latency_reference.root_cause</code> works at the level the data supports: the broker’s <b>aggregated</b> feed per server and symbol. Constituent feed IDs aren’t available (MT5 ticks carry a single “Zeal Gateway” feeder, and MT4 ticks carry none). Over reference-covered trades, per (feed, symbol):</p>
+  <ul>
+    <li><b>Stale-TOB event</b> = a reference dislocation at the fill. <b>Success</b> = a stale-TOB event that also hit early.</li>
+    <li>Columns: executions, events, successes, impact USD, median feed age, median excess age over 300 ms, median |divergence|, distinct clients, rates, and concentration of events.</li>
+    <li><b><code>architecture_risk</code></b> = ≥ 10 events ∧ ≥ 3 clients ∧ success rate ≥ 50%. These conditions become <code>LA_FEED_ARCHITECTURE_RISK</code> and drive the <code>market_data_condition</code> gate.</li>
+  </ul>
+</section>
+
+<!-- 14 -->
+<section id="outputs">
+  <h2><span class="n">14</span>Outputs, tags and audit</h2>
+  <h3>Scan result (<code>artifacts/latency_scan.json</code>)</h3>
+  <p>Top level: <code>rows</code>, <code>n_trades</code>, <code>n_flagged_trades</code>, <code>base_flag_rate</code>, <code>tick_coverage</code>, <code>ms_fill_share</code>, curve summary, <code>mt4_ms_times</code>, <code>exclusions</code>, <code>spec</code> (scale, benchmark, distributions, replicated conditions), <code>reference</code> (clock, coverage, quantiles, fetch stats), <code>root_cause</code> (top 25), <code>near_misses</code>, <code>flagged_orders_all</code>, <code>engine_b</code>, <code>mode</code>, <code>new_alerts</code>, <code>kpis</code>, <code>generated_at</code>.</p>
+  <p>Each row holds the account, risk and confidence, band, verdict, profiles, gates, components (<code>c_*</code>), confidence parts (<code>conf_*</code>), curve metrics, reference shares and markouts, legacy axes, flagged order ids (up to 300), and the recommended MIN/MAX actions.</p>
+  <h3>Automation tags (<code>latency_tags.py</code>)</h3>
+  <p>Codes never change meaning; new codes are only ever added. An automation rule should read the categories in this order:</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Category</th><th>Cardinality</th><th>Codes</th></tr></thead>
+    <tbody>
+      <tr><td>VERDICT</td><td>exactly 1</td><td><code>LA_VERDICT_ESCALATE | RESTRICT | MONITOR | CLEAR</code></td></tr>
+      <tr><td>BAND</td><td>exactly 1</td><td><code>LA_BAND_CRITICAL | HIGH | MODERATE | EMERGING | NORMAL</code></td></tr>
+      <tr><td>CAP</td><td>0+</td><td><code>LA_CAP_LOW_CONFIDENCE, _REPLICATED, _MARKET_DATA_CONDITION, _EARLY_HIT_RATE, _EVENT_SUCCESS, _PROFIT_CONCENTRATION, _REALIZED_PNL</code></td></tr>
+      <tr><td>PROFILE</td><td>0+</td><td><code>LA_L1_…</code> to <code>LA_L10_…</code> (no L6)</td></tr>
+      <tr><td>CURVE</td><td>exactly 1</td><td><code>LA_CURVE_FAST_TRANSIENT | PERSISTENT | NEUTRAL | NO_TICKS</code></td></tr>
+      <tr><td>EVIDENCE</td><td>0+</td><td><code>REFERENCE_CONFIRMED</code> (≥ 50% confirmed), <code>STALE_QUOTES</code> (price-age component ≥ 0.5), <code>QUOTE_AGE_ONLY</code>, <code>DIRECTIONAL_FLOW</code> (≥ 5 directional trades)</td></tr>
+      <tr><td>DATA</td><td>0+</td><td><code>SECOND_PRECISION</code> (millisecond share &lt; 0.5), <code>LOW_TICK_COVERAGE</code> (&lt; 80%), <code>NO_REFERENCE</code></td></tr>
+      <tr><td>REVIEW</td><td>exactly 1</td><td><code>LA_REVIEW_PENDING | CONFIRMED | DISMISSED</code></td></tr>
+      <tr><td>FEED</td><td>per feed</td><td><code>LA_FEED_ARCHITECTURE_RISK, LA_FEED_STALE_TOB, LA_FEED_REPLICATED_MOMENT</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>Accounts missing from the tag feed are <code>LA_VERDICT_CLEAR</code>. <code>account_tags</code> asserts that every tag it emits exists in the catalog.</p>
+  <h3>SQLite tables (<code>app.db</code>)</h3>
+  <ul>
+    <li><code>latency_audit</code>: id, ts, account, verdict, risk, action, mode, operator, status (<code>auto | confirm | dismiss | clear</code>), note, tags. Tags exclude the REVIEW category, so a review doesn’t re-trigger an auto row.</li>
+    <li><code>latency_history</code>: one row per (day, account). Each live scan replaces the day’s rows, so the trend always reflects the latest scan.</li>
+    <li><code>latency_labels</code>: (day, account, label) accumulated by ML training.</li>
+  </ul>
+  <p><b>Operator override</b> (<code>decide</code>): <i>confirm</i> or <i>dismiss</i> requires a comment, and <i>clear</i> undoes a previous override. Overrides feed the Alert Accuracy KPI.</p>
+  <h3>Near misses</h3>
+  <p>Up to 15 accounts with at least 1 event that aren’t in the table, ranked by score × min(events ÷ 5, 1). Each lists what holds it back (the event minimum or the band) and its three weakest components by missing points.</p>
+</section>
+
+<!-- 15 -->
+<section id="legacy">
+  <h2><span class="n">15</span>Legacy fused score and ML detector</h2>
+  <p>These fields are still computed and shown for comparison, but <b>they don’t drive the verdict</b>: <code>risk</code> is <code>spec_score</code>.</p>
+  <div class="formula">legacy_risk = 100 × (0.30·stat_conf + 0.25·consistency + 0.20·persistence + 0.25·econ_axis)
+            × (1 + 0.35·ml + 0.20·behavioural + 0.10·stale_share + 0.05·event_share + 0.06·illiquid_share)</div>
+  <ul>
+    <li><b>consistency</b> = flagged ÷ trades. <b>persistence</b> = flagged days ÷ span of days. <b>econ_axis</b> = flagged PnL ÷ the p90 of flagged PnL (at least $100). <b>stat_conf</b> = the binomial Φ(z).</li>
+    <li><b>behavioural</b> = the strongest score among an account’s toxic_flow, persistent_edge, scalper and news_vol profiles, normalised by the p95.</li>
+    <li><b>ML detector</b> (<code>train_model</code>): LightGBM (400 trees, 63 leaves, balanced classes) on about 190 features. That is 17 tick-free trade-shape features plus the latest account-day corpus row (<code>ad_*</code>). Labels come from tick-covered accounts (≥ 20 covered trades): positive = ≥ 5 flags and ≥ $25 extracted; negative = ≤ 1 flag; accounts in between are left out. Labels accumulate daily in <code>latency_labels</code>. Evaluation uses 5-fold stratified out-of-fold predictions, with the threshold chosen to maximise min(precision, recall). Saved to <code>artifacts/latency_ml.txt</code> and <code>latency_ml_meta.json</code>.</li>
+    <li><b>ew</b>: the rule-models 5-day early-warning probability for the <code>latency_arbitrage</code> category.</li>
+  </ul>
+  <div class="note warn"><b>Model state (trained 15 Sep 2026 23:17).</b> AUC 0.967, but only 12 positives, 1 label day, precision 0.30 and recall 0.25 at threshold 0.05. It isn’t reliable yet, which is why it only feeds the legacy score.</div>
+</section>
+
+<!-- 16 -->
+<section id="ops">
+  <h2><span class="n">16</span>Operations</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Trigger</th><th>What runs</th></tr></thead>
+    <tbody>
+      <tr><td>App startup</td><td><code>_warm_latency</code> serves the disk cache, or builds a scan if none exists. It runs in the app process because the DuckDB tick store allows only one process.</td></tr>
+      <tr><td>Auto-rescan loop</td><td>Starts 90 s after boot and checks every 30 s. A scan starts when <code>auto_rescan_minutes</code> have passed since the last one <b>finished</b>, and never while one is running. The current setting is 20 min.</td></tr>
+      <tr><td>Midnight, London time</td><td>Rebuild the feature table, then a latency scan, other rule scans, prediction verification, <code>latency_arb.train_model()</code>, <code>train_all_rules</code> and a prediction snapshot.</td></tr>
+      <tr><td>Refresh button / <code>?refresh=1</code></td><td>Background rebuild with the current rules. Requests return <code>{"building": true}</code> and the tab polls.</td></tr>
+      <tr><td>Historical as-of</td><td>A past <code>as_of</code> date recomputes detection at that day’s end, cached in memory per day and rules key.</td></tr>
+      <tr><td>Scan with stale MT4 backfill (&gt; 6 h)</td><td>Detached <code>python -m webapp.mt4_kafka_backfill --release-lock</code>, guarded by a 3 h lock file and resumed from <code>manifest.json</code>. It uses a throwaway consumer group, so the app’s offsets are never touched.</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><b>Rules and caching.</b> The in-memory cache is keyed on every rule except the display-only ones (<code>complex_filter</code>, <code>shadow_mode</code>). Editing a detection rule marks the cached scan <code>rules_changed</code> until the next refresh. <code>save_rules</code> merges over the <i>effective</i> rules, so a partial post never resets thresholds.</li>
+    <li><b>Range and filter are display-only.</b> The table defaults to accounts active in the last 24 h, and <code>complex_filter</code> (a safe expression over row columns) narrows it further. Detection, audit and tags always use every row.</li>
+    <li><b>Duration.</b> The last scan took 965 s (about 16 min). The trade-load and markout stages dominate.</li>
+    <li><b>Files</b> under <code>webapp/artifacts/</code>: <code>latency_scan.json</code>, <code>latency_scan_progress.json</code>, <code>latency_markouts.json</code>, <code>latency_action_recs.json</code>, <code>latency_ml*.{txt,json}</code>, <code>reference_ticks/</code>, <code>mt4_event_times/</code>.</li>
+  </ul>
+</section>
+
+<!-- 17 -->
+<section id="config">
+  <h2><span class="n">17</span>Configuration reference</h2>
+  <p>Effective values from <code>latency_rules.json</code> (code defaults are in <code>DEFAULT_RULES</code>, <code>SPEC_DEFAULT_RULES</code> and <code>REFERENCE_DEFAULT_RULES</code>).</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Key</th><th>Value</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>window_days</code></td><td>7</td><td>Detection window</td></tr>
+      <tr><td><code>horizons_seconds</code></td><td>0.1, 0.2, 0.3, 0.5, 1, 5, 60</td><td>Markout horizons; the last is the persistence horizon</td></tr>
+      <tr><td><code>flag_markout_bps</code></td><td>0.75 / 1.0 / 1.25 / 1.5 / 1.9 / 2.0</td><td>Early thresholds per horizon</td></tr>
+      <tr><td><code>early_horizons_seconds</code></td><td>0.1–1</td><td>Early window for millisecond fills</td></tr>
+      <tr><td><code>fallback_early_horizons_seconds</code></td><td>1, 5</td><td>Early window for second-stamped fills</td></tr>
+      <tr><td><code>quote_throttle_ms</code> + <code>quote_age_tolerance_ms</code></td><td>200 + 100</td><td>Stale-quote cut-off</td></tr>
+      <tr><td><code>max_price_age_ms</code></td><td>60,000</td><td>Longer gaps are data holes</td></tr>
+      <tr><td><code>min_decay_pct</code></td><td>50</td><td>Required fade by 60 s</td></tr>
+      <tr><td><code>directional_markout_bps</code></td><td>3.0</td><td>Directional trade threshold</td></tr>
+      <tr><td><code>neutral_band_bps</code></td><td>0.5</td><td>Curve-profile neutral band</td></tr>
+      <tr><td><code>max_hold_seconds</code> / <code>min_trade_profit_usd</code></td><td>120 / 1.0</td><td>Fast / paid</td></tr>
+      <tr><td><code>min_flagged_trades</code></td><td>5</td><td>Table minimum and the “enough events” count</td></tr>
+      <tr><td><code>illiquid_spread_ratio</code></td><td>1.5</td><td>Illiquid entry</td></tr>
+      <tr><td><code>score_weights</code></td><td>see §09</td><td>Component weights</td></tr>
+      <tr><td><code>score_calibration</code></td><td>population, p99, min 20 trades</td><td>Full-marks calibration</td></tr>
+      <tr><td><code>score_floor</code> / <code>score_scale</code></td><td>see §09</td><td>Calibration bounds; <code>confidence_min_trades</code> = 50</td></tr>
+      <tr><td><code>min_confidence</code></td><td>40</td><td>Confidence gate</td></tr>
+      <tr><td><code>min_early_hit_rate_pct</code>, <code>min_event_success_rate_pct</code>, <code>min_profit_concentration_pct</code></td><td>0, 0, 0</td><td>Gates, not yet calibrated</td></tr>
+      <tr><td><code>excluded_symbols</code> / <code>excluded_account_groups</code></td><td>[] / []</td><td>s5.1 exclusions</td></tr>
+      <tr><td><code>profile_params</code></td><td>cluster 300 s / 3; replication 2 s / 3 accounts; symbol 0.80</td><td>L7, L8, L9</td></tr>
+      <tr><td><code>reference_feed_enabled</code></td><td>true</td><td>Enables the Vantage reference</td></tr>
+      <tr><td><code>reference_price_delay_ms</code></td><td>500</td><td>Lead window for L4</td></tr>
+      <tr><td><code>reference_divergence_bps</code> / <code>reference_lead_bps</code></td><td>1.0 / 1.0</td><td>Dislocation / lead-lag thresholds</td></tr>
+      <tr><td><code>reference_server_offsets_h</code></td><td>2, 3</td><td>Candidate server offsets</td></tr>
+      <tr><td><code>reference_max_pairs</code> / <code>reference_fetch_timeout_s</code></td><td>2000 / 1800</td><td>Fetch limits</td></tr>
+      <tr><td><code>architecture_min_events</code></td><td>10</td><td>Architecture-risk minimum</td></tr>
+      <tr><td><code>actions</code></td><td>see §09</td><td>Treatment per verdict</td></tr>
+      <tr><td><code>shadow_mode</code></td><td>true</td><td>Log decisions without executing them</td></tr>
+      <tr><td><code>complex_filter</code></td><td>(empty)</td><td>Display filter expression</td></tr>
+      <tr><td><code>auto_rescan_minutes</code></td><td>20</td><td>0 = manual only</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 18 -->
+<section id="api">
+  <h2><span class="n">18</span>API</h2>
+  <p>All routes require the Trading view.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Route</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /api/antifraud/latency?refresh=&amp;as_of=&amp;start=</code></td><td>Scan result (filtered for display), plus rule_meta, verification, rule_stats and autoscan state</td></tr>
+      <tr><td><code>GET | POST /api/antifraud/latency/rules</code></td><td>Read the effective rules / merge and save them</td></tr>
+      <tr><td><code>POST /api/antifraud/latency/decide</code></td><td><code>{account, decision: confirm|dismiss|clear, note}</code>; the operator is the signed-in user</td></tr>
+      <tr><td><code>POST /api/antifraud/latency/train</code></td><td>Background <code>rule_models.train_rule("latency_arbitrage")</code>, which also runs the tape detector’s <code>train_model</code></td></tr>
+      <tr><td><code>GET /api/antifraud/latency/tags?catalog_only=</code></td><td>Automation feed: catalog, per-account tags from the latest full scan, feed tags</td></tr>
+      <tr><td><code>GET /api/antifraud/latency/trade_markout?account=&amp;order=…</code></td><td>Evidence for one order: broker tape and reference at the seven horizons (cached 10 min)</td></tr>
+      <tr><td><code>GET /api/antifraud/latency/trend?days=</code></td><td>Daily counts per tier and extracted USD from <code>latency_history</code></td></tr>
+      <tr><td><code>GET /api/antifraud/latency/audit?limit=</code></td><td>Newest audit rows</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 19 -->
+<section id="state">
+  <h2><span class="n">19</span>Current state: last live scan</h2>
+  <p>From <code>latency_scan.json</code>, generated 16 Sep 2026 12:16 UTC, shadow mode.</p>
+  <div class="stats">
+    <div><span class="v">2,059,982</span><span class="k">trades scanned</span></div>
+    <div><span class="v">1,031</span><span class="k">latency events (0.05%)</span></div>
+    <div><span class="v">96.8%</span><span class="k">tick coverage</span></div>
+    <div><span class="v">98.5%</span><span class="k">millisecond fills</span></div>
+    <div><span class="v">930,941</span><span class="k">of 961,757 MT4 opens at ms</span></div>
+    <div><span class="v">100%</span><span class="k">reference coverage (87,041 qualifying)</span></div>
+    <div><span class="v">11</span><span class="k">accounts in table, all emerging / monitor</span></div>
+    <div><span class="v">44,312</span><span class="k">directional trades (1,731 accounts)</span></div>
+  </div>
+  <ul>
+    <li><b>Curve profiles</b>: 7,356 neutral, 1,511 persistent, 123 fast_transient, 640 no_ticks.</li>
+    <li><b>Reference clock</b>: +3 h on every day from 9 to 16 Sep, with residual deviation of 0.06–0.10 bps on XAUUSD. Reference age at the fill: p50 46 ms, p90 148 ms.</li>
+    <li><b>Population benchmark</b>: early markout −0.40 bps; early hit rate 10.8% (millisecond) and 25.9% (second); stale-quote share 3.8%.</li>
+    <li><b>Calibrated full marks</b> (p99 over 5,599 accounts): early markout 0.386 bps, hit-rate excess 0.277, price age 0.10 (capped), events 9.9, profit concentration 0.50 (capped).</li>
+    <li><b>Accounts with ≥ 5 events</b> (17): median score 34.3, median confidence 94.4, median reference-confirmed share 0%.</li>
+    <li><b>Root cause</b>: largest conditions are XAUUSD on mt4 (165 stale-TOB events, 122 clients, 7% success) and mt5_live01 (109, 56 clients, 10%). None reaches architecture risk.</li>
+    <li><b>KPIs vs the 27-Sep targets</b>: detection rate 72.7% (target 80); improvement vs baseline 0% (target 30); alert accuracy has no data because no overrides have been made yet (target 70).</li>
+  </ul>
+</section>
+
+<!-- 20 -->
+<section id="gaps">
+  <h2><span class="n">20</span>Known gaps and code notes</h2>
+  <h3>Spec coverage</h3>
+  <ul>
+    <li><b>L6</b> can’t be measured, and per-feed attribution isn’t possible: constituent feed IDs aren’t recorded. This needs data from infrastructure.</li>
+    <li><b>Gate minimums</b> for early hit rate, event success and profit concentration are still 0. Calibrate them from <code>spec_distributions</code>.</li>
+    <li><b>MT4 millisecond match rate</b>: now 96.8% of MT4 opens (930,941 of 961,757) with 26 backfill files. It is sensitive to Kafka retention (about 7–8 days) and backfill freshness.</li>
+    <li><b>Reference coverage</b> depends on the Vantage symbol list. Symbols without a match score 0 on the reference component, by design.</li>
+  </ul>
+  <h3>Code notes for maintainers</h3>
+  <ul>
+    <li><code>_independent_verify</code> (the old MySQL second-source check) is <b>no longer called</b>, because the Vantage reference replaced it. The <code>independent_check</code> rule it used is also unused.</li>
+    <li><code>tiers</code> (75/55/35) in the rules is <b>unused</b>: the verdict now comes from the spec bands (85/70/50/25). Editing it has no effect.</li>
+    <li>The <code>auto_rescan_minutes</code> comment says a scan takes 3–4 min. The last one took about 16.</li>
+    <li>The <code>automation_success</code> KPI is autos ÷ autos, so it always reads 100% once any auto row exists. It doesn’t measure execution success.</li>
+    <li>Within the scan, <code>confidence</code> is first the binomial statistic and is then overwritten by <code>spec_confidence/100</code>. The first value is kept as <code>stat_confidence</code>.</li>
+    <li>Near misses use a fixed 25 for “points short” rather than reading the band table.</li>
+    <li>The ML detector feeds only <code>legacy_risk</code>. With 12 positives it shouldn’t be promoted to the verdict yet.</li>
+  </ul>
+</section>
+
+<footer>Built from <code>latency_arb.py</code>, <code>latency_spec.py</code>, <code>latency_reference.py</code>, <code>latency_tags.py</code>, <code>mt4_kafka_backfill.py</code>, <code>trade_markout.py</code>, <code>main.py</code>, <code>latency_rules.json</code> and <code>artifacts/latency_scan.json</code> as of 16 Sep 2026. Companion documents: <i>Latency Arbitrage Engine – How It Works (Team Brief)</i> and <i>P1_Risk_Detection_Formal_Specification.docx</i>.</footer>
+</main>
+</div>

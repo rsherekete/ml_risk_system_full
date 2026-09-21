@@ -1,0 +1,37 @@
+{# Shared banner: says whether what you are looking at reflects the current
+   settings. Deliberately does NOT refit -- it offers the choice. #}
+{% if job.status == 'running' %}
+<div class="alert alert-info" id="job-banner">
+  <b>Training…</b> <span id="job-msg">{{ job.message }}</span>
+  <div style="height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden">
+    <div id="job-bar" style="height:100%;width:{{ (job.progress*100)|round(1) }}%;background:var(--accent);transition:width .4s"></div>
+  </div>
+</div>
+{% elif job.status == 'error' %}
+<div class="alert alert-error"><b>Training failed.</b> {{ job.message }}</div>
+{% elif stale and has_data %}
+<div class="alert alert-info">
+  <b>Settings changed.</b> These results were produced by the previous configuration and
+  remain valid for it. Press <b>Retrain</b> on the Model Performance tab to apply the new settings.
+</div>
+{% elif not has_data %}
+<div class="alert alert-info">
+  <b>No model artefact yet.</b> Go to <a href="/{{ view }}/performance">Model Performance</a> and press Retrain.
+</div>
+{% endif %}
+
+{% if job.status == 'running' %}
+<script>
+// Poll rather than reload: a refit can take minutes and reloading would throw
+// away whatever filter the user had set.
+(function () {
+  const tick = setInterval(async () => {
+    const r = await fetch('/api/{{ view }}/job');
+    const j = await r.json();
+    document.getElementById('job-msg').textContent = j.message;
+    document.getElementById('job-bar').style.width = (j.progress * 100).toFixed(1) + '%';
+    if (j.status === 'done' || j.status === 'error') { clearInterval(tick); location.reload(); }
+  }, 2000);
+})();
+</script>
+{% endif %}

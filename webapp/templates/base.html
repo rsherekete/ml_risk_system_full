@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}ZFX Risk Intelligence{% endblock %}</title>
+{# ?v= busts browser caches on redesigns -- without it the sidebar renders as
+   unstyled inline links on any browser holding the old stylesheet #}
+<link rel="stylesheet" href="/static/app.css?v=5">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="/static/ui.js?v=5"></script>
+</head>
+<body>
+
+{% if user %}
+<header class="masthead">
+  {# The BETA instance is deliberately plain: three sections, a name and a way
+     out. No hub, no view switch, no warehouse or data-source controls -- those
+     belong to the full instance. #}
+  <a class="brand" href="{{ beta_routes['latency'][0] if beta else '/hub' }}"
+     title="{{ 'Anti-Fraud Engine' if beta else 'Command hub' }}"
+     style="text-decoration:none;color:inherit">
+    <div class="brand-mark">Z</div>
+    <div>ZFX<small>{{ 'Anti-Fraud Engine' if beta else 'Risk Intelligence' }}</small></div>
+  </a>
+
+  <nav class="view-switch">
+    {% if beta %}
+      {% for key, label, blurb in beta_tabs %}
+      <a href="{{ beta_routes[key][0] }}" title="{{ blurb }}"
+         class="{{ 'on' if beta_active == key }}">{{ label }}</a>
+      {% endfor %}
+    {% else %}
+    <a href="/hub" class="{{ 'on' if view == 'hub' }}">Hub</a>
+    <a href="/executive" class="{{ 'on' if view == 'executive' }}">Executive</a>
+    {% if user.may_see('trading') %}
+      <a href="/trading/overview" class="{{ 'on' if view == 'trading' }}">Trading</a>
+    {% else %}<a class="locked" title="No permission">Trading</a>{% endif %}
+    {% if user.may_see('quant') %}
+      <a href="/quant/overview" class="{{ 'on' if view == 'quant' }}">Quant</a>
+    {% else %}<a class="locked" title="No permission">Quant</a>{% endif %}
+    {% if user.may_see('trading') %}
+      <a href="/replay" class="{{ 'on' if view == 'replay' }}">Replay</a>
+      <a href="/taf" class="{{ 'on' if view == 'taf' }}">TAF</a>
+    {% endif %}
+    {% endif %}
+  </nav>
+
+  <div class="masthead-right">
+    {% if beta %}
+    <span class="env-chip" title="First beta -- screening output, not a fraud determination"
+          style="border-color:rgba(255,176,32,.55);color:#ffb020">BETA</span>
+    <span class="who"><b>{{ user.username }}</b></span>
+    <a href="/logout" class="btn btn-sm">Sign out</a>
+    {% else %}
+    {# Kafka now points at the PRODUCTION clusters (Zeal / AE / ID). #}
+    <span class="env-chip" title="Kafka cluster environment"
+          style="border-color:rgba(46,230,168,.5);color:var(--pos)">PROD</span>
+    <span class="who">
+      <b>{{ user.username }}</b>
+      {% if user.is_admin %}<span class="pill">Admin</span>{% endif %}
+    </span>
+    <button class="btn btn-sm" onclick="askOpen()" title="Ask a question (Ctrl-K)"
+            style="display:inline-flex;align-items:center;gap:6px">
+      <span id="ask-btn-icon"></span>Ask
+    </button>
+    {% if user.is_admin %}<a href="/vantage" class="btn btn-sm" style="border-color:#22d3ee">Vantage</a>{% endif %}
+    {% if user.is_admin %}<a href="/admin" class="btn btn-sm">Admin</a>{% endif %}
+    <a href="/data" class="btn btn-sm">Warehouse</a>
+    <a href="/settings" class="btn btn-sm">Data source</a>
+    <a href="/logout" class="btn btn-sm">Sign out</a>
+    {% if tabs %}
+    <button class="btn btn-sm nav-burger" id="nav-burger" title="Toggle navigation"
+            onclick="toggleSidenav()">☰</button>
+    {% endif %}
+    {% endif %}
+  </div>
+</header>
+{% endif %}
+
+{# The beta has no sidenav: its three sections are the top nav. #}
+<div class="layout {{ 'with-nav' if user and tabs and not beta }}">
+  {% if user and tabs and not beta %}
+  <aside class="sidenav" id="sidenav">
+    <div class="sidenav-head">{{ view | title }}</div>
+    {% for key, label, blurb in tabs %}
+      <a href="/{{ view }}/{{ key }}" class="{{ 'on' if active == key }}">
+        <span class="nav-dot"></span>
+        <span class="nav-text">{{ label }}<small>{{ blurb }}</small></span>
+      </a>
+    {% endfor %}
+  </aside>
+  {% endif %}
+  <main class="{{ 'page' if user else '' }}">
+  {% block content %}{% endblock %}
+  </main>
+</div>
+
+<script>
+// Sidebar collapse: remembered per browser; the burger in the top right opens
+// and closes it, collapsing to nothing so the data gets the full width.
+function toggleSidenav() {
+  const collapsed = document.body.classList.toggle('nav-collapsed');
+  try { localStorage.setItem('zfx-nav-collapsed', collapsed ? '1' : '0'); } catch (e) {}
+}
+try {
+  if (localStorage.getItem('zfx-nav-collapsed') === '1')
+    document.body.classList.add('nav-collapsed');
+} catch (e) {}
+</script>
+
+<script>
+// Shared ECharts theme so every chart in the product reads as one system.
+window.zfxTheme = {
+  bg: 'transparent',
+  grid: { left: 58, right: 22, top: 26, bottom: 34 },
+  axis: {
+    axisLine:  { lineStyle: { color: '#1b2438' } },
+    axisLabel: { color: '#55637d', fontSize: 11, fontFamily: 'JetBrains Mono' },
+    splitLine: { lineStyle: { color: 'rgba(27,36,56,.5)' } }
+  },
+  tooltip: {
+    backgroundColor: 'rgba(10,14,24,.96)', borderColor: '#26324a',
+    textStyle: { color: '#e6edf7', fontSize: 12 }
+  },
+  colors: ['#22d3ee', '#2ee6a8', '#ffb020', '#7c8cff', '#ff4d6d']
+};
+window.zfxChart = function (el, option) {
+  if (!el) return null;
+  const chart = echarts.init(el, null, { renderer: 'canvas' });
+  chart.setOption(option);
+  window.addEventListener('resize', () => chart.resize());
+  return chart;
+};
+</script>
+{% if user %}
+{% include "_ask.html" %}
+<script>
+  // Populate the masthead icon once the icon set is defined.
+  document.getElementById('ask-btn-icon').innerHTML = ICONS.search;
+</script>
+{% include "_agent.html" %}
+{% endif %}
+{% block scripts %}{% endblock %}
+</body>
+</html>
